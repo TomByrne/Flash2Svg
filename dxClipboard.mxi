@@ -1,0 +1,34 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<macromedia-extension name="Document Relative Cut/Copy & Paste In Place" version=".1">
+	<author name="David Belais" />
+	<products>
+		<product name="Flash" version="10" primary="true" />
+	</products>
+	<ui-access>
+	<![CDATA[
+		Adds "DX - Copy in Place", "DX - Cut in Place", & "DX - Paste in Place" to the "Commands" menu in Flash.		
+	]]>
+	</ui-access>
+	<description>
+	<![CDATA[
+		These commands work just like "copy" or "cut" & "paste in place", except that they work relative to the document so that you can copy from one symbol and paste into another while retaining the position of the copied elements.
+	]]>
+	</description>
+	<license-agreement>
+	<![CDATA[GNU Public License: http://www.gnu.org/licenses/gpl.html]]>
+	</license-agreement>
+	<files>
+		<file source="init.jsfl" destination="$flash/Javascript/dx/" />
+		<file source="Array.jsfl" destination="$flash/Javascript/dx/" />
+		<file source="Clipboard.jsfl" destination="$flash/Javascript/dx/" />
+		<file source="Color.jsfl" destination="$flash/Javascript/dx/" />
+		<file source="Object.jsfl" destination="$flash/Javascript/dx/" />
+		<file source="Selection.jsfl" destination="$flash/Javascript/dx/" />
+		<file source="Shape.jsfl" destination="$flash/Javascript/dx/" />
+		<file source="String.jsfl" destination="$flash/Javascript/dx/" />
+		<file source="Timeline.jsfl" destination="$flash/Javascript/dx/" />
+		<file source="Commands/DX - Copy In Place.jsfl" destination="$flash/Commands/" />
+		<file source="Commands/DX - Cut In Place.jsfl" destination="$flash/Commands/" />
+		<file source="Commands/DX - Past In Place.jsfl" destination="$flash/Commands/" />
+	</files>
+</macromedia-extension>
