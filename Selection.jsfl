@@ -1,6 +1,39 @@
 ﻿(function(dx){
-	function Selection(){
-		dx.Array.apply(this,arguments);
+	function Selection(s){
+		if(!s || !(s instanceof Array)){s=[];}
+		var sel=[];
+		for(var i=0;i<s.length;i++){
+			var e;
+			if(s[i] instanceof Element){
+				switch(s[i].elementType){
+					case 'shape':
+					case 'shapeObj':	
+						sel.push(new dx.Shape(s[i]));
+						break;
+					case 'text':
+						sel.push(new dx.Text(s[i]));
+						break;
+					case 'instance':
+						switch(s[i].instanceType){
+							case 'symbol':
+								sel.push(new dx.SymbolInstance(s[i]));
+								break;
+							case 'bitmap':
+								sel.push(new dx.BitmapInstance(s[i]));
+								break;
+							default:
+								sel.push(new dx.Instance(s[i]));
+						}
+						break;
+					default:
+						sel.push(new dx.Element(s[i]));
+				}
+			}else if(s[i].$ &&  s[i].$ instanceof Element){
+				sel.push(s[i]);
+			}
+		}
+		Array.prototype.slice.call(this,sel);
+		dx.Array.apply(this,[sel]);
 		return this;
 	}
 	Selection.prototype={
@@ -9,27 +42,26 @@
 		getShapes:function(){
 			var sh=new this.type();
 			for(var e=0;e<this.length;e++){
-				if(this[e].constructor.name=='Shape'){
+				if(this[e].type==dx.Shape){
 					sh.push(this[e]);
+				}else if(this[e].$.constructor.name=='Shape'){
+					sh.push(new dx.Shape(this[e]));
 				}
 			}
-			this.shapes=sh;
 			return sh;
 		},
-		expand:function(sel){
-			var sel=sel?sel:this.clone();
+		expand:function(){
 			var expandedSel=new this.type();
-			for(var i=0;i<sel.length;i++){
-				expandedSel.push(sel[i]);
-				if(sel[i].constructor.name=="Shape" && sel[i].isGroup && ! sel[i].isDrawingObject){
-					var ex=this.expand(sel[i].members);
-					for(var e=0;e<ex.length;e++) ex.parent=sel[i];
-					expandedSel=expandedSel.concat(ex);
+			for(var i=0;i<this.length;i++){
+				expandedSel.push(this[i]);
+				if(this[i].type==dx.Shape && this[i].isGroup && ! this[i].isDrawingObject){
+					var members=new this.type(this[i].members);
+					expandedSel=expandedSel.concat(members.expand());
 				}			
 			}
 			return expandedSel;
 		},
-		breakApart:function(){
+		/*breakApart:function(){//not yet functional
 			for(var i=0;i<this.length;i++){
 				if(this[i].constructor.name=='SymbolInstance'){
 					var clr=new Color(this[i]);
@@ -75,7 +107,49 @@
 					dx.doc.breakApart();
 				}
 			}
-			
+		},
+		indexOf:function(element){
+			for(var i=0;i<this.length;i++){
+				if(
+					this[i]==element || (
+						this[i]['$'] && 
+						element['$'] && (
+							this[i]==element ||
+							this[i].$==element.$
+						)
+					) || (
+						this[i]['$'] && this[i].$==element
+					) || (
+						element['$'] && this[i]==element.$
+					)
+					
+				){
+					return i;
+				}
+			}
+			return -1;
+		},*/
+		byFrame:function(){//returns an Array of Selections by frame.
+			var frameElements=new dx.Selection();
+			var elements=new dx.Selection(this);
+			var byFrame=new dx.Array();
+			for(var i=0;i<elements.length;i++){
+				var caught=false;
+				for(var n=0;n<frameElements.length;n++){
+					if(frameElements[n].indexOf(elements[i])>-1){
+						byFrame[n].push(elements[i]);
+						caught=true;
+					}
+				}
+				if(!caught){
+					var f=elements[i].getFrame();
+					//if(f){
+						frameElements.push(f.elements);
+						byFrame.push(new dx.Selection([elements[i]]));
+					//}
+				}
+			}
+			return byFrame;
 		},
 		clone:function(rlist){
 			return dx.Object.prototype.clone.call(this,rlist);

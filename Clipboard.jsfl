@@ -1,6 +1,6 @@
 ﻿(function(dx){
 	function Clipboard(){
-		this.viewMatrix={};
+		this.viewMatrix=new dx.Object({a:1, b:0, c:0, d:1, tx:0, ty:0});
 		return this;
 	}
 	Clipboard.prototype={
@@ -11,8 +11,8 @@
 			this.libraryItem="";
 			this.viewMatrix=dx.doc.viewMatrix;
 			this.rectangle=dx.doc.getSelectionRect();
-			for(var i=0;i<sel.length;i++){ 
-				if(i>0 && sel[i].constructor.name=='Shape' && !(sel[i].isGroup || sel[i].isDrawingObject)){
+			for(var i=0;i<sel.length;i++){
+				if(i>0 && sel[i].type==dx.Shape && !(sel[i].isGroup || sel[i].isDrawingObject)){
 					dx.sel=[sel[i]];
 					fl.getDocumentDOM().union();
 					fl.getDocumentDOM().arrange('back');
@@ -49,19 +49,22 @@
 			var s=dx.sel;
 			var sel=new dx.Selection();
 			for(var i=0;i<s.length;i++){
-				if(s[i].constructor.name=='SymbolInstance' || !s[i].isGroup || s[i].isDrawingObject){
+				if(s[i].$.constructor.name=='SymbolInstance' || !s[i].isGroup || s[i].isDrawingObject){
 					var gmx=fl.Math.concatMatrix(s[i].matrix,this.viewMatrix);
 					var mx=fl.Math.concatMatrix(gmx,fl.Math.invertMatrix(dx.doc.viewMatrix));				
 					s[i].matrix=mx;
-				}else{
+				}else{			
 					sel.push(s[i]);
 				}
 			}
 			if(sel.length){
 				dx.sel=sel;
-				var mx=fl.Math.concatMatrix(this.viewMatrix,fl.Math.invertMatrix(dx.doc.viewMatrix));
+				var nx={a:1, b:0, c:0, d:1, tx:0, ty:0};
+				var vm=this.viewMatrix;
+				var im=fl.Math.invertMatrix(dx.doc.viewMatrix);
+				var mx=fl.Math.concatMatrix(im,vm);
 				dx.doc.transformSelection(mx.a,mx.b,mx.c,mx.d);
-				dx.doc.moveSelectionBy({x:mx.tx,y:mx.ty});
+				dx.doc.moveSelectionBy({x:-mx.tx,y:-mx.ty});
 				var sel=dx.sel;
 			}
 			dx.sel=s;

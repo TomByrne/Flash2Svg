@@ -5,6 +5,9 @@ String.prototype.trim=function(){
 String.prototype.dir=function(){
 	return(this.replace(/\/[^\/]*?$/g,""));
 };
+String.prototype.stripExtension=function(){
+	return(this.replace(/\.[^\.]*?$/g,""));
+};
 String.prototype.basename=function(){
 	var a=this.split("/");
 	return a.pop();
@@ -32,3 +35,8 @@ String.prototype.ccSplit=function(capitalize){//camelCasing >> [camel,casing]
 	}
 	return output;
 };
+String.prototype.camelCase=function(capitalize){
+	var a=new dx.Array(this.split(/[^A-Za-z\d_\$]/g));
+	a=a.remove('');
+	return a.ccJoin(capitalize);
+}

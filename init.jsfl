@@ -7,39 +7,6 @@ function DX(options){
 	return this;
 }
 DX.prototype={
-	get doc(){
-		return fl.getDocumentDOM();
-	},
-	get dir(){
-		return(fl.scriptURI.replace(/\/[^\/]*?$/g,""));
-	},
-	get timeline(){
-		return new dx.Timeline(dx.doc.getTimeline());
-	},
-	get frame(){
-		return dx.timeline.currentFrame;
-	},
-	get layer(){
-		return dx.timeline.currentLayer;
-	},
-	get lib(){
-		return(dx.doc.library);
-	},
-	get sel(){
-		return(new dx.Selection(dx.doc.selection));
-	},
-	set sel(s){
-		s=new dx.Array(s);
-		var removeSel=dx.sel.remove(s);
-		var addSel=s.remove(dx.sel);
-		for(i=0;i<removeSel.length;i++){removeSel[i].selected=false;}
-		for(i=0;i<addSel.length;i++){
-			if(addSel[i] instanceof Element){
-				addSel[i].selected=true;
-			}
-		}
-		return dx.sel;
-	},
 	extend:function(obj){
 		for(var n in obj){
 			this[n]=obj[n];
@@ -59,7 +26,53 @@ DX.prototype={
 			}
 		}
 		return this;
-	}
+	},
+	get doc(){
+		return fl.getDocumentDOM();
+	},
+	set doc(){},
+	get dir(){
+		return(fl.scriptURI.replace(/\/[^\/]*?$/g,""));
+	},
+	set dir(){},
+	get timeline(){
+		return new this.Timeline(this.doc.getTimeline());
+	},
+	set timeline(){},
+	get frame(){
+		return this.timeline.currentFrame;
+	},
+	set frame(){},
+	get layer(){
+		return this.timeline.currentLayer;
+	},
+	set layer(){},
+	get lib(){
+		return(this.doc.library);
+	},
+	set lib(){},
+	get sel(){
+		return(new this.Selection(this.doc.selection));
+	},
+	set sel(s){
+		s=new this.Selection(s);
+		var removeSel=this.sel.remove(s);
+		var addSel=s.remove(dx.sel);
+		for(i=0;i<removeSel.length;i++){removeSel[i].selected=false;}
+		for(i=0;i<addSel.length;i++){
+			addSel[i].selected=true;
+		}
+		return dx.sel;
+	},
+	get publishProfile(){
+		return new XML(this.doc.exportPublishProfileString());
+	},
+	set publishProfile(s){},
+	get includeHiddenLayers(){
+		return this.publishProfile.PublishFlashProperties.InvisibleLayer.valueOf()==1;
+	},
+	set exportHiddenLayer(s){},
+	
 };
 
 this.dx=new DX();
@@ -68,10 +81,24 @@ dx.load(
 		'String',
 		'Object',
 		'Array',
-		'Selection',
-		'Clipboard',
 		'Color',
-		'Timeline'
+		'HalfEdge',
+		'Point',
+		'Edge',
+		'Fill',
+		'Stroke',
+		'Contour',
+		'Element',
+		'Shape',
+		'Instance',
+		'SymbolInstance',
+		'BitmapInstance',
+		'Text',
+		'Frame',
+		'Layer',
+		'Timeline',
+		'Selection',
+		'Clipboard'
 	],
 	true
 );
