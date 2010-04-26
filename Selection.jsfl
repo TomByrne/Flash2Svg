@@ -43,25 +43,53 @@
 	Selection.prototype={
 		__proto__:dx.Array.prototype,
 		type:Selection,
-		getShapes:function(){
-			var sh=new this.type();
+		getElementsByType:function(type,matchObj){
+			var match=new dx.Object({});//isGroup,isDrawingObject,instanceType,etc.
+			match.extend(matchObj);
+			var sel=new this.type([],this.options);
 			for(var e=0;e<this.length;e++){
-				if(this[e].type==dx.Shape){
-					dx.Object.apply(this[e],this.options);
-					sh.push(this[e]);
-				}else if(this[e].$.constructor.name=='Shape'){
-					sh.push(new dx.Shape(this[e],this.options));
+				if(
+					this[e] instanceof type || 
+					(this[e].$ && this[e].$ instanceof type)
+				){
+					var m=true;
+					for(var attr in match){
+						if(
+							match[attr]!==null && 
+							match[attr]!==undefined &&
+							match[attr]!=this[e][attr]
+						){
+							m=false;
+							break;
+						}
+					}
+					if(m){
+						dx.Object.apply(this[e],this.options);
+						sel.push(this[e]);
+					}
 				}
 			}
-			return sh;
+			return sel;
 		},
-		expand:function(){
+		getShapes:function(){
+			return this.getElementsByType(Shape);
+		},
+		getGroups:function(){
+			return this.getElementsByType(Shape,{isGroup:true,isDrawingObject:false});
+		},
+		getSymbolInstances:function(){
+			return this.getElementsByType(SymbolInstance);
+		},
+		getBitmapInstances:function(){
+			return this.getElementsByType(Instance,{instanceType:'bitmap'});
+		},
+		expandGroups:function(){
 			var expandedSel=new this.type();
 			for(var i=0;i<this.length;i++){
 				expandedSel.push(this[i]);
 				if(this[i].type==dx.Shape && this[i].isGroup && ! this[i].isDrawingObject){
 					var members=new this.type(this[i].members,this.options);
-					expandedSel=expandedSel.concat(members.expand());
+					expandedSel.extend(members.expandGroups());
 				}			
 			}
 			return expandedSel;

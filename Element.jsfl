@@ -113,7 +113,7 @@
 			var layer=this.layer;
 			var frames=this.layer.frames;
 			for(var i=0;i<frames.length;i++){
-				if(frames[i].elements && frames[i].elements.expand().indexOf(this)>-1){
+				if(frames[i].elements && frames[i].elements.expandGroups().indexOf(this)>-1){
 					this.cache.frame=frames[i];
 					return(this.cache.frame);
 				}

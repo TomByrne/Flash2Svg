@@ -207,7 +207,7 @@
 			var elements=this.getElements({
 				frame:settings.frame,
 				includeHiddenLayers:settings.includeHiddenLayers
-			}).expand();
+			}).expandGroups();
 			var numCubicSegments=0;
 			for(var i=0;i<elements.length;i++){
 				if(elements[i] instanceof dx.Shape){

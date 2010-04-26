@@ -101,10 +101,10 @@
 				if(this.frames[i].elements.length!=l.frames[i].elements.length){
 					return false;
 				}
-				if(this.frames[i].elements.expand().length!=l.frames[i].elements.expand().length){
+				if(this.frames[i].elements.expandGroups().length!=l.frames[i].elements.expandGroups().length){
 					return false;
 				}
-				if(this.frames[i].elements.expand().getShapes().length!=l.frames[i].elements.expand().getShapes().length){
+				if(this.frames[i].elements.expandGroups().getShapes().length!=l.frames[i].elements.expandGroups().getShapes().length){
 					return false;
 				}
 			}
