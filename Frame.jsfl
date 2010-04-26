@@ -7,6 +7,23 @@
 		}else{
 			this.$=new Frame();
 		}
+		dx.Object.apply(this,[options]);
+		this.cache=new dx.Object({});
+		if(options && options.layer){
+			if(options.layer instanceof Layer){
+				this.cache.layer=new dx.Layer(options.layer,{timeline:options.timeline});
+			}else if(options.layer.$ && options.layer.$ instanceof Layer){
+				options.layer.timeline=options.timeline;
+				this.cache.layer=options.layer;
+			}
+		}
+		if(options && options.timeline){
+			if(options.timeline instanceof Timeline){
+				this.cache.timeline=new dx.Timeline(options.timeline);
+			}else if(options.timeline.$ && options.timeline.$ instanceof Timeline){
+				this.cache.timeline=options.timeline;
+			}
+		}
 		return this;
 	}
 	ExtensibleFrame.prototype={
@@ -29,16 +46,9 @@
 		get duration(){return this.$.duration;},
 		set duration(s){this.$.duration=s;},
 		get elements(){
-			var inputElements=this.$.elements;
-			var elements=new dx.Array();
-			for(var i=0;i<inputElements.length;i++){
-				if(inputElements[i] instanceof Shape){
-					elements.push(new dx.Shape(inputElements[i]));
-				}else if(inputElements[i] instanceof Element){
-					elements.push(new dx.Element(inputElements[i]));
-				}
-			}
-			return elements;
+			var options={};
+			if(this.timeline){options.timeline=this.timeline;}
+			return new dx.Selection(this.$.elements,options);
 		},
 		set elements(s){},
 		get hasCustomEase(){return this.$.hasCustomEase;},
@@ -80,9 +90,36 @@
 		set tweenInstanceName(s){this.$.tweenInstanceName=s;},
 		get useSingleEaseCurve(){return this.$.useSingleEaseCurve;},
 		set useSingleEaseCurve(s){this.$.useSingleEaseCurve=s;},
+		//
+		getTimeline:function(){
+			return;
+		},
+		//
+		get timeline(){
+			if(this.cache.timeline){
+				return this.cache.timeline;
+			}else{
+				return this.getTimeline();
+			}
+		},
+		set timeline(s){
+			if(this.cache){this.cache.timeline=new dx.Timeline(s);}
+		},
+		//
+		get layer(){
+			if(this.elements.length>0){return this.elements[0].layer;}
+			else if(this.cache.layer){return this.cache.layer;}
+		},
+		set layer(s){
+			this.cache.layer=s;
+		},
 		//methods
-		is:function(f){
-			return((f.$ && f.$==this.$)||(f==this.$));	
+		is:function(f,fast){
+			if(!f.$){f=new this.type(f);}
+			if(this.startFrame!=f.startFrame){return false;}
+			if(!this.layer.is(f.layer)){return false;}
+			if(!fast && !this.elements.is(f.elements)){return false;}
+			return true;	
 		}
 	}
 	dx.extend({Frame:ExtensibleFrame});

@@ -1,11 +1,12 @@
 (function(dx){
 	var ExtensibleArray=function(){
-		if(arguments.length==1 && arguments[0]!=undefined && arguments[0].constructor.name=='Array' || (arguments[0] instanceof Array))
+		if(arguments.length==1 && arguments[0] instanceof Array){
 			Array.prototype.splice.apply(this,[0,0].concat(Array.prototype.slice.call(arguments[0])));
-		else if(arguments.length>1)
+		}else if(arguments.length>1){
 			Array.prototype.splice.apply(this,[0,0].concat(Array.prototype.slice.call(arguments)));	
-		else
-			this.length=0;	
+		}else{
+			this.length=0;
+		}
 		return this;
 	}
 	ExtensibleArray.prototype={
@@ -23,20 +24,17 @@
 			return output;
 		},
 		extend:function(ilist){
-			if(ilist===undefined){
-				return this;
-			}else if(ilist.constructor.name!='Array'){
-				ilist=Array.prototype.slice.call(arguments);
+			for(var i=0;i<ilist.length;i++){
+				this.push(ilist[i]);
 			}
-			ilist=ilist.filter(function(element,index,array){
-					return(this.indexOf(element)<0);
-			},this);
-			if(ilist.length){return this.concat(ilist);}
-			else{return this;}
+			return this;
 		},
 		clear:function(nlist){
-			if(nlist) this.splice(0,this.length,nlist);
-			else this.splice(0,this.length);
+			if(nlist){
+				this.splice(0,this.length,nlist);
+			}else{
+				this.splice(0,this.length);
+			}
 			return this;
 		},
 		clone:function(rlist){
@@ -51,7 +49,7 @@
 			},this);
 		},
 		remove:function(rlist){
-			if(arguments.length==1 && arguments[0].constructor.name=='Array'){
+			if(arguments.length==1 && arguments[0] instanceof Array){
 				rlist=arguments[0];
 			}else{
 				rlist=Array.prototype.slice.call(arguments);

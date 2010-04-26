@@ -9,8 +9,9 @@
 		}
 		this.cache=new dx.Object({});
 		if(options && options.frame instanceof Frame){
-			this.cache.frame=new dx.Frame(options.frame);
+			this.cache.frame=new dx.Frame(options.frame,{timeline:options.timeline});
 		}else if(options && options.frame && options.frame.$ instanceof Frame){
+			options.frame.timeline=options.frame;
 			this.cache.frame=options.frame;	
 		}
 		return this;

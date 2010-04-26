@@ -25,25 +25,6 @@
 				if(this.color!=s.color){return false;}
 			}
 			return true;
-		},
-		getSVG:function(){
-			var color=new dx.Color(this.color);
-			var svg='';
-			//if(this.fill && this.fill!='noFill'){
-				
-			//}else{
-				svg+='stroke="'+color.hex+'" ';
-				svg+='stroke-opacity="'+(color.alpha/255.0)+'" ';
-			//}
-			svg+='stroke-width="'+this.thickness+'" ';
-			svg+='stroke-linecap="'+(this.capType=='none'?'round':this.capType)+'" ';
-			svg+='stroke-linejoin="'+this.joinType+'" ';
-			if(this.joinType=='miter'){svg+='stroke-miterlimit="'+this.miterLimit+'" ';}
-			
-			if(this.scaleType=='none'){
-				svg+='vector-effect="non-scaling-stroke" ';
-			}
-			return svg;
 		}
 
 	}

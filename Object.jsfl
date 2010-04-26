@@ -4,7 +4,9 @@
 		var args=Array.prototype.slice.call(arguments);
 		if(obj){
 			for(var i in obj){
-				this[i]=obj[i];
+				if(!obj.__lookupGetter__(i)){
+					this[i]=obj[i];
+				}
 			}
 		}
 		return this;

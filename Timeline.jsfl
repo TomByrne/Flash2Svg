@@ -80,7 +80,8 @@
 		getKeyframes:function(options){
 			var settings=new dx.Object({
 				includeHiddenLayers:dx.includeHiddenLayers,
-				selected:false
+				selected:false,
+				includeGuides:false
 			});
 			settings.extend(options);
 			var sel={};
@@ -100,16 +101,17 @@
 			for(var l=0;l<layers.length;l++){
 				if(
 					(!settings.selected || sel[String(l)]) &&
-					(layers[l].visible || settings.includeHiddenLayers)
+					(layers[l].visible || settings.includeHiddenLayers) && 
+					(layers[l].layerType!='guide' || settings.includeGuides)
 				){
 					var frames=layers[l].frames;
 					for(var f=0;f<frames.length;f++){
 						if(!settings.selected || sel[String(l)].indexOf(f)>-1){
 							if(
 								f==frames[f].startFrame || 
-								(selected && k.indexOf(frames[frames[f].startFrame])<0)
+								(settings.selected && k.indexOf(frames[frames[f].startFrame])<0)
 							){
-								k.push(new dx.Frame(frames[frames[f].startFrame]));
+								k.push(new dx.Frame(frames[frames[f].startFrame],{timeline:this}));
 							}
 						}
 					}
@@ -119,31 +121,48 @@
 		},
 		getElements:function(options){
 			var settings=new dx.Object({
+				includeGuides:false,
 				includeHiddenLayers:dx.includeHiddenLayers,
 				frame:null
 			});
 			settings.extend(options);
-			var e=new dx.Selection();
+			var e=new dx.Selection([],{timeline:this});
 			var frames=(
 				settings.frame?
-				this.getFrames({position:settings.frame,includeHiddenLayers:settings.includeHiddenLayers}):
-				this.getKeyframes({includeHiddenLayers:settings.includeHiddenLayers})
+				this.getFrames({position:settings.frame,includeHiddenLayers:settings.includeHiddenLayers,includeGuides:settings.includeGuides}):
+				this.getKeyframes({includeHiddenLayers:settings.includeHiddenLayers,includeGuides:settings.includeGuides})
 			);
+			frames=frames.reverse();
 			for(var k=0;k<frames.length;k++){
-				e=e.concat(frames[k].elements);
+				if(frames[k] instanceof Frame){
+					frames[k]=new dx.Frame(frames[k],{timeline:this});
+				}	
+				if(frames[k] && frames[k].$ && frames[k].$ instanceof Frame){
+					var fe=frames[k].elements;
+					for(var i=0;i<fe.length;i++){
+						fe[i].frame=frames[k];
+						fe[i].timeline=this;
+						fe[i].frame.timeline=this;
+					}
+					e.extend(fe);
+				}
 			}
 			return e;
 		},
 		getFrames:function(options){
 			var settings=new dx.Object({
 				position:null,
-				includeHiddenLayers:dx.includeHiddenLayers
+				includeHiddenLayers:dx.includeHiddenLayers,
+				includeGuides:false
 			});
 			settings.extend(options);
 			var f=new dx.Array();
 			var layers=this.layers;
 			for(var l=0;l<layers.length;l++){
-				if((layers[l].visible || settings.includeHiddenLayers)){
+				if(
+					(layers[l].visible || settings.includeHiddenLayers) && 
+					(layers[l].layerType!='guide' || settings.includeGuides)
+				){
 					if(settings.position!==null && layers[l].frameCount>settings.position){
 						f.push(layers[l].frames[settings.position]);	
 					}else{
@@ -151,7 +170,7 @@
 					}
 				}
 			}
-			return f;		
+			return f;	
 		},
 		//getter properties
 		get elements(){
@@ -168,56 +187,14 @@
 			return dx.Object.prototype.clone.call(this,rlist);
 		},
 		getSVG:function(options){
-			dx.sel.clear();
 			var settings=new dx.Object({
-				frame:this.currentFrame,
-				selected:false,
-				degree:2,
-				includeHiddenLayers:dx.includeHiddenLayers,
-				root:true,
-				profile:'basic',
-				version:'1.1',
-				x:'0',
- 				y:'0',
-				width:String(dx.doc.width),
-				height:String(dx.doc.height),
-				id:String(dx.doc.name.stripExtension().camelCase()),
-				matrix:dx.doc.viewMatrix//{a:1,b:0,c:0,d:1,tx:0,tx:0}
+				timeline:this
 			});
 			settings.extend(options);
-			var xmlString=(
-				'<svg version="'+settings.version+'" baseProfile="'+settings.profile+'" '+
-				'id="'+settings.id+'" '+
-				'xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" '+
-				'x="'+settings.x+'px" y="'+settings.y+'px" width="'+settings.width+'px" height="'+settings.height+'px" '+
-				'viewBox="'+settings.x+' '+settings.y+' '+settings.width+' '+settings.height+'" '+
-				'xml:space="preserve" >\n</svg>'
-			);
-			var xml=new XML(xmlString);
-			var elements;
-			if(settings.selected){
-				elements=dx.sel.byFrame().reverse();
-			}else{
-				elements=this.getElements({
-					frame:settings.frame,
-					includeHiddenLayers:settings.includeHiddenLayers
-				}).byFrame().reverse();
-			}
-			for(var i=0;i<elements.length;i++){
-				if(elements[i] && elements[i].length>0){
-					var layer=new XML('<g id="'+elements[i][0].layer.name.camelCase()+'" />');
-					for(var n=0;n<elements[i].length;n++){
-						if(elements[i][n].getSVG){
-							var element=elements[i][n].getSVG({degree:settings.degree,matrix:settings.matrix});
-							layer.appendChild(element);
-						}
-					}
-					xml.appendChild(layer);
-				}
-			}
-			var docString='<?xml version="1.0" encoding="utf-8"?>\n';
-			return docString+xml.toXMLString();
-		},
+			var svg=new dx.SVG(settings);
+			return String(svg);
+		}/*
+,
 		numCubicSegments:function(options){
 			var settings=new dx.Object({
 				frame:this.currentFrame,
@@ -247,6 +224,7 @@
 				return num;
 			}
 		}
+*/
 	}
 	dx.extend({Timeline:ExtensibleTimeline});
 })(dx);

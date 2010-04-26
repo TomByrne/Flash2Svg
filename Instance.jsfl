@@ -9,20 +9,26 @@
 		}
 		this.cache=new dx.Object({});
 		if(options && options.frame instanceof Frame){
-			this.cache.frame=new dx.Frame(options.frame);
+			this.cache.frame=new dx.Frame(options.frame,{timeline:options.timeline});
 		}else if(options && options.frame && options.frame.$ instanceof Frame){
+			optoins.frame.timeline=options.timeline;
 			this.cache.frame=options.frame;	
 		}
 		return this;
 	}
 	ExtensibleInstance.prototype={
 		__proto__:dx.Element.prototype,
-		$:Instance,
 		type:ExtensibleInstance,
+		//built in functions
 		get instanceType(){return this.$.instanceType;},
-		set instanceType(){},
+		set instanceType(s){this.$.instanceType=s;},
 		get libraryItem(){return this.$.libraryItem;},
-		set libraryItem(s){this.$.libraryItem=s;}
+		set libraryItem(s){this.$.libraryItem=s;},
+		//
+		get libraryItemObject(){
+			return this.libraryItem;
+		},
+		set libraryItemObject(s){},
 	}
 	dx.extend({Instance:ExtensibleInstance});
 })(dx);

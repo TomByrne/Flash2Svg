@@ -7,11 +7,21 @@
 		}else{
 			this.$=null;
 		}
-		this.cache=new dx.Object({});
-		if(options && options.frame instanceof Frame){
-			this.cache.frame=new dx.Frame(options.frame);
-		}else if(options && options.frame && options.frame.$ instanceof Frame){
-			this.cache.frame=options.frame;	
+		if(!this.cache){this.cache=new dx.Object({});}
+		if(options && options.frame){
+			if(options.frame instanceof Frame){
+				this.cache.frame=new dx.Frame(options.frame,{timeline:options.timeline});
+			}else if(options.frame.$ instanceof Frame){
+				options.frame.timeline=options.timeline;
+				this.cache.frame=options.frame;	
+			}
+		}
+		if(options && options.timeline){
+			if(options.timeline instanceof Timeline){
+				this.cache.timeline=new dx.Timeline(options.timeline);
+			}else if(options.timeline.$ && options.timeline.$ instanceof Timeline){
+				this.cache.timeline=options.timeline;
+			}
 		}
 		return this;
 	}
@@ -33,13 +43,17 @@
 		set elementType(s){this.$.elementType=s;},
 		get height(){return this.$.height;},
 		set height(s){this.$.height=s;},
-		get layer(){return new dx.Layer(this.$.layer);},
+		get layer(){
+			var options={};
+			if(this.timeline){options.timeline=this.timeline;}
+			return new dx.Layer(this.$.layer,options);
+		},
 		set layer(s){},
 		get left(){return this.$.left;},
 		set left(){},
 		get locked(){return this.$.locked;},
 		set locked(s){this.$.locked=s;},
-		get matrix(){return this.$.matrix;},
+		get matrix(){return new dx.Matrix(this.$.matrix);},
 		set matrix(s){this.$.matrix=s;},
 		get name(){return this.$.name;},
 		set name(s){this.$.name=s;},
@@ -63,33 +77,76 @@
 		set transformY(s){this.$.transformY=s;},
 		get width(){return this.$.width;},
 		set width(s){this.$.width=s;},
+		//
+		getTimeline:function(){
+			return;
+		},
+		//
+		get preTransform(){//untransformed width and height
+			if(!this.cache.preTransform){
+				var m=this.matrix;
+				this.matrix={a:1,b:0,c:0,d:1,tx:0,ty:0};
+				this.cache.preTransform=new dx.Object({
+					width:this.width,
+					height:this.height,
+					left:this.left,
+					top:this.top
+				});
+				this.matrix=m;
+			}
+			return this.cache.preTransform;
+		},
+		set dimensions(){},
 		get x(){return this.$.x;},
 		set x(s){this.$.x=s;},
 		get y(){return this.$.y;},
 		set y(s){this.$.y=s;},
+		get center(){
+			return new dx.Point({x:this.left+this.width/2,y:this.top+this.height/2});
+		},
+		set center(){},			
 		//methods
 		getFrame:function(){
-			if(this.$==null){return;}
+			if(this.$==null){
+				return;
+			}
 			var layer=this.layer;
 			var frames=this.layer.frames;
 			for(var i=0;i<frames.length;i++){
-				if(frames[i].elements && frames[i].elements.indexOf(this)>-1){
+				if(frames[i].elements && frames[i].elements.expand().indexOf(this)>-1){
 					this.cache.frame=frames[i];
 					return(this.cache.frame);
 				}
 			}
 		},
 		is:function(f){
-			return((f.$ && f.$==this.$)||(f==this.$));	
+			return false;	
 		},
 		get frame(){
-			if(this.cache.frame && this.cache.frame.$ instanceof Frame){
+			if(this.parent){
+				return this.parent.frame;
+			}else if(this.cache.frame && this.cache.frame.$ instanceof Frame){
 				return this.cache.frame;
 			}else{
 				return this.getFrame();
 			}
 		},
 		set frame(s){this.cache.frame=s;},
+		get timeline(){
+			if(this.cache.timeline){
+				return this.cache.timeline;
+			}else{
+				return this.getTimeline();
+			}
+		},
+		set timeline(s){
+			if(this.cache){
+				this.cache.timeline=new dx.Timeline(s);
+			}else{
+				this.cache=new dx.Object({});
+				this.cache.timeline=new dx.Timeline(s);
+			}
+		}
 	}
 	dx.extend({Element:ExtensibleElement});
 })(dx);
