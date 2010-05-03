@@ -50,7 +50,7 @@
 			var mx=new dx.Array();
 			for(var i=0;i<sel.length;i++){
 				var gmx=sel[i].matrix.concat(this.sourceMatrix);
-				mx.push(dx.viewMatrix.invert().concat(gmx));
+				mx.push(gmx.concat(dx.viewMatrix.invert()));
 			}
 			for(var i=0;i<sel.length;i++){
 				if(!(sel[i].isGroup && sel[i].parent)){
@@ -59,17 +59,6 @@
 					sel[i].matrix=mx[i];
 				}
 			}
-			/*if(sel.length){
-				var mx;
-				gmx=s[i].matrix.concat(this.sourceMatrix);
-				mx=dx.viewMatrix.invert().concat(gmx);
-				s[i].x=mx.tx;
-				s[i].y=mx.ty;
-				s[i].matrix=mx;
-				
-
-
-			}*/
 			dx.sel=originalSelection;
 		}
 	};

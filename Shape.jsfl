@@ -1,29 +1,12 @@
 (function(dx){
 	function ExtensibleShape(shape,options){
-		if(shape instanceof Shape){
-			this.$=shape;
-		}else if(shape && shape.$ && shape.$ instanceof Shape){
-			this.$=shape.$;
-		}else{
-			this.$=null;
-		}
-		this.parent=null;
-		dx.Object.apply(this,[options]);
-		if(!this.cache){this.cache=new dx.Object({});}
-		this.cache.cubicSegmentPoints=new dx.Array();
-		if(options && options.frame instanceof Frame){
-			this.cache.frame=new dx.Frame(options.frame,{timeline:options.timeline});
-		}else if(options && options.frame && options.frame.$ instanceof Frame){
-			options.frame.timeline=options.timeline;
-			this.cache.frame=options.frame;
-		}
+		dx.Element.apply(this,arguments);
+		this.cache.cubicSegmentPoints=this.cache.cubicSegmentPoints||new dx.Array();
 		return this;
 	}
 	ExtensibleShape.prototype={
 		__proto__:dx.Element.prototype,
-		$:Shape,
 		type:ExtensibleShape,
-		//built in methods
 		beginEdit:function(){return this.$.beginEdit();},
 		deleteEdge:function(index){return this.$.deleteEdge(index);},
 		endEdit:function(){return this.$.endEdit();},
@@ -43,7 +26,6 @@
 				return;
 			}
 		},
-		//built-in properties
 		get contours(){
 			if(!this.$){return;}
 			if(this.cache['contours']){return this.cache.contours;}
@@ -77,16 +59,9 @@
 				return edges;
 			}
 		},
-		set edges(){},
-		get center(){
-			if(this.isGroup){
-				return new dx.Point({x:this.matrix.tx,y:this.matrix.ty});
-			}else{
-				return new dx.Point({x:this.left+this.width/2,y:this.top+this.height/2});
-			}
-		},
+		set edges(){return;},
 		get isDrawingObject(){if(this.$){return this.$.isDrawingObject;}},
-		set isDrawingObject(){},
+		set isDrawingObject(){return;},
 		get isGroup(){if(this.$){return this.$.isGroup;}},set isGroup(){},
 		get isOvalObject(){return this.$.isOvalObject;},
 		set isOvalObject(){},
@@ -101,21 +76,29 @@
 				return members;
 			}
 		},
-		set members(){},
+		set members(s){return;},
 		get numCubicSegments(){if(this.$){return this.$.numCubicSegments;}},
 		set numCubicSegments(){},
 		get vertices(){if(this.$){return this.$.vertices;}},
-		set vertices(){},
-		//methods
-		is:function(sh){
-			if(!sh.$){sh=new this.type(sh);}
-			if(this.numCubicSegments!=sh.numCubicSegments){return false;}
-			if(!this.matrix.is(sh.matrix)){return false;}
-			if(this.isGroup!=sh.isGroup){return false;}
-			if(this.isGroup && !this.members.is(sh.members)){return false;}
-			if(this.isDrawingObject!=sh.isDrawingObject){return false;}
-			if(!this.contours.is(sh.contours)){return false;}
-			return true;
+		set vertices(s){return;},
+		get objectSpaceBounds(){
+			return new dx.Object(this.$.objectSpaceBounds);
+		},
+		set objectSpaceBounds(s){
+			this.$.objectSpaceBounds=s;
+		},
+		is:function(element,options){
+			var settings=new dx.Object({
+				checklist:[
+					'objectSpaceBounds',
+					'numCubicSegments',
+					'isGroup',
+					'isDrawingObject',
+					'contours'
+				]		
+			});
+			settings.extend(options,true);
+			return dx.Element.prototype.is.call(this,element,settings);
 		}
 	}
 	dx.extend({Shape:ExtensibleShape});

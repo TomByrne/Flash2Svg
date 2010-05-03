@@ -48,7 +48,7 @@
 		get elements(){
 			var options={};
 			if(this.timeline){options.timeline=this.timeline;}
-			return new dx.Selection(this.$.elements,options);
+			return(new dx.Selection(this.$.elements,options));
 		},
 		set elements(s){},
 		get hasCustomEase(){return this.$.hasCustomEase;},
@@ -114,11 +114,40 @@
 			this.cache.layer=s;
 		},
 		//methods
-		is:function(f,fast){
+		is:function(f,options){
+			var settings=new dx.Object({
+				fast:false,
+				stacked:false,
+				timeline:null,
+				duplicateEntriesPossible:false
+			});
+			settings.extend(options);
 			if(!f.$){f=new this.type(f);}
-			if(this.startFrame!=f.startFrame){return false;}
-			if(!this.layer.is(f.layer)){return false;}
-			if(!fast && !this.elements.is(f.elements)){return false;}
+			var checklist=new dx.Array([
+				'name','startFrame','actionScript','hasCustomEase','labelType',
+				'motionTweenOrientToPath','motionTweenRotate','motionTweenRotateTimes',
+				'motionTweenScale','motionTweenSnap','motionTweenSync','shapeTweenBlend',
+				'soundEffect','soundLoop','soundLoopMode','soundName','soundSync','tweenEasing',
+				'tweenInstanceName','tweenType','useSingleEaseCurve'
+			]);
+			if(!dx.Object.prototype.is.call(this,f,{checklist:checklist})){
+				return false;
+			}		
+			if(
+				!this.layer.is(
+					f.layer,
+					{
+							timeline:settings.timeline,
+							fast:settings.fast,
+							duplicateEntriesPossible:settings.duplicateEntriesPossible
+					}
+				)
+			){
+				return false;
+			}else if(settings.stacked){
+				return true;
+			}
+			if(!this.elements.is(f.elements)){return false;}
 			return true;	
 		}
 	}

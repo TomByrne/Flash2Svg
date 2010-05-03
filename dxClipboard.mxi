@@ -11,7 +11,7 @@
 	</ui-access>
 	<description>
 	<![CDATA[
-		These commands work just like "copy" or "cut" & "paste in place", except that they work relative to the document so that you can copy from one symbol and paste into another while retaining the position of the copied elements.
+		Works just like "copy" or "cut" + "paste in place", but relative to the root timeline in the current view. For use in copying elements from one timeline (symbol) in edit-in-place mode, in order to paste them into another.
 	]]>
 	</description>
 	<license-agreement>

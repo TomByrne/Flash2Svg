@@ -1,19 +1,6 @@
 (function(dx){
 	function ExtensibleSymbolInstance(instance,options){
-		if(instance instanceof SymbolInstance){
-			this.$=instance;
-		}else if(instance && instance.$ && instance.$ instanceof SymbolInstance){
-			this.$=instance.$;
-		}else{
-			this.$=null;
-		}
-		this.cache=new dx.Object({});
-		if(options && options.frame instanceof Frame){
-			this.cache.frame=new dx.Frame(options.frame,{timeline:options.timeline});
-		}else if(options && options.frame && options.frame.$ instanceof Frame){
-			options.frame.timeline=options.timeline;
-			this.cache.frame=options.frame;	
-		}
+		dx.Element.apply(this,arguments);
 		return this;
 	}
 	ExtensibleSymbolInstance.prototype={
@@ -66,19 +53,39 @@
 		set symbolType(s){this.$.symbolType=s;},
 		get tabIndex(){return this.$.tabIndex;},
 		set tabIndex(s){this.$.tabIndex=s;},
-		//built in methods
-		//
 		get timeline(){
-			return new dx.Timeline(this.libraryItem.timeline);
+			return(
+				(this.libraryItem.timeline instanceof dx.Timeline)?
+				this.libraryItem.timeline:
+				new dx.Timeline(this.libraryItem.timeline)
+			);
 		},
-		set timeline(s){},
-		is:function(instance){
-			return false;
+		set timeline(s){return;},
+		getNumCubicSegments:function(options){
+			return this.timeline.getNumCubicSegments(options);
 		},
-		get svg(){
-			return this.getSVG();
-		},
-		set svg(){}
+		getCurrentFrame:function(parentFrame){
+			parentFrame=parentFrame||0;
+			var frame=0;
+			var timeline=this.timeline;
+			if(this.firstFrame!==undefined){
+				var playPosition=parentFrame-this.frame.startFrame+this.firstFrame;
+				if(this.loop=='single frame'){
+					frame=this.firstFrame;
+				}else if(this.loop=='play once'){
+					frame=(
+						playPosition<timeline.frameCount?
+						playPosition:
+						timeline.frameCount-1
+					);
+				}else if(this.loop=='loop'){
+					frame=playPosition % timeline.frameCount;
+				}
+			}else{
+				frame=0;
+			}
+			return frame;
+		}
 	}
 	dx.extend({SymbolInstance:ExtensibleSymbolInstance});
 })(dx);

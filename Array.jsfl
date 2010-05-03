@@ -23,9 +23,9 @@
 			}
 			return output;
 		},
-		extend:function(ilist){
-			for(var i=0;i<ilist.length;i++){
-				this.push(ilist[i]);
+		extend:function(array,recursive){
+			for(var i=0;i<array.length;i++){
+				this.push(array[i]);
 			}
 			return this;
 		},
@@ -36,9 +36,6 @@
 				this.splice(0,this.length);
 			}
 			return this;
-		},
-		clone:function(rlist){
-			return dx.Object.prototype.clone.call(this,rlist);
 		},
 		intersect:function(ilist){
 			if(!ilist || ilist.constructor.name!='Array'){return new this.type();}

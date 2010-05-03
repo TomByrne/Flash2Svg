@@ -24,7 +24,7 @@
 		set color(s){this.$.color=s;},
 		get frameCount(){return this.$.frameCount;},
 		set frameCount(s){this.$.frameCount=s;},
-		get frames(){
+		getFrames:function(){
 			var inputFrames=this.$.frames;
 			var frames=new dx.Array();
 			var options={};
@@ -32,10 +32,15 @@
 			for(var i=0;i<inputFrames.length;i++){
 				frames.push(new dx.Frame(inputFrames[i],options));
 			}
+			this.cache.frames=frames;
 			return frames;
 		},
-		set frames(){},
-		get elements(){
+		get frames(){
+			if(this.cache.frames){return this.cache.frames;}
+			else{return this.getFrames();}
+		},
+		set frames(s){this.cache.frames=new dx.Array(frames[i].elements);},
+		getElements:function(){
 			var frames=this.frames;
 			var options={};
 			if(this.timeline){options.timeline=this.timeline;}
@@ -43,7 +48,15 @@
 			for(var i=0;i<frames.length;i++){
 				elements.extend(frames[i].elements,options);
 			}
+			this.cache.elements=elements;
 			return elements;
+		},
+		get elements(){
+			if(this.cache.elements){
+				return this.cache.elements;	
+			}else{
+				return this.getElements();
+			}
 		},
 		set elements(){},
 		get height(){return this.$.height;},
@@ -72,43 +85,85 @@
 		set index(s){return;},
 		//methods
 		getTimeline:function(){},
-		is:function(l,fast){
+		is:function(l,options){
+			var settings=new dx.Object({
+				timeline:null,
+				fast:false,
+				duplicateEntriesPossible:false
+			});
+			settings.extend(options);
 			if(!l.$){l=new this.type(f);}
-			if(l.frameCount!=this.frameCount){return false;}
-			if(l.layerType!=this.layerType){return false;}
-			if(l.locked!=this.locked){return false;}
-			if(l.name!=this.name){return false;}
-			if(l.visible!=this.visible){return false;}
-			if(l.color!=this.color){return false;}
-			var timeline=this.timeline;
-			var lTimeline=l.timeline;
-			if(timeline && lTimeline){
-				if(timeline.libraryItem && lTimeline.libraryItem){
-					if(timeline.libraryItem.name!=lTimeline.libraryItem.name){
-						return false;
-					}else{
-						return true;
-					}
-				}
-				if(timeline.frameCount!=lTimeline.frameCount){return false;}
-				if(timeline.layerCount!=lTimeline.layerCount){return false;}
-				if(timeline.name!=lTimeline.name){return false;}
-			}
-			if(this.frames.length!=l.frames.length){
+			var checklist=new dx.Array([
+				'name','frameCount','layerType','locked','visible','color','height','outline'
+			]);
+			if(!dx.Object.prototype.is.call(this,l,{checklist:checklist})){
 				return false;
 			}
-			for(var i=0;i<this.frames.length;i++){
-				if(this.frames[i].elements.length!=l.frames[i].elements.length){
-					return false;
+			if(settings.fast){return true;}
+			var layers=null;
+			if(settings.timeline && !settings.duplicateEntriesPossible){
+				layers=new dx.Array();
+				var tlayers=settings.timeline.layers;
+				for(i=0;i<tlayers.length;i++){
+					var layer=tlayers[i];
+					if(dx.Object.prototype.is.call(this,layer,{checklist:checklist})){
+						layers.push(layer);
+					}
 				}
-				if(this.frames[i].elements.expandGroups().length!=l.frames[i].elements.expandGroups().length){
-					return false;
-				}
-				if(this.frames[i].elements.expandGroups().getShapes().length!=l.frames[i].elements.expandGroups().getShapes().length){
-					return false;
+				if(layers.length<2){
+					return true;
 				}
 			}
-			if(!fast && !this.elements.is(l.elements)){return false;}
+			var frames=this.frames;
+			var lframes=l.frames;
+			if(frames.length!=lframes.length){return false;}
+			for(var i=0;i<frames.length;i++){
+				var e=frames[i].elements;
+				var le=lframes[i].elements;
+				if(e.length!=le.length){return false;}
+				var eeg=e.expandGroups();
+				var leeg=le.expandGroups();
+				if(eeg.length!=leeg.length){return false;}
+				if(eeg.getShapes().length!=leeg.getShapes().length){return false;}
+			}
+			fl.trace("isLayer overkill");
+			if(settings.timeline && !settings.duplicateEntriesPossible){
+				var mLayers=new dx.Array();
+				for(var n=0;n<layers.length;n++){
+					var nframes=layers[n].frames;
+					var matched=true;
+					for(var i=0;i<frames.length;i++){
+						var e=frames[i].elements;
+						var ne=nframes[i].elements;
+						if(e.length!=ne.length){matched=false;break;}
+						var eeg=e.expandGroups();
+						var neeg=ne.expandGroups();
+						if(eeg.length!=neeg.length){matched=false;break;}
+						if(eeg.getShapes().length!=neeg.getShapes().length){matched=false;break;}
+					}
+					if(matched){mLayers.push(layers[n]);}
+				}
+				if(mLayers.length<2){return true;}
+			}else{
+				var timeline=this.timeline;
+				var lTimeline=l.timeline;
+				if(timeline && lTimeline){
+					if(timeline.libraryItem && lTimeline.libraryItem){
+						if(timeline.libraryItem.name!=lTimeline.libraryItem.name){
+							return false;
+						}
+					}else{
+						if(
+							timeline.frameCount!=lTimeline.frameCount ||
+							timeline.layerCount!=lTimeline.layerCount ||
+							timeline.name!=lTimeline.name
+						){
+							return false;
+						}
+					}
+				}
+			}
+			if(!this.elements.is(l.elements)){return false;}
 			return true;
 		}	
 	}

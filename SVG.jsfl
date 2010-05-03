@@ -1,24 +1,29 @@
 (function(dx){
 	function SVG(options){
 		var settings=new dx.Object({
-			frame:dx.frame,
-			selection:null,
-			degree:2,
+			degree:2,// Quadratic (2) or Cubic (3)
+			masking:'alpha', //'alpha','clipping',or 'luminance'
+			timeline:null,
 			includeHiddenLayers:dx.includeHiddenLayers,
-			baseProfile:'basic',
-			version:'1.1',
+			includeGuides:false,
+			selection:null,
+			id:String(dx.doc.name.stripExtension().camelCase()),
 			x:0,y:0,
 			width:dx.doc.width,
 			height:dx.doc.height,
-			id:String(dx.doc.name.stripExtension().camelCase()),
-			timeline:null,
-			docString:'',
-			includeGuides:false,
-			masking:'alpha', //'alpha','clipping',or 'luminance'
-			enterEditMode:false,
-			docString:'<?xml version="1.0" encoding="utf-8"?>\n<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">\n'
+			docString:(
+				'<?xml version="1.0" encoding="utf-8"?>\n'+
+				'<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">\n'
+			),
+			log:undefined,// URI or dx.Log
+			frame:dx.frame,
+			baseProfile:'basic',
+			version:'1.1'
 		});
 		settings.extend(options);
+		if(typeof settings.log=='string'){fl.trace('go');
+			settings.log=new dx.Log({url:settings.log});
+		}
 		dx.Object.apply(this,[settings]);
 		this.library=new dx.Object({});
 		this.getSVG();
@@ -27,6 +32,39 @@
 	SVG.prototype={
 		__proto__:dx.Object,
 		type:SVG,
+		getSVG:function(){
+			if(this.log){var timer=this.log.startTimer('SVG.getSVG');}
+			var origSelection=dx.sel;
+			dx.doc.selectNone();
+			fl.showIdleMessage(false);
+			this.xml=new XML('<svg/>');
+			this.xml['@version']=this.version;
+			this.xml['@baseProfile']=this.baseProfile;
+			this.xml['@xmlns']="http://www.w3.org/2000/svg";
+			this.xml['@xmlns:xlink']="http://www.w3.org/1999/xlink";
+			this.xml['@x']=String(this.x)+'px';
+			this.xml['@y']=String(this.y)+'px';
+			this.xml['@width']=String(this.width)+'px';
+			this.xml['@height']=String(this.height)+'px';
+			this.xml['@viewBox']=String(this.x)+' '+String(this.y)+' '+String(this.width)+' '+String(this.height);
+			this.xml['@xml:space']='preserve';
+			this.xml.appendChild(new XML('<defs/>'));
+			var x=this.getTimeline(dx.timeline,{
+				matrix:dx.viewMatrix,
+				frame:dx.frame
+			});
+			if(dx.viewMatrix.is(new dx.Matrix())){
+				for each(var e in x.*){
+					this.xml.appendChild(e);
+				}
+			}else{
+				this.xml.appendChild(x);
+			}
+			fl.showIdleMessage(true);
+			if(this.log){this.log.stopTimer(timer);}
+			dx.sel=origSelection;
+			return this.xml;
+		},
 		getTimeline:function(timeline,options){
 			var settings=new dx.Object({
 				frame:0,
@@ -34,35 +72,25 @@
 				id:null,
 				matrix:null,
 				libraryItem:null,
-				color:null,
-				enterEditMode:this.enterEditMode
+				color:null
 			});
 			settings.extend(options);
+			if(this.log){
+				var timer=this.log.startTimer(
+					'SVG.getTimeline('+
+					((timeline && timeline.name)?timeline.name:'')+')'
+				);
+			}
 			if(settings.color){settings.color=new dx.Color(settings.color);}
-			var fast=true;
+			var fast=false;
 			if(!settings.selection){
 				settings.selection=timeline.getElements({
 					frame:settings.frame,
 					includeHiddenLayers:this.includeHiddenLayers,
 					includeGuides:this.includeGuides
 				});
-				var names=new dx.Array();
-				var layers=timeline.layers;
-				for(var i=0;i<layers.length;i++){
-					if(
-						(this.includeHiddenLayers || layers[i].visible) &&
-						(this.includeGuides || layers[i].layerType!='guide')
-					){//if there are 2 layers with the same name, perform more thorough matching
-						var n=layers[i].name;
-						if(names.indexOf(n)){
-							fast=false;
-							break;
-						}
-						names.push(n);
-					}
-				}
 			}
-			var selection=settings.selection.byFrame(fast);
+			var selection=settings.selection.byFrame({stacked:true});
 			var xml;
 			if(settings.libraryItem){
 				var id=settings.libraryItem.name.replace('/','_').camelCase();
@@ -124,9 +152,6 @@
 						var element=this.getElement(selection[i][n],{
 							colorTransform:colorX,
 							frame:settings.frame
-							//masking:this.masking,
-							//includeHiddenLayers:this.includeHiddenLayers,
-							//enterEditMode:this.enterEditMode
 						});
 						layerXML.appendChild(element);
 					}
@@ -147,10 +172,20 @@
 					if(layer.locked!=lLocked){layer.locked=lLocked;}
 				}
 			}
+			if(this.log){
+				this.log.stopTimer(timer);
+			}
 			return xml;
 		},
 		getElement:function(element,options){
 			if(element.$ instanceof Shape){
+/*
+				if(
+					this.isOvalObject && 
+				){
+					return this.getOvalObject(element,options);
+				}
+*/
 				return this.getShape(element,options);
 			}else if(element.$ instanceof Instance){
 				if(element.instanceType=='symbol'){return this.getSymbolInstance(element,options);}
@@ -159,7 +194,6 @@
 			
 		},
 		getSymbolInstance:function(instance,options){
-			//return;
 			var settings=new dx.Object({
 				frame:0,
 				matrix:new dx.Matrix(),
@@ -168,39 +202,8 @@
 			});
 			settings.extend(options);
 			settings.matrix=instance.matrix.concat(settings.matrix);
-			var timeline=instance.timeline;
-			if(instance.firstFrame!=undefined){
-				var currentFrame=settings.frame;
-				var playPosition=currentFrame-instance.frame.startFrame+instance.firstFrame;
-				if(instance.loop=='single frame'){
-					settings.frame=instance.firstFrame;
-				}else if(instance.loop=='play once'){
-					settings.frame=(
-						playPosition<timeline.frameCount?
-						playPosition:
-						timeline.frameCount-1
-					);
-				}else if(instance.loop=='loop'){
-					settings.frame=playPosition-(Math.floor(playPosition/timeline.frameCount)*playPosition);
-				}
-			}else{
-				settings.frame=0;
-			}
-			var layerLocked=instance.layer.locked;
-			if(settings.enterEditMode){
-				instance.layer.locked=false;
-				dx.sel=[instance];
-				while(dx.sel.length==0){
-					dx.doc.exitEditMode();
-					dx.sel=[instance];
-				}
-				dx.doc.enterEditMode("inPlace");
-			}
+			settings.frame=instance.getCurrentFrame(settings.frame);
 			var xml=this.getTimeline(timeline,settings);
-			if(settings.enterEditMode){
-				dx.doc.exitEditMode();
-				instance.layer.locked=layerLocked;
-			}
 			return xml;
 		},
 		getBitmapInstance:function(bitmapInstance,options){
@@ -217,41 +220,34 @@
 			var pathMatrix=null;
 			var layerLocked=shape.layer.locked;
 			if(shape.isDrawingObject){
-				matrix=shape.matrix.concat(settings.matrix);
-			}else if(shape.isGroup){
-				if(this.enterEditMode){
-					shape.layer.locked=false;
-					dx.sel=[shape];
-					while(dx.sel.length==0){
-						dx.doc.exitEditMode();
-						dx.sel=[shape];
-					}
-					dx.doc.enterEditMode("inPlace");
-				}
-				matrix=new dx.Matrix({
-					a:shape.matrix.a,
-					b:shape.matrix.b,
-					c:shape.matrix.c,
-					d:shape.matrix.d
-				});
-				var tr=shape.center;
-				var offset=tr.difference(tr.transform(matrix));
-				matrix=matrix.concat({
-					tx:offset.x,
-					ty:offset.y
-				});
-				descendantMatrix=matrix.invert();
 				matrix=matrix.concat(settings.matrix);
-
+			}else if(shape.isOvalObject || shape.isRectangleObject){
+				shape.setTransformationPoint({x:0.0,y:0.0});
+				matrix.tx=shape.left;
+				matrix.ty=shape.top;
+				matrix=matrix.concat(settings.matrix);
+				if(shape.objectSpaceBounds.left!=0 || shape.objectSpaceBounds.top!=0){
+					pathMatrix=new dx.Matrix({
+						tx:-shape.objectSpaceBounds.left,
+						ty:-shape.objectSpaceBounds.top}
+					);
+				}
+			}else if(shape.isGroup){
+				descendantMatrix=matrix.invert();
+				pathMatrix=new dx.Matrix({
+					tx:(shape.objectSpaceBounds.left+shape.objectSpaceBounds.right)/2.0,
+					ty:(shape.objectSpaceBounds.top+shape.objectSpaceBounds.bottom)/2.0
+				});
+				pathMatrix=pathMatrix.invert();
+				matrix=matrix.concat(settings.matrix);
 			}else{
-				matrix=fl.Math.concatMatrix(settings.matrix,{
-					a:shape.matrix.a,
-					b:shape.matrix.b,
-					c:shape.matrix.c,
-					d:shape.matrix.d,
-					tx:0,
-					ty:0
-				});	
+				matrix.tx=shape.left;
+				matrix.ty=shape.top;
+				matrix=matrix.concat(settings.matrix);
+				if(shape.objectSpaceBounds.left!=0 || shape.objectSpaceBounds.top!=0){
+					pathMatrix=new dx.Matrix({tx:shape.objectSpaceBounds.left,ty:shape.objectSpaceBounds.top});
+					pathMatrix=pathMatrix.invert();
+				}
 			}
 			var contours=shape.contours;
 			var svgArray=new dx.Array();
@@ -345,33 +341,8 @@
 						})
 					);
 				}
-				if(this.enterEditMode){
-					shape.layer.locked=layerLocked;
-					dx.doc.exitEditMode();
-				}
 			}
 			return svg;		
-		},
-		idExists:function(svgID){
-			for(id in this.xml..@id){
-				if(id==svgID){
-					return true
-				}
-			}
-			return false;
-		},
-		uniqueID:function(svgID){
-			if(this.idExists(svgID)){
-				if(/\_[\d]*?$/.test(svgID)){
-					return this.uniqueID(svgID.replace(/[\d]*?$/,String(Number(/[\d]*?$/.exec(svgID)[0])+1)));
-				}else{
-					return  this.uniqueID(svgID+"_1");
-				}
-			}
-			return svgID;
-		},
-		toString:function(){
-			return this.docString+'\n'+this.xml.toXMLString();
 		},
 		getCountour:function(contour,options){
 			var settings=new dx.Object({
@@ -639,6 +610,13 @@
 			}
 			return curveString;
 		},
+		getFill:function(fillObj,options){
+			var settings=new dx.Object({
+				
+			});
+			var fill='';
+			return fill;
+		},
 		getStroke:function(stroke,options){
 			var color=new dx.Color(stroke.color);
 			var svg='';
@@ -658,36 +636,26 @@
 			}
 			return svg;
 		},
-		getSVG:function(){
-			var origSelection=dx.sel;
-			dx.doc.selectNone();
-			fl.showIdleMessage(false);
-			this.xml=new XML('<svg/>');
-			this.xml['@version']=this.version;
-			this.xml['@baseProfile']=this.baseProfile;
-			this.xml['@xmlns']="http://www.w3.org/2000/svg";
-			this.xml['@xmlns:xlink']="http://www.w3.org/1999/xlink";
-			this.xml['@x']=String(this.x)+'px';
-			this.xml['@y']=String(this.y)+'px';
-			this.xml['@width']=String(this.width)+'px';
-			this.xml['@height']=String(this.height)+'px';
-			this.xml['@viewBox']=String(this.x)+' '+String(this.y)+' '+String(this.width)+' '+String(this.height);
-			this.xml['@xml:space']='preserve';
-			this.xml.appendChild('<defs/>');
-			var x=this.getTimeline(dx.timeline,{
-				matrix:dx.viewMatrix,
-				frame:dx.frame
-			});
-			if(dx.viewMatrix.is(new dx.Matrix())){
-				for each(var e in x.*){
-					this.xml.appendChild(e);
+		idExists:function(svgID){
+			for(id in this.xml..@id){
+				if(id==svgID){
+					return true
 				}
-			}else{
-				this.xml.appendChild(x);
 			}
-			fl.showIdleMessage(true);
-			dx.sel=origSelection;
-			return this.xml;
+			return false;
+		},
+		uniqueID:function(svgID){
+			if(this.idExists(svgID)){
+				if(/\_[\d]*?$/.test(svgID)){
+					return this.uniqueID(svgID.replace(/[\d]*?$/,String(Number(/[\d]*?$/.exec(svgID)[0])+1)));
+				}else{
+					return  this.uniqueID(svgID+"_1");
+				}
+			}
+			return svgID;
+		},
+		toString:function(){
+			return this.docString+'\n'+this.xml.toXMLString();
 		}
 	}
 	dx.extend({SVG:SVG});

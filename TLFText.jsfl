@@ -1,11 +1,11 @@
 (function(dx){
-	function ExtensibleText(text,options){
+	function ExtensibleTLFText(text,options){
 		dx.Element.apply(this,arguments);
 		return this;
 	}
 	ExtensibleText.prototype={
 		__proto__:dx.Element.prototype,
-		type:ExtensibleText
+		type:ExtensibleTLFText
 	}
-	dx.extend({Text:ExtensibleText});
+	dx.extend({TLFText:ExtensibleTLFText});
 })(dx);

@@ -1,42 +1,79 @@
 (function(dx){
 	function ExtensibleElement(element,options){
-		if(element instanceof Element){
-			this.$=element;
-		}else if(element && element.$ && element.$ instanceof Element){
-			this.$=element.$;
-		}else{
-			this.$=null;
-		}
-		if(!this.cache){this.cache=new dx.Object({});}
-		if(options && options.frame){
-			if(options.frame instanceof Frame){
-				this.cache.frame=new dx.Frame(options.frame,{timeline:options.timeline});
-			}else if(options.frame.$ instanceof Frame){
-				options.frame.timeline=options.timeline;
-				this.cache.frame=options.frame;	
+		var type=this.type;
+		var settings=new dx.Object({
+			$:(
+				(element instanceof Element)?
+				element:
+				(
+					(element instanceof type)?
+					element.$:
+					null
+				)
+			),
+			cache:new dx.Object({})
+		});
+		settings.extend(options);
+		if(options){
+			settings.cache=settings.cache||new dx.Object();
+			if(settings.frame){
+				if(settings.frame instanceof Frame){
+					settings.cache.frame=new dx.Frame(
+						settings.frame,
+						{
+							timeline:settings.timeline
+						}
+					);
+				}else if(settings.frame instanceof dx.Frame){
+					settings.cache.frame=settings.frame;
+					if(!settings.cache.frame.timeline ){
+						settings.cache.frame.timeline=settings.timeline;
+					}
+				}
+				delete settings.frame;
+			}
+			if(settings.timeline){
+				if(settings.timeline instanceof Timeline){
+					settings.cache.timeline=new dx.Timeline(settings.timeline);
+				}else if(settings.timeline instanceof dx.Timeline){
+					settings.cache.timeline=settings.timeline;
+				}
+				delete settings.timeline;
 			}
 		}
-		if(options && options.timeline){
-			if(options.timeline instanceof Timeline){
-				this.cache.timeline=new dx.Timeline(options.timeline);
-			}else if(options.timeline.$ && options.timeline.$ instanceof Timeline){
-				this.cache.timeline=options.timeline;
-			}
-		}
+		dx.Object.apply(this,[settings]);
 		return this;
 	}
 	ExtensibleElement.prototype={
 		__proto__:dx.Object.prototype,
-		$:Element,
 		type:ExtensibleElement,
-		//built in methods
 		getPersistentData:function(name){return this.$.getPersistentData(name);},
 		getTransformationPoint:function(){return this.$.getTransformationPoint();},
 		hasPersistentData:function(name){return this.$.hasPersistentData(name);},
 		removePersistentData:function(name){return this.$.removePersistentData(name);},
-		setPersistentData:function(name,type,value){return this.$.setPersistentData(name,type,value);},
+		setPersistentData:function(name,type,value){this.$.setPersistentData(name,type,value);},
+		uniqueDataName:function(name){
+			if(typeof(name)!='string'){return;}
+			if(this.hasPersistentData(name)){
+				if(/\_[\d]*?$/.test(name)){
+					return this.uniqueDataName(name.replace(/[\d]*?$/,String(Number(/[\d]*?$/.exec(name)[0])+1)));
+				}else{
+					return  this.uniqueDataName(name+"_1");
+				}
+			}
+			return name;
+		},
 		setTransformationPoint:function(transformationPoint){return this.$.setTransformationPoint(transformationPoint);},
-		//built-in properties
+		getFilters:function(){
+			var filters=new dx.Array(this.$.getFilters());
+			for(var i=0;i<filters.length;i++){
+				filters[i]=new dx.Object(filters[i]);	
+			}
+			return filters;
+		},
+		setFilters:function(s){this.$.setFilters(s);},
+		get filters(){return this.getFilters();},
+		set filters(s){this.setFilters(s);},
 		get depth(){return this.$.depth;},
 		set depth(s){this.$.depth=s;},
 		get elementType(){return this.$.elementType;},
@@ -50,7 +87,9 @@
 		},
 		set layer(s){},
 		get left(){return this.$.left;},
-		set left(){},
+		set left(left){this.x+=(left-this.left);},
+		get right(){return this.left+this.width;},
+		set right(right){this.x+=(right-this.right);},
 		get locked(){return this.$.locked;},
 		set locked(s){this.$.locked=s;},
 		get matrix(){return new dx.Matrix(this.$.matrix);},
@@ -70,33 +109,17 @@
 		get skewY(){return this.$.skewY;},
 		set skewY(s){this.$.skewY=s;},
 		get top(){return this.$.top;},
-		set top(){},
+		set top(top){this.y+=(top-this.top);},
+		get bottom(){return this.top+this.height;},
+		set bottom(bottom){this.y+=(bottom-this.bottom);},
 		get transformX(){return this.$.transformX;},
 		set transformX(s){this.$.transformX=s;},
 		get transformY(){return this.$.transformY;},
 		set transformY(s){this.$.transformY=s;},
 		get width(){return this.$.width;},
 		set width(s){this.$.width=s;},
-		//
-		getTimeline:function(){
-			return;
-		},
-		//
-		get preTransform(){//untransformed width and height
-			if(!this.cache.preTransform){
-				var m=this.matrix;
-				this.matrix={a:1,b:0,c:0,d:1,tx:0,ty:0};
-				this.cache.preTransform=new dx.Object({
-					width:this.width,
-					height:this.height,
-					left:this.left,
-					top:this.top
-				});
-				this.matrix=m;
-			}
-			return this.cache.preTransform;
-		},
-		set dimensions(){},
+		get transformationPoint(){return new dx.Point(this.$.transformationPoint);},
+		set transformationPoint(p){this.$.transformationPoint=p;},
 		get x(){return this.$.x;},
 		set x(s){this.$.x=s;},
 		get y(){return this.$.y;},
@@ -104,34 +127,40 @@
 		get center(){
 			return new dx.Point({x:this.left+this.width/2,y:this.top+this.height/2});
 		},
-		set center(){},			
-		//methods
-		getFrame:function(){
-			if(this.$==null){
-				return;
+		set center(point){
+			if(!point instanceof dx.Point){
+				point=new dx.Point(point);
 			}
+			var offset=p.difference(this.center);
+			this.x+=offset.x;
+			this.y+=offset.y;
+		},			
+		getFrame:function(){
 			var layer=this.layer;
 			var frames=this.layer.frames;
 			for(var i=0;i<frames.length;i++){
-				if(frames[i].elements && frames[i].elements.expandGroups().indexOf(this)>-1){
+				var e=frames[i].elements;
+				if(e && e.expandGroups().indexOf(this)>-1){
 					this.cache.frame=frames[i];
 					return(this.cache.frame);
 				}
 			}
 		},
-		is:function(f){
-			return false;	
-		},
 		get frame(){
-			if(this.parent){
+			if(this.parent instanceof dx.Shape){
 				return this.parent.frame;
-			}else if(this.cache.frame && this.cache.frame.$ instanceof Frame){
+			}else if(this.cache.frame instanceof dx.Frame){
 				return this.cache.frame;
 			}else{
 				return this.getFrame();
 			}
 		},
-		set frame(s){this.cache.frame=s;},
+		set frame(s){
+			this.cache.frame=s;
+		},
+		getTimeline:function(){
+			return;
+		},
 		get timeline(){
 			if(this.cache.timeline){
 				return this.cache.timeline;
@@ -140,13 +169,37 @@
 			}
 		},
 		set timeline(s){
-			if(this.cache){
-				this.cache.timeline=new dx.Timeline(s);
-			}else{
-				this.cache=new dx.Object({});
-				this.cache.timeline=new dx.Timeline(s);
+			this.cache.timeline=(s instanceof dx.Timeline)?s:new dx.Timeline(s);
+		},
+		is:function(element,options){
+			if(element.constructor==this.$.constructor){element=new this.type(element);}
+			if(!(element instanceof this.type)){return false;}
+			if(!(this instanceof dx.Shape)){
+				var id=this.uniqueDataName(String('temporaryID_'+String(Math.floor(Math.random()*9999))));
+				var pd=Math.floor(Math.random()*99999999);
+				this.setPersistentData(id,'integer',pd);
+				var matched=false;
+				if(element.hasPersistentData(id)&&element.getPersistentData(id)==pd){
+					matched=true;
+				}
+				this.removePersistentData(id);
+				return matched;
 			}
-		}
+			var settings=new dx.Object({
+				checklist:[
+					'matrix',
+					'width',
+					'height',
+					'name',
+					'locked',
+					'transformationPoint',
+					'selected',
+					'filters'
+				]		
+			});
+			settings.extend(options,true);
+			return dx.Object.prototype.is.call(this,element,settings);
+		}		
 	}
 	dx.extend({Element:ExtensibleElement});
 })(dx);

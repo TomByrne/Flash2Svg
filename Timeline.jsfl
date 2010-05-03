@@ -117,18 +117,18 @@
 					}
 				}
 			}
-			return k;	
+			return k;
 		},
 		getElements:function(options){
 			var settings=new dx.Object({
-				includeGuides:false,
+				includeGuides:undefined,
 				includeHiddenLayers:dx.includeHiddenLayers,
-				frame:null
+				frame:undefined
 			});
 			settings.extend(options);
 			var e=new dx.Selection([],{timeline:this});
 			var frames=(
-				settings.frame?
+				settings.frame!==undefined?
 				this.getFrames({position:settings.frame,includeHiddenLayers:settings.includeHiddenLayers,includeGuides:settings.includeGuides}):
 				this.getKeyframes({includeHiddenLayers:settings.includeHiddenLayers,includeGuides:settings.includeGuides})
 			);
@@ -183,48 +183,34 @@
 		get keyframes(){
 			return this.getKeyframes({selected:false});
 		},
-		clone:function(rlist){
-			return dx.Object.prototype.clone.call(this,rlist);
-		},
-		getSVG:function(options){
+		getNumCubicSegments:function(options){
 			var settings=new dx.Object({
-				timeline:this
-			});
-			settings.extend(options);
-			var svg=new dx.SVG(settings);
-			return String(svg);
-		}/*
-,
-		numCubicSegments:function(options){
-			var settings=new dx.Object({
-				frame:this.currentFrame,
+				includeGuides:undefined,
 				includeHiddenLayers:dx.includeHiddenLayers,
+				frame:undefined
 			});
 			settings.extend(options);
-			if(settings.frame && this.cache.numCubicSegments.length>settings.frame){
+			if(settings.frame && this.cache.numCubicSegments[settings.frame]){
 				return this.cache.numCubicSegments[settings.frame];
 			}
-			var elements=this.getElements({
-				frame:settings.frame,
-				includeHiddenLayers:settings.includeHiddenLayers
-			}).expandGroups();
+			var elements=this.getElements(options).expandGroups();
 			var numCubicSegments=0;
 			for(var i=0;i<elements.length;i++){
-				if(elements[i] instanceof dx.Shape){
-					var ncs=elements[i].numCubicSegments();
-					numCubicSegments+=ncs||0;
-				}//else if(elements[i] instanceof dx.SymbolInstance){
-				//	numCubicSegments+=
-				//}
+				if(elements[i] instanceof dx.SymbolInstance){
+					numCubicSegments+=elements[i].getNumCubicSegments({
+						includeGuides:settings.includeGuides,
+						includeHiddenLayers:settings.includeHiddenLayers,
+						frame:elements[i].getCurrentFrame(settings.frame)
+					})||0;
+				}else{
+					numCubicSegments+=elements[i].numCubicSegments||0;
+				}
 			}
 			if(settings.frame){
-				this.cache.numCubicSegments[settings.frame]=num;
-				return num;
-			}else{
-				return num;
+				this.cache.numCubicSegments[settings.frame]=numCubicSegments;
 			}
+			return numCubicSegments;
 		}
-*/
 	}
 	dx.extend({Timeline:ExtensibleTimeline});
 })(dx);

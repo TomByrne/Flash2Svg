@@ -6,8 +6,8 @@
  
 (function(dom){
 	function DX(options){
+		this._modules=[];
 		for(var o in options){this[o]=options[o];}
-		this.modules=[];
 		return this;
 	}
 	DX.prototype={
@@ -17,10 +17,10 @@
 			}
 		},
 		load:function(mods,force){
-			if(force){this.modules=[];}
+			if(force){this._modules=[];}
 			if(mods && mods.length){
 				for(i=0;i<mods.length;i++){
-					if(force || this.modules.indexOf[mods[i]]<0){
+					if(force || this._modules.indexOf[mods[i]]<0){
 						var file=this.dir+"/"+mods[i]+".jsfl";
 						if(file!=fl.scriptURI && FLfile.exists(file)){
 							fl.runScript(file);
@@ -89,6 +89,8 @@
 			return this.publishProfile.PublishFlashProperties.InvisibleLayer.valueOf()==1;
 		},
 		set exportHiddenLayer(s){},
+		get modules(){return this._modules;},
+		set modules(m){this.load(m);}
 	};
 	dom.dx=new DX();
 })(this)
@@ -111,12 +113,14 @@ dx.load(
 		'SymbolInstance',
 		'BitmapInstance',
 		'Text',
+		'TLFText',
 		'Frame',
 		'Layer',
 		'Timeline',
 		'Selection',
 		'Clipboard',
-		'SVG'
+		'SVG',
+		'Log'
 	],
 	true
 );

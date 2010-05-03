@@ -1,19 +1,6 @@
 (function(dx){
 	function ExtensibleInstance(instance,options){
-		if(instance instanceof Instance){
-			this.$=instance;
-		}else if(instance && instance.$ && instance.$ instanceof Instance){
-			this.$=instance.$;
-		}else{
-			this.$=null;
-		}
-		this.cache=new dx.Object({});
-		if(options && options.frame instanceof Frame){
-			this.cache.frame=new dx.Frame(options.frame,{timeline:options.timeline});
-		}else if(options && options.frame && options.frame.$ instanceof Frame){
-			optoins.frame.timeline=options.timeline;
-			this.cache.frame=options.frame;	
-		}
+		dx.Element.apply(this,arguments);
 		return this;
 	}
 	ExtensibleInstance.prototype={
@@ -23,12 +10,7 @@
 		get instanceType(){return this.$.instanceType;},
 		set instanceType(s){this.$.instanceType=s;},
 		get libraryItem(){return this.$.libraryItem;},
-		set libraryItem(s){this.$.libraryItem=s;},
-		//
-		get libraryItemObject(){
-			return this.libraryItem;
-		},
-		set libraryItemObject(s){},
+		set libraryItem(s){this.$.libraryItem=s;}
 	}
 	dx.extend({Instance:ExtensibleInstance});
 })(dx);
