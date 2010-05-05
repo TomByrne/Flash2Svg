@@ -3,7 +3,7 @@
 		dx.Shape.apply(this,arguments);
 		return this;
 	}
-	ExtensibleShape.prototype={
+	ExtensibleRectangleObject.prototype={
 		__proto__:dx.Shape.prototype,
 		type:ExtensibleRectangleObject,
 		get topLeftRadius(){return this.$.topLeftRadius;},

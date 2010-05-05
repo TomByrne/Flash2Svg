@@ -1,12 +1,12 @@
 (function(dx){
 	function ExtensibleMatrix(matrix){
-		this.a=1;
-		this.b=0;
-		this.c=0;
-		this.d=1;
-		this.tx=0;
-		this.ty=0;
-		dx.Object.apply(this,[matrix]);
+		matrix=matrix||{};
+		this.a=matrix.a||1;
+		this.b=matrix.b||0;
+		this.c=matrix.c||0;
+		this.d=matrix.d||1;
+		this.tx=matrix.tx||0;
+		this.ty=matrix.ty||0;
 		return this;
 	}
 	ExtensibleMatrix.prototype={
@@ -14,6 +14,7 @@
 		type:ExtensibleMatrix,
 		is:function(m){
 			return(
+				m &&
 				m.a==this.a &&
 				m.b==this.b &&
 				m.c==this.c &&

@@ -126,7 +126,6 @@
 				if(eeg.length!=leeg.length){return false;}
 				if(eeg.getShapes().length!=leeg.getShapes().length){return false;}
 			}
-			fl.trace("isLayer overkill");
 			if(settings.timeline && !settings.duplicateEntriesPossible){
 				var mLayers=new dx.Array();
 				for(var n=0;n<layers.length;n++){

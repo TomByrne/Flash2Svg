@@ -1,11 +1,15 @@
 (function(dx){
 	function Log(options){
 		var settings=new dx.Object({
-			url:dx.doc.pathURI.stripExtension()+"_log.csv",
+			url:(
+				dx.doc.pathURI?
+				dx.doc.pathURI.stripExtension()+"_log.csv":
+				null
+			),
 			append:true
 		});
 		settings.extend(options);
-		if(!settings.append){
+		if(settings.url && !settings.append){
 			FLfile.write(settings.url,'');
 		}
 		delete settings.append;

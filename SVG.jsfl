@@ -3,10 +3,12 @@
 		var settings=new dx.Object({
 			degree:2,// Quadratic (2) or Cubic (3)
 			masking:'alpha', //'alpha','clipping',or 'luminance'
-			timeline:null,
+			timeline:dx.timeline,
+			frame:dx.frame,
 			includeHiddenLayers:dx.includeHiddenLayers,
 			includeGuides:false,
 			selection:null,
+			matrix:dx.viewMatrix,
 			id:String(dx.doc.name.stripExtension().camelCase()),
 			x:0,y:0,
 			width:dx.doc.width,
@@ -18,14 +20,21 @@
 			log:undefined,// URI or dx.Log
 			frame:dx.frame,
 			baseProfile:'basic',
-			version:'1.1'
+			version:'1.1',
+			defaultMatrixString:'matrix(1 0 0 1 0 0)',
+			flatten:true
 		});
 		settings.extend(options);
-		if(typeof settings.log=='string'){fl.trace('go');
+		if(typeof(settings.log)=='string'){
 			settings.log=new dx.Log({url:settings.log});
+			if(!settings.log.url){
+				settings.log=null;
+			}
 		}
 		dx.Object.apply(this,[settings]);
-		this.library=new dx.Object({});
+		this.symbols=new dx.Array([]);
+		this.ids=new dx.Array([]);
+		this.tempFolder='';
 		this.getSVG();
 		return this;
 	}
@@ -37,11 +46,9 @@
 			var origSelection=dx.sel;
 			dx.doc.selectNone();
 			fl.showIdleMessage(false);
-			this.xml=new XML('<svg/>');
+			this.xml=new XML('<svg xmlns:xlink="http://www.w3.org/1999/xlink"/>');
 			this.xml['@version']=this.version;
 			this.xml['@baseProfile']=this.baseProfile;
-			this.xml['@xmlns']="http://www.w3.org/2000/svg";
-			this.xml['@xmlns:xlink']="http://www.w3.org/1999/xlink";
 			this.xml['@x']=String(this.x)+'px';
 			this.xml['@y']=String(this.y)+'px';
 			this.xml['@width']=String(this.width)+'px';
@@ -49,17 +56,23 @@
 			this.xml['@viewBox']=String(this.x)+' '+String(this.y)+' '+String(this.width)+' '+String(this.height);
 			this.xml['@xml:space']='preserve';
 			this.xml.appendChild(new XML('<defs/>'));
-			var x=this.getTimeline(dx.timeline,{
-				matrix:dx.viewMatrix,
-				frame:dx.frame
+			var x=this.getTimeline(this.timeline,{
+				matrix:this.matrix,
+				frame:this.frame,
+				selection:this.selection
 			});
-			if(dx.viewMatrix.is(new dx.Matrix())){
+			if(this.matrix.is(new dx.Matrix())){
 				for each(var e in x.*){
 					this.xml.appendChild(e);
 				}
 			}else{
 				this.xml.appendChild(x);
 			}
+			if(this.flatten){
+				this.expandUse(this.xml);
+				delete this.xml.defs.symbol;
+			}
+			this.xml['@xmlns']="http://www.w3.org/2000/svg";
 			fl.showIdleMessage(true);
 			if(this.log){this.log.stopTimer(timer);}
 			dx.sel=origSelection;
@@ -70,7 +83,7 @@
 				frame:0,
 				selection:null,
 				id:null,
-				matrix:null,
+				matrix:new dx.Matrix(),
 				libraryItem:null,
 				color:null
 			});
@@ -92,6 +105,16 @@
 			}
 			var selection=settings.selection.byFrame({stacked:true});
 			var xml;
+			var instanceXML;
+			var boundingBox;
+			var transformString=(
+				'matrix('+settings.matrix.a+' '+
+				settings.matrix.b+' '+
+				settings.matrix.c+' '+
+				settings.matrix.d+' '+
+				settings.matrix.tx+' '+
+				settings.matrix.ty+')'
+			);
 			if(settings.libraryItem){
 				var id=settings.libraryItem.name.replace('/','_').camelCase();
 				if(settings.frame!=0){
@@ -100,25 +123,35 @@
 				if(settings.color){
 					id+='_'+settings.color.idString;
 				}
-				if(this.idExists(id)){
-					xml=new XML('<use xlink:href="#'+id+'"/>');
-					selection.clear();
-				}else{
-					xml=new XML('<g/>');
+				id=this.uniqueID(id);
+				xml=new XML('<use xlink-href="#'+id+'"/>');
+				if(this.symbols.indexOf(id)<0){
+					instanceXML=xml;
+					instanceXML['@width']=0;
+					instanceXML['@height']=0;
+					instanceXML['@x']=0;
+					instanceXML['@y']=0;
+					instanceXML['@transform']=transformString;
+					instanceXML['@overflow']="visible";
+					this.symbols.push(id);
+					xml=new XML('<symbol/>');
 					xml['@id']=id;
+					boundingBox=new dx.Object({left:0,top:0,right:0,bottom:0});
+				}else{
+					var vb=String(this.xml.defs.symbol.(@id==id)[0]['@viewBox']).split(' ');
+					xml['@width']=vb[2];
+					xml['@height']=vb[3];
+					xml['@x']=vb[0];
+					xml['@y']=vb[1];
+					xml['@transform']=transformString;
+					xml['@overflow']="visible";
+					selection.clear();
 				}
 			}else{
 				xml=new XML('<g/>');
-			}
-			if(settings.matrix && !settings.matrix.is(new dx.Matrix())){
-				xml['@transform']=(
-					'matrix('+settings.matrix.a+' '+
-					settings.matrix.b+' '+
-					settings.matrix.c+' '+
-					settings.matrix.d+' '+
-					settings.matrix.tx+' '+
-					settings.matrix.ty+')'
-				);
+				if(settings.matrix && !settings.matrix.is(new dx.Matrix())){
+					xml['@transform']=transformString;
+				}
 			}
 			var masked=new dx.Array();
 			for(var i=0;i<selection.length;i++){
@@ -144,27 +177,35 @@
 					}else{
 						layerXML=new XML('<g id="'+id+'" />');
 					}
+					//if(this.defaultMatrixString){layerXML['@transform']=this.defaultMatrixString;}
 					for(var n=0;n<selection[i].length;n++){
-						//delay symbol xml by creating element group,
-						//then using it's id as a key for an argument
-						//array (timeline,options) for passing to a symbol generator list
-						//then loop through after timeline is created passing each to getTimeline
+						if(boundingBox){
+							if(selection[i][n].left<boundingBox.left){boundingBox.left=selection[i][n].left;}
+							if(selection[i][n].top<boundingBox.top){boundingBox.top=selection[i][n].top;}
+							if(selection[i][n].right>boundingBox.right){boundingBox.right=selection[i][n].right;}
+							if(selection[i][n].bottom>boundingBox.bottom){boundingBox.bottom=selection[i][n].bottom;}
+						}
 						var element=this.getElement(selection[i][n],{
 							colorTransform:colorX,
 							frame:settings.frame
 						});
-						layerXML.appendChild(element);
+						if(element){
+							layerXML.appendChild(element);
+						}
 					}
 					if(layer.layerType=='masked'){
 						masked.push(layerXML);
-					}else{
+					}else if(layerXML){
 						xml.appendChild(layerXML);
 						if(layer.layerType=='mask'){
 							var mg=new XML('<g mask="url(#'+id+')"/>');
+							//if(this.defaultMatrixString){mg['@transform']=this.defaultMatrixString;}
 							for(var m=0;m<masked.length;m++){
 								mg.appendChild(masked[m]);
 							}
-							xml.appendChild(mg);
+							if(mg){
+								xml.appendChild(mg);
+							}
 							masked.clear();
 						}
 					}
@@ -175,9 +216,25 @@
 			if(this.log){
 				this.log.stopTimer(timer);
 			}
-			return xml;
+			if(instanceXML){
+				instanceXML['@width']=String(boundingBox.right-boundingBox.left);
+				instanceXML['@height']=String(boundingBox.bottom-boundingBox.top);
+				instanceXML['@x']=String(boundingBox.left);
+				instanceXML['@y']=String(boundingBox.top);
+				xml['@viewBox']=(
+					String(boundingBox.left)+' '+
+					String(boundingBox.top)+' '+
+					String(boundingBox.right-boundingBox.left)+' '+
+					String(boundingBox.bottom-boundingBox.top)
+				);
+				this.xml.defs.appendChild(xml);
+				return instanceXML;
+			}else{
+				return xml;
+			}
 		},
 		getElement:function(element,options){
+			
 			if(element.$ instanceof Shape){
 /*
 				if(
@@ -194,6 +251,7 @@
 			
 		},
 		getSymbolInstance:function(instance,options){
+			//return;
 			var settings=new dx.Object({
 				frame:0,
 				matrix:new dx.Matrix(),
@@ -201,9 +259,10 @@
 				libraryItem:instance.libraryItem
 			});
 			settings.extend(options);
-			settings.matrix=instance.matrix.concat(settings.matrix);
+			settings.matrix=instance.matrix.concat(settings.matrix);	
+			var timeline=instance.timeline;
 			settings.frame=instance.getCurrentFrame(settings.frame);
-			var xml=this.getTimeline(timeline,settings);
+			var xml=this.getTimeline(instance.timeline,settings);
 			return xml;
 		},
 		getBitmapInstance:function(bitmapInstance,options){
@@ -212,11 +271,12 @@
 		getShape:function(shape,options){
 			var settings=new dx.Object({
 				matrix:new dx.Matrix(),
-				colorTransform:null
+				colorTransform:null,
+				frame:null
 			});
 			settings.extend(options);
 			var matrix=shape.matrix;
-			var descendantMatrix=null;
+			var descendantMatrix=new dx.Matrix();
 			var pathMatrix=null;
 			var layerLocked=shape.layer.locked;
 			if(shape.isDrawingObject){
@@ -328,18 +388,18 @@
 							}
 						}
 					}
-					svg.appendChild(svgArray[i]);
+					if(svgArray[i]){svg.appendChild(svgArray[i]);}
 				}
 			}
 			if(shape.isGroup && !shape.isDrawingObject){
 				var g=shape.members;
 				for(i=0;i<g.length;i++){
-					svg.appendChild(
-						this.getElement(g[i],{
-							colorTransform:settings.colorTransform,
-							matrix:descendantMatrix
-						})
-					);
+					var e=this.getElement(g[i],{
+						colorTransform:settings.colorTransform,
+						matrix:descendantMatrix,
+						frame:settings.frame
+					})
+					if(e){svg.appendChild(e);}
 				}
 			}
 			return svg;		
@@ -636,26 +696,60 @@
 			}
 			return svg;
 		},
-		idExists:function(svgID){
-			for(id in this.xml..@id){
-				if(id==svgID){
-					return true
+		globalizeStrokeWidths:function(xml){
+			xml=xml||this.xml;
+		},
+		expandUse:function(xml){
+			xml=xml||this.xml;
+			for each(use in xml..use){
+				var id=String(use['@xlink-href']).slice(1);
+				var symbol=this.expandUse(this.xml.defs.symbol.(@id==id)[0]);
+				use.setName('g');
+				for each(child in symbol.*){
+					use.appendChild(child);	
+				}
+				use['@id']=this.uniqueID(String(symbol['@id'])+'_instance');
+				delete use['@xlink-href'];
+				delete use['@width'];
+				delete use['@height'];
+				delete use['@x'];
+				delete use['@y'];
+				if(use['@transform']==this.defaultMatrixString){
+					delete use['@transform'];
 				}
 			}
+			return xml;
+		},
+		idExists:function(svgID,xml){
+			if(this.ids.indexOf(svgID)>-1){
+				return true;
+			}
+			/*
+			xml=xml||this.xml;
+			for each(id in xml..@id){
+				if(id==svgID){
+					return true;
+				}
+			}
+			*/
 			return false;
 		},
-		uniqueID:function(svgID){
-			if(this.idExists(svgID)){
+		uniqueID:function(svgID,xml){
+			svgID=svgID.trim().camelCase();
+			if(!svgID.length){svgID='g';}
+			if(/^[^A-Za-z]/.test(svgID)){svgID='g'+svgID;}
+			if(this.idExists(svgID,xml)){
 				if(/\_[\d]*?$/.test(svgID)){
 					return this.uniqueID(svgID.replace(/[\d]*?$/,String(Number(/[\d]*?$/.exec(svgID)[0])+1)));
 				}else{
 					return  this.uniqueID(svgID+"_1");
 				}
 			}
+			this.ids.push(svgID);
 			return svgID;
 		},
 		toString:function(){
-			return this.docString+'\n'+this.xml.toXMLString();
+			return this.docString+'\n'+this.xml.toXMLString().replace('<use xlink-href="#','<use xlink:href="#','g');
 		}
 	}
 	dx.extend({SVG:SVG});

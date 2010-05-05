@@ -53,7 +53,7 @@
 			if(this.$){
 				var edges=new dx.Array();
 				var e=this.$.edges;
-				for(i=0;i<e;i++){
+				for(var i=0;i<e.length;i++){
 					edges.push(new dx.Edge(this.$.edges[i]));
 				}
 				return edges;

@@ -172,8 +172,9 @@
 			this.cache.timeline=(s instanceof dx.Timeline)?s:new dx.Timeline(s);
 		},
 		is:function(element,options){
-			if(element.constructor==this.$.constructor){element=new this.type(element);}
-			if(!(element instanceof this.type)){return false;}
+			if(!(element instanceof this.type)){
+				element=new this.type(element);
+			}
 			if(!(this instanceof dx.Shape)){
 				var id=this.uniqueDataName(String('temporaryID_'+String(Math.floor(Math.random()*9999))));
 				var pd=Math.floor(Math.random()*99999999);

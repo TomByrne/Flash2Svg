@@ -1,13 +1,26 @@
 (function(){
 	function ExtensibleObject(obj){
-		var empty=(obj && obj.type)?new obj.type():{};
 		if(obj){
+			var empty=(obj && obj.type)?new obj.type():{};
 			for(var i in obj){
 				if(
 					!obj.__lookupGetter__(i)&&
 					empty[i]===undefined
 				){
-					this[i]=obj[i];
+					if(obj[i] && !obj[i].type){
+						switch(obj[i].constructor.name){
+							case 'Array':
+								this[i]=new dx.Array(obj[i]);
+								break;
+							case 'Object':
+								this[i]=new this.type(obj[i]);
+								break;
+							default:
+								this[i]=obj[i];
+						}
+					}else{
+						this[i]=obj[i];
+					}
 				}
 			}
 		}
@@ -121,6 +134,9 @@
 		},
 		is:function(o,options){
 			if(typeof(o)!='object'){return;}
+			if(!(o instanceof this.type)){
+				o=new dx.Object(o);	
+			}
 			var settings=new dx.Object({
 				ignore:null,//list of attributes to ignore, defaults to none
 				checklist:null//list of attributes to check, defaults to all
@@ -132,12 +148,18 @@
 			if(settings.checklist && !(settings.checklist instanceof dx.Array)){
 				settings.checklist=new dx.Array(settings.checklist)
 			}
-			for(var i in o){
+			var keys=settings.checklist||o.keys;
+			for(var i=0;i<keys.length;i++){
+				var k=keys[i];
 				if(
-					(!settings.ignore || settings.ignore.indexOf(i)<0) &&
-					(!settings.checklist || settings.checklist.indexOf(i)>-1) &&
-					!(o[i] instanceof Function) &&
-					this[i]!=o[i] && !(this[i]['is'] && this[i].is(o[i]))
+					(!settings.ignore || settings.ignore.indexOf(k)<0) && (
+						!(o[k] instanceof Function) && (
+							(Boolean(o[k]) != Boolean(this[k])) || (
+								this[k]!=o[k] && 
+								!(this[k]['is'] && this[k].is(o[k]))
+							)
+						)
+					)
 				){
 					return false;
 				}

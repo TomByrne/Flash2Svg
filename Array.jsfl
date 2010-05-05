@@ -23,9 +23,11 @@
 			}
 			return output;
 		},
-		extend:function(array,recursive){
+		extend:function(array,noDuplicates){
 			for(var i=0;i<array.length;i++){
-				this.push(array[i]);
+				if(!noDuplicates || this.indexOf(array[i])<0){
+					this.push(array[i]);
+				}
 			}
 			return this;
 		},
@@ -78,17 +80,16 @@
 			return -1;
 		},
 		filter:function(){
-			var args=Array.prototype.slice.call(arguments);
 			return(
 				this.length?
-				new this.type(Array.prototype.filter.apply(this,args)):
+				new this.type(Array.prototype.filter.apply(this,arguments)):
 				new this.type()
 			);
 		},
 		is:function(a){
 			if(this.length!=a.length){return false;}
 			for(var i=0;i<this.length;i++){
-				if(this[i]!=a[i] && !(this[i]['is'] && a[i]['is'] && this[i].is(a[i]))){
+				if(this[i]!=a[i] && !(this[i]['is'] && this[i].is(a[i]))){
 					return false;
 				}
 			}

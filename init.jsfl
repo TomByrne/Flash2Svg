@@ -109,6 +109,8 @@ dx.load(
 		'Contour',
 		'Element',
 		'Shape',
+		'OvalObject',
+		'RectangleObject',
 		'Instance',
 		'SymbolInstance',
 		'BitmapInstance',

@@ -3,7 +3,7 @@
 		dx.Shape.apply(this,arguments);
 		return this;
 	}
-	ExtensibleShape.prototype={
+	ExtensibleOvalObject.prototype={
 		__proto__:dx.Shape.prototype,
 		type:ExtensibleOvalObject,
 		get startAngle(){return this.$.startAngle;},
