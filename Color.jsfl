@@ -48,7 +48,7 @@
 			if(hstring[0]=="#") hstring=hstring.slice(1);
 			this.amount.clear();
 			for(var i=0;i<hstring.length;i+=2){
-				this.amount.push(hexDigit.indexOf(hstring[i].toUpperCase())*16.0+hexDigit.indexOf(hstring[i+1]));
+				this.amount.push(hexDigit.indexOf(hstring[i].toUpperCase())*16.0+hexDigit.indexOf(hstring[i+1].toUpperCase()));
 			}
 			while(this.amount.length<4){this.amount.push(255);}
 			return this;

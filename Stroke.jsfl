@@ -10,7 +10,6 @@
 	}
 	ExtensibleStroke.prototype={
 		__proto__:dx.Object.prototype,
-		$:Object,
 		type:ExtensibleStroke
 	}
 	dx.extend({Stroke:ExtensibleStroke});

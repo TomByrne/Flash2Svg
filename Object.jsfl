@@ -1,14 +1,11 @@
 (function(){
 	function ExtensibleObject(obj){
 		if(obj){
-			var empty=(obj && obj.type)?new obj.type():{};
 			for(var i in obj){
-				if(
-					!obj.__lookupGetter__(i)&&
-					empty[i]===undefined
-				){
-					if(obj[i] && !obj[i].type){
-						switch(obj[i].constructor.name){
+				if(obj.hasOwnProperty(i)){
+					var element=obj[i];
+					if(element && !element.type){
+						switch(element.constructor.name){
 							case 'Array':
 								this[i]=new dx.Array(obj[i]);
 								break;
@@ -19,7 +16,7 @@
 								this[i]=obj[i];
 						}
 					}else{
-						this[i]=obj[i];
+						this[i]=element;
 					}
 				}
 			}
@@ -34,10 +31,7 @@
 			context=context || this;
 			args=args||[];
 			for(k in this){
-				if(
-					!empty.__lookupGetter__(k) &&
-					empty[k]===undefined
-				){
+				if(this.hasOwnProperty(k)){
 					var a=args;
 					a.splice(0,0,this[k],k);
 					iterator.apply(context,a);
@@ -45,39 +39,25 @@
 			}
 			return all;
 		},
-		get all(){
-			var all={};
-			var empty=new this.type();
+		indexOf:function(element){
 			for(k in this){
 				if(
-					!empty.__lookupGetter__(k) &&
-					empty[k]===undefined
+					this.hasOwnProperty(k)&& (
+						this[k]==element || ( 
+							this[k]['is'] && 
+							this[k].is(element)
+						)
+					)
 				){
-					all[k]=this[k];
-				}	
-			}
-			return all;
-		},
-		set all(obj){
-			if(obj){
-				var keys=this.keys;
-				var unset=new dx.Array();
-				for(var i in obj){
-					if(!obj.__lookupGetter__(i)){
-						unset.push(i);
-						this[i]=obj[i];
-					}
+					return k;
 				}
-				this.clear(unset);
-			}	
+			}
 		},
 		get keys(){
 			var keys=new dx.Array();
-			var empty=new this.type();
 			for(k in this){
 				if(
-					!empty.__lookupGetter__(k) &&
-					empty[k]===undefined
+					this.hasOwnProperty(k)
 				){
 					keys.push(k);
 				}
@@ -91,30 +71,33 @@
 			}
 		},
 		extend:function(obj,recursive){
-			if(typeof(obj)!='object'){return;}
-			obj=obj.all || obj;
 			for(var n in obj){
-				if(
-					recursive && 
-					typeof(this[n])==typeof(obj[n])
-				){
-					if(this[n].constructor.name=='Object'){
-						this[n]=new dx.Object(this[n]);
-					}else if(this[n].constructor.name=='Array'){
-						this[n]=new dx.Array(this[n]);
-					}
-					if(this[n].extend instanceof Function){
-						this[n].extend(obj[n],recursive);
+				if(obj.hasOwnProperty(n)){
+					if(
+						recursive && 
+						typeof(this[n])==typeof(obj[n])
+					){
+						if(this[n].constructor.name=='Object'){
+							this[n]=new dx.Object(this[n]);
+							this[n].extend(obj[n],recursive);
+						}else if(this[n].constructor.name=='Array'){
+							this[n]=new dx.Array(this[n]);
+							this[n].extend(obj[n],recursive);
+						}else{
+							this[n]=obj[n];
+						}
 					}else{
-						this[n]=obj[n];
+						this[n]=obj[n];	
 					}
-				}else{
-					this[n]=obj[n];	
 				}
 			}
 		},
 		remove:function(r){
-			if(typeof(r)!='array'){return;}
+			if(typeof(r)=='string'){
+				r=[r];
+			}else if(typeof(r)!='array'){
+				return;
+			}
 			for(var i=0;i<r.length;i++){
 				if(this[r[i]]){
 					delete this[r[i]];

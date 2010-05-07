@@ -1,8 +1,26 @@
 (function(dx){
 	function ExtensibleFill(fill){
-		if(arguments.length==0){fill=document.getCustomFill();}		
-		dx.Object.apply(this,[fill]);
-		if(this.matrix){this.matrix=new dx.Matrix(this.matrix);}
+		var settings=new dx.Object({
+			style:'solid',
+			color:'#000000',
+			bitmapIsClipped:undefined,
+			bitmapPath:undefined,
+			colorArray:undefined,
+			focalPoint:undefined,
+			linearRGB:undefined,
+			matrix:undefined,
+			overflow:undefined,
+			posArray:undefined
+		});
+		if(typeof fill=='string'){
+			settings.color=fill;
+		}else{
+			settings.extend(fill);
+		}
+		dx.Object.apply(this,[settings]);
+		if(this.matrix && !(this.matrix instanceof dx.Matrix)){
+			this.matrix=new dx.Matrix(this.matrix);
+		}
 		return this;
 	}
 	ExtensibleFill.prototype={

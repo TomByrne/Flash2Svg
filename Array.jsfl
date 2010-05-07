@@ -1,7 +1,11 @@
 (function(dx){
 	var ExtensibleArray=function(){
 		if(arguments.length==1 && arguments[0] instanceof Array){
-			Array.prototype.splice.apply(this,[0,0].concat(Array.prototype.slice.call(arguments[0])));
+			Array.prototype.splice.apply(
+				this,[0,0].concat(
+					Array.prototype.slice.call(arguments[0])
+				)
+			);
 		}else if(arguments.length>1){
 			Array.prototype.splice.apply(this,[0,0].concat(Array.prototype.slice.call(arguments)));	
 		}else{
@@ -41,7 +45,7 @@
 		},
 		intersect:function(ilist){
 			if(!ilist || ilist.constructor.name!='Array'){return new this.type();}
-			if(ilist.length==0) return new this.type();
+			if(ilist.length==0){return new this.type();}
 			ilist=new this.type(ilist);
 			return this.filter(function(element,index,array){
 				return(ilist.indexOf(element)>=0);

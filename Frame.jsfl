@@ -28,7 +28,6 @@
 	}
 	ExtensibleFrame.prototype={
 		__proto__:dx.Object.prototype,
-		$:Frame,
 		type:ExtensibleFrame,
 		//built in methods
 		getCustomEase:function(property){return this.$.getCustomEase(property);},

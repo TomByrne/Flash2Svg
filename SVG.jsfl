@@ -1,28 +1,29 @@
 (function(dx){
 	function SVG(options){
 		var settings=new dx.Object({
-			degree:2,// Quadratic (2) or Cubic (3)
-			masking:'alpha', //'alpha','clipping',or 'luminance'
-			timeline:dx.timeline,
-			frame:dx.frame,
+			flatten:true,// If true, symbols are converted to graphic elements for compatibility w/ Webkit browsers & Adobe Illustrator.
+			degree:2,// Determines whether curves are created as Quadratic (2) or Cubic (3). Quadratic is faster for large documents.
+			masking:'alpha', // Determines how masks are applied: 'alpha','clipping',or 'luminance'. Clipping mimicks the way flash displays masks.
+			timeline:dx.timeline, // The base timeline for export. Defaults to the currently open timeline.
+			frame:dx.frame, // The index of the frame for which SVG markup will be generated. Defaults to the current frame.
+			backgroundColor:dx.doc.backgroundColor, // RGB/Hexadecimal. Defaults to the current background color.
 			includeHiddenLayers:dx.includeHiddenLayers,
 			includeGuides:false,
-			selection:null,
-			matrix:dx.viewMatrix,
-			id:String(dx.doc.name.stripExtension().camelCase()),
-			x:0,y:0,
-			width:dx.doc.width,
-			height:dx.doc.height,
-			docString:(
+			selection:null, // A dx.Selection object. Limits content to specified elements.
+			matrix:dx.viewMatrix, // The matrix applied to the root element, defaults to the current viewMatrix.
+			id:String(dx.doc.name.stripExtension().camelCase()), // Root element ID.
+			x:0,y:0, // Root element registration point.
+			width:dx.doc.width, // Document width.
+			height:dx.doc.height, // Document height.
+			docString:( // DOCTYPE
 				'<?xml version="1.0" encoding="utf-8"?>\n'+
 				'<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">\n'
 			),
-			log:undefined,// URI or dx.Log
-			frame:dx.frame,
-			baseProfile:'basic',
-			version:'1.1',
-			defaultMatrixString:'matrix(1 0 0 1 0 0)',
-			flatten:true
+			log:undefined,// URI to write debugging log.
+			version:'1.1',// SVG Version.
+			defaultMatrixString:'matrix(1 0 0 1 0 0)', 
+			defaultGradientLength:819.2,//Pre-transformation length of ALL linear gradients in flash.
+			defaultGradientRadius:810.7//Pre-transformation radius of ALL radial gradients in flash.
 		});
 		settings.extend(options);
 		if(typeof(settings.log)=='string'){
@@ -48,12 +49,14 @@
 			fl.showIdleMessage(false);
 			this.xml=new XML('<svg xmlns:xlink="http://www.w3.org/1999/xlink"/>');
 			this.xml['@version']=this.version;
-			this.xml['@baseProfile']=this.baseProfile;
+			this.xml['@style']="background-color:"+this.backgroundColor;
 			this.xml['@x']=String(this.x)+'px';
 			this.xml['@y']=String(this.y)+'px';
 			this.xml['@width']=String(this.width)+'px';
 			this.xml['@height']=String(this.height)+'px';
-			this.xml['@viewBox']=String(this.x)+' '+String(this.y)+' '+String(this.width)+' '+String(this.height);
+			var vb=String(this.x)+' '+String(this.y)+' '+String(this.width)+' '+String(this.height);
+			this.xml['@viewBox']=vb;
+			this.xml['@enable-background']='new '+vb;
 			this.xml['@xml:space']='preserve';
 			this.xml.appendChild(new XML('<defs/>'));
 			var x=this.getTimeline(this.timeline,{
@@ -77,6 +80,9 @@
 			if(this.log){this.log.stopTimer(timer);}
 			dx.sel=origSelection;
 			return this.xml;
+		},
+		createTemporaryTimelines:function(){//breaks apart tweens
+			
 		},
 		getTimeline:function(timeline,options){
 			var settings=new dx.Object({
@@ -177,7 +183,6 @@
 					}else{
 						layerXML=new XML('<g id="'+id+'" />');
 					}
-					//if(this.defaultMatrixString){layerXML['@transform']=this.defaultMatrixString;}
 					for(var n=0;n<selection[i].length;n++){
 						if(boundingBox){
 							if(selection[i][n].left<boundingBox.left){boundingBox.left=selection[i][n].left;}
@@ -199,7 +204,6 @@
 						xml.appendChild(layerXML);
 						if(layer.layerType=='mask'){
 							var mg=new XML('<g mask="url(#'+id+')"/>');
-							//if(this.defaultMatrixString){mg['@transform']=this.defaultMatrixString;}
 							for(var m=0;m<masked.length;m++){
 								mg.appendChild(masked[m]);
 							}
@@ -327,15 +331,15 @@
 										colorTransform:settings.colorTransform,
 										reversed:true
 									});
-									svgArray[filled[n]][0]['@d']+=/^[^Zz]*[Zz]?/.exec(s[0]['@d'].trim())[0];
+									svgArray[filled[n]].path[0]['@d']+=/^[^Zz]*[Zz]?/.exec(s.path[0]['@d'].trim())[0];
 									break;
 								}
 							}
 						}
 						if(contours[i].fill.style=='noFill'){
-							for(n=0;n<svgArray[i].length();n++){
-								if(svgArray[i][n].stroke.length()==0){
-									delete svgArray[i][n];
+							for each(n in svgArray[i].*){
+								if(n.stroke.length()==0){
+									delete n;
 								}
 							}
 						}
@@ -348,16 +352,16 @@
 			var svg=new XML('<g/>');
 			svg['@transform']='matrix('+matrix.a+' '+matrix.b+' '+matrix.c+' '+matrix.d+' '+matrix.tx+' '+matrix.ty+')';
 			for(var i=0;i<svgArray.length;i++){
-				if(svgArray[i].length()){//eliminate duplicate paths
-					for(n in svgArray[i]){
+				if(svgArray[i].*.length()){//eliminate duplicate paths
+					for each(n in svgArray[i].*){
 						if(
-							svgArray[i][n].localName()=='path' && 
-							(!svgArray[i][n]['@stroke'].length() || svgArray[i][n]['@stroke']=='none' || svgArray[i][n]['@stroke']=='') && 
-							(!svgArray[i][n]['@fill'].length() || svgArray[i][n]['@fill']=='none' || svgArray[i][n]['@fill']=='')
+							n.localName()=='path' && 
+							(!n['@stroke'].length() || n['@stroke']=='none' || n['@stroke']=='') && 
+							(!n['@fill'].length() || n['@fill']=='none' || n['@fill']=='')
 						){
-							delete svgArray[i][n];
-						}else if(svgArray[i][n].localName()=='path' && svgArray[i][n]['@stroke'].length()){
-							var cs0=String(svgArray[i][n]['@d']).replace(/[^\d\.\,]/g,' ').replace(/([^\s])(\s\s*?)([^\s])/g,'$1 $3').trim();
+							delete n;
+						}else if(n.localName()=='path' && n['@stroke'].length()){
+							var cs0=String(n['@d']).replace(/[^\d\.\,]/g,' ').replace(/([^\s])(\s\s*?)([^\s])/g,'$1 $3').trim();
 							var ca0=cs0.split(' ');
 							if(ca0[ca0.length-1]==ca0[0]){
 								ca0.pop();
@@ -388,7 +392,9 @@
 							}
 						}
 					}
-					if(svgArray[i]){svg.appendChild(svgArray[i]);}
+					for each(var s in svgArray[i].*){
+						svg.appendChild(s);
+					}
 				}
 			}
 			if(shape.isGroup && !shape.isDrawingObject){
@@ -544,23 +550,24 @@
 			}
 			if(contour.interior){//Construct a curve for the enclosed shape if present.
 				interior=true;
-				var fill='none';
-				var opacity='1.0';
-				if(contour.fill.style!='noFill'){
-					fill=contour.fill.color;
-					if(contour.fill.style=='solid'){
-						if(settings.colorTransform instanceof dx.Color){
-							var c=new dx.Color(contour.fill.color);
-							c=c.transform(settings.colorTransform);
-							fill=c.hex;
-							opacity=c.opacity;
-						}
+				var fillString='none';
+				var opacityString='1';
+				var fill=this.getFill(contour.fill,{
+					shape:contour.shape
+				});
+				if(fill){
+					if(fill.name()=='solidColor'){
+						fillString=String(fill['@solid-color']);
+						opacityString=String(fill['@solid-opacity']);
+						this.ids.pop();
 					}else{
+						fills.push(fill);
+						fillString='url(#'+String(fill['@id'])+')';
 					}
 				}
 				var cdata;
 				cdata=this.getCurve(controlPoints,true);
-				paths.push('<path  '+xform+'fill="'+fill+'" opacity="'+opacity+'" d="'+cdata+'"/>\n');
+				paths.push('<path  '+xform+'fill="'+fillString+'" opacity="'+opacityString+'" d="'+cdata+'"/>\n');
 			}
 			if(edges.length>0 && !settings.reversed){//Create a contour for each length of contiguous edges w/ the same stroke attributes. Skipped for settings.reversed, which is only used for creating hollows.
 				var cp=new dx.Array([]);
@@ -636,46 +643,149 @@
 					}
 				}
 			}
-			var xml=new XMLList();
-			for(var i=0;i<paths.length;i++){
-				xml+=new XML(paths[i]);
-			}
+			var xml=new XML('<g/>');
 			for(var i=0;i<fills.length;i++){
-				xml+=new XML(fills[i]);
+				xml.appendChild(fills[i]);
 			}
+			for(var i=0;i<paths.length;i++){
+				xml.appendChild(new XML(paths[i]));
+			}
+			//fl.trace(xml.toXMLString());
 			return(xml);
 		},
 		getCurve:function(controlPoints,close){
-			close=close!=undefined?close:true;
+			close=close!==undefined?close:true;
 			var degPrefix=['M','L','Q','C'];
 			var deg=controlPoints[0].length-1;
-			var curveString=degPrefix[0]+controlPoints[0][0].x+","+controlPoints[0][0].y+" ";
-			if(deg>0){curveString+=degPrefix[deg]+controlPoints[0][1].x+","+controlPoints[0][1].y+" ";}
-			if(deg>1){curveString+=controlPoints[0][2].x+","+controlPoints[0][2].y+" ";}
-			if(deg>2){curveString+=controlPoints[0][3].x+","+controlPoints[0][3].y+" ";}
+			var curveString=[degPrefix[0]+controlPoints[0][0].x+","+controlPoints[0][0].y+" "];
+			if(deg>0){
+				curveString.push(degPrefix[deg]+controlPoints[0][1].x+","+controlPoints[0][1].y+" ");
+			}
+			if(deg>1){
+				curveString.push(controlPoints[0][2].x+","+controlPoints[0][2].y+" ");
+			}
+			if(deg>2){
+				curveString.push(controlPoints[0][3].x+","+controlPoints[0][3].y+" ");
+			}
 			for(var i=1;i<controlPoints.length;i++){
 				var prevdeg=deg;
 				deg=controlPoints[i].length-1;
-				if(deg!=prevdeg){curveString+=degPrefix[deg];}
+				if(deg!=prevdeg){curveString.push(degPrefix[deg]);}
 				for(var n=1;n<=deg;n++){
-					curveString+=controlPoints[i][n].x+","+controlPoints[i][n].y+(n==deg?"":" ");
+					curveString.push(controlPoints[i][n].x+","+controlPoints[i][n].y+(n==deg?"":" "));
 				}
 				//if(i==controlPoints.length-1 && close){//  
 				if(controlPoints[i][deg].x==controlPoints[0][0].x && controlPoints[i][deg].y==controlPoints[0][0].y && close){
-					curveString+='z ';
+					curveString.push('z ');
 					break;
 				}else{
-					curveString+=" ";
+					curveString.push(" ");
 				}
 			}
-			return curveString;
+			return curveString.join('');
 		},
 		getFill:function(fillObj,options){
 			var settings=new dx.Object({
-				
+				shape:undefined,
+				gradientUnits:'userSpaceOnUse'
+				//gradientUnits:'objectBoundingBox'
 			});
-			var fill='';
-			return fill;
+			settings.extend(options);
+			if(typeof fillObj=='string'){
+				fillObj=new dx.Fill(fillObj);
+			}else if(fillObj.style=='noFill'){
+				return;
+			}
+			id=this.uniqueID(fillObj.style);
+			var xml,defaultMeasurement;
+			var shape=settings.shape;
+			var matrix=fillObj.matrix;
+			switch(fillObj.style){
+				case 'linearGradient':
+					defaultMeasurement=this.defaultGradientLength;
+				case 'radialGradient':
+					defaultMeasurement=defaultMeasurement||this.defaultGradientRadius;
+					if(!shape){return;}
+					xml=new XML('<'+fillObj.style+'/>');
+					xml['@gradientUnits']=settings.gradientUnits;
+					xml['@color-interpolation']=fillObj.linearRGB?'linearRGB':'sRGB';
+					switch(fillObj.overflow){
+						case 'extend':
+							xml['@spreadMethod']='pad';
+							break;
+						case 'reflect':
+							xml['@spreadMethod']='reflect';
+							break;
+						case 'repeat':
+							xml['@spreadMethod']='repeat';
+							break;
+					}
+					for(var i=0;i<fillObj.colorArray.length;i++){
+						var stop=new XML('<stop/>');
+						var c=new dx.Color(fillObj.colorArray[i]);
+						stop['@stop-color']=c.hex;
+						stop['@stop-opacity']=c.opacity;
+						if(i<fillObj.posArray.length){
+							stop['@offset']=String((fillObj.posArray[i]/255.0)*100)+'%';
+						}
+						xml.appendChild(stop);
+					}
+					var width=shape.objectSpaceBounds.right-shape.objectSpaceBounds.left;
+					var height=shape.objectSpaceBounds.bottom-shape.objectSpaceBounds.top;
+					var p0=new dx.Point();
+					var p1=new dx.Point({x:0,y:0});
+					var p2=new dx.Point();
+					var unitID='';
+					if(settings.gradientUnits=='objectBoundingBox'){
+						unitID='%';
+						p2.x=((defaultMeasurement)/width)*100;
+						p2.y=0;
+					}else{
+						p2.x=defaultMeasurement;
+						p2.y=0;
+					}
+					p0=p2.reflect(p1);
+					switch(fillObj.style){
+						case 'radialGradient':
+							var bias=(fillObj.focalPoint+255)/510;
+							var fp=p0.midPoint(p2,bias);
+							xml['@r']=String(p1.distanceTo(p2))+unitID;
+							xml['@cx']=String(p1.x)+unitID;
+							xml['@cy']=String(p1.y)+unitID;
+							xml['@fx']=String(fp.x)+unitID;
+							xml['@fy']=String(fp.y)+unitID;
+							xml['@gradientTransform']=(
+								'matrix('+matrix.a+' '+
+								matrix.b+' '+
+								matrix.c+' '+
+								matrix.d+' '+
+								matrix.tx+' '+
+								matrix.ty+')'
+							);
+							break;
+						case 'linearGradient':
+							p0=p0.transform(matrix);
+							p1=p1.transform(matrix);
+							p2=p2.transform(matrix);
+							xml['@x1']=String(p0.x)+unitID;
+							xml['@y1']=String(p0.y)+unitID;
+							xml['@x2']=String(p2.x)+unitID;
+							xml['@y2']=String(p2.y)+unitID;
+							break;
+					}
+					break;
+				case 'bitmap':
+					xml=new XML('<pattern/>');
+					break;
+				case 'solid':
+					var color=new dx.Color(fillObj.color);
+					xml=new XML('<solidColor/>');
+					xml['@solid-color']=color.hex;
+					xml['@solid-opacity']=color.opacity;
+					break;
+			}
+			xml['@id']=id;
+			return xml;
 		},
 		getStroke:function(stroke,options){
 			var color=new dx.Color(stroke.color);

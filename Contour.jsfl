@@ -18,7 +18,6 @@
 	ExtensibleContour.prototype={
 		__proto__:dx.Object.prototype,
 		$:Contour,
-		shape:null,
 		type:ExtensibleContour,
 		//built in methods
 		getHalfEdge:function(){return new dx.HalfEdge(this.$.getHalfEdge(),{shape:this.shape});},
