@@ -1,25 +1,28 @@
 ﻿/* DAVID BELAIS 2010 DAVID@DISSENTGRAPHICS.COM
- * DISSENT GRAPHICS' JSFL Framework 
- * provides extensible javascript contructors for
- * extending Native Code DOM elements within the 
- * Flash Javascript API. */
+ * EXTENSIBLE : A javascript Framework for extending Flash. */
  
 (function(dom){
-	function DX(options){
+	function Extensible(options){
 		this._modules=[];
-		for(var o in options){this[o]=options[o];}
+		this.log=undefined;
+		for(var o in options){
+			this[o]=options[o];
+		}
+		this.dir=fl.scriptURI.replace(/\/[^\/]*?$/g,"");
 		return this;
 	}
-	DX.prototype={
+	Extensible.prototype={
 		extend:function(obj){
 			for(var n in obj){
-				this[n]=obj[n];
+				if(obj.hasOwnProperty(n)){
+					this[n]=obj[n];
+				}
 			}
 		},
 		load:function(mods,force){
 			if(force){this._modules=[];}
 			if(mods && mods.length){
-				for(i=0;i<mods.length;i++){
+				for(var i=0;i<mods.length;i++){
 					if(force || this._modules.indexOf[mods[i]]<0){
 						var file=this.dir+"/"+mods[i]+".jsfl";
 						if(file!=fl.scriptURI && FLfile.exists(file)){
@@ -35,10 +38,6 @@
 			return fl.getDocumentDOM();
 		},
 		set doc(){},
-		get dir(){
-			return(fl.scriptURI.replace(/\/[^\/]*?$/g,""));
-		},
-		set dir(){},
 		get timeline(){
 			return new this.Timeline(this.doc.getTimeline());
 		},
@@ -61,7 +60,7 @@
 		},
 		set layer(){},
 		get lib(){
-			return(this.doc.library);
+			return new this.Library(this.doc.library);
 		},
 		set lib(){},
 		get sel(){
@@ -88,13 +87,68 @@
 		get includeHiddenLayers(){
 			return this.publishProfile.PublishFlashProperties.InvisibleLayer.valueOf()==1;
 		},
-		set exportHiddenLayer(s){},
-		get modules(){return this._modules;},
-		set modules(m){this.load(m);}
+		set includeHiddenLayers(s){
+			this.publishProfile.PublishFlashProperties.InvisibleLayer=s?1:0;			
+		},
+		get flashVersion(){
+			return Number((/\d*\d/.exec(fl.version))[0]);		
+		},
+		set flashVersion(){
+			return;
+		},
+		get modules(){
+			return this._modules;
+		},
+		set modules(m){
+			this.load(m);
+		},
+		startLog:function(options){
+			this.log=new this.Log(options);
+		},
+		stopLog:function(){
+			if(this.log){
+				this.log.stop();
+				delete this.log;
+			}
+		},
+		buildExtension:function(options){
+			var settings=new this.Object({
+				name:undefined,
+				commands:undefined,
+				modules:undefined
+			});
+			settings.extend(options);
+			var url=this.dir+"/"+settings.name+'.mxi';
+			var xmlString=FLfile.read(url);
+			var header=/<\?xml.*?\?>/.exec(xmlString);
+			var xmlString;
+			if(header.length){
+				header=header[0];
+				xmlString=xmlString.replace(header,'');
+			}else{
+				header='';	
+			}
+			var xml=new XML(xmlString);
+			delete xml.files.file;
+			var modules=settings.modules||this._modules;
+			for(var i=0;i<settings.commands.length;i++){
+				var x=new XML('<file/>');
+				x['@source']='Commands/'+settings.commands[i]+'.jsfl';
+				x['@destination']='$flash/Commands';
+				xml.files.appendChild(x);
+			}			
+			for(var i=0;i<modules.length;i++){
+				var x=new XML('<file/>');
+				x['@source']=modules[i]+'.jsfl';
+				x['@destination']='$flash/Javascript/Extensible';
+				xml.files.appendChild(x);
+			}
+			FLfile.write(this.dir+"/"+settings.name+'.mxi',header+'\n'+xml.toXMLString());
+		}
 	};
-	dom.dx=new DX();
+	dom.extensible=new Extensible();
 })(this)
-dx.load(
+extensible.load(
 	[
 		'String',
 		'Object',
@@ -120,6 +174,8 @@ dx.load(
 		'Layer',
 		'Timeline',
 		'Selection',
+		'Library',
+		'Item',
 		'Clipboard',
 		'SVG',
 		'Log'

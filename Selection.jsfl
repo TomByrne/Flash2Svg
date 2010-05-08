@@ -1,4 +1,4 @@
-﻿(function(dx){
+﻿(function(ext){
 	function Selection(s,options){
 		if(!(s instanceof Array)){s=[];}
 		var sel=[];
@@ -9,49 +9,49 @@
 					case 'shapeObj':
 					case 'shape':
 						if(s[i].isOvalObject){
-							sel.push(new dx.OvalObject(s[i],options));
+							sel.push(new ext.OvalObject(s[i],options));
 						}else if(s[i].isRectangleObject){
-							sel.push(new dx.RectangleObject(s[i],options));								
+							sel.push(new ext.RectangleObject(s[i],options));								
 						}else{
-							sel.push(new dx.Shape(s[i],options));	
+							sel.push(new ext.Shape(s[i],options));	
 						}
 						break;
 					case 'tlfText':
-						sel.push(new dx.TLFText(s[i],options));
+						sel.push(new ext.TLFText(s[i],options));
 						break;
 					case 'text':
-						sel.push(new dx.Text(s[i],options));
+						sel.push(new ext.Text(s[i],options));
 						break;
 					case 'instance':
 						switch(s[i].instanceType){
 							case 'symbol':
-								sel.push(new dx.SymbolInstance(s[i],options));
+								sel.push(new ext.SymbolInstance(s[i],options));
 								break;
 							case 'bitmap':
-								sel.push(new dx.BitmapInstance(s[i],options));
+								sel.push(new ext.BitmapInstance(s[i],options));
 								break;
 							default:
-								sel.push(new dx.Instance(s[i],options));
+								sel.push(new ext.Instance(s[i],options));
 						}
 						break;
 					default:
-						sel.push(new dx.Element(s[i],options));
+						sel.push(new ext.Element(s[i],options));
 				}
-			}else if(s[i] instanceof dx.Element){
-				dx.Object.apply(s[i],[options]);
+			}else if(s[i] instanceof ext.Element){
+				ext.Object.apply(s[i],[options]);
 				sel.push(s[i]);
 			}
 		}
 		Array.prototype.slice.call(this,sel);
-		dx.Array.apply(this,[sel]);
+		ext.Array.apply(this,[sel]);
 		this.options=options;
 		return this;
 	}
 	Selection.prototype={
-		__proto__:dx.Array.prototype,
+		__proto__:ext.Array.prototype,
 		type:Selection,
 		getElementsByType:function(type,matchObj){
-			var match=new dx.Object({});//isGroup,isDrawingObject,instanceType,etc.
+			var match=new ext.Object({});//isGroup,isDrawingObject,instanceType,etc.
 			match.extend(matchObj);
 			var keys=match.keys;
 			var sel=new this.type([],this.options);
@@ -74,7 +74,7 @@
 						}
 					};
 					if(m){;
-						dx.Object.call(this[e],this.options);
+						ext.Object.call(this[e],this.options);
 						sel.push(this[e]);
 					}
 				}
@@ -97,7 +97,7 @@
 			var expandedSel=new this.type();
 			for(var i=0;i<this.length;i++){
 				expandedSel.push(this[i]);
-				if(this[i].type==dx.Shape && this[i].isGroup && ! this[i].isDrawingObject){
+				if(this[i].type==ext.Shape && this[i].isGroup && ! this[i].isDrawingObject){
 					var members=new this.type(this[i].members,this.options);
 					expandedSel.extend(members.expandGroups());
 				}			
@@ -105,22 +105,22 @@
 			return expandedSel;
 		},
 		byFrame:function(options){// returns an Array of Selections by frame
-			var settings=new dx.Object({
+			var settings=new ext.Object({
 				stacked:false, // true if each frame is known to be on a separate layer
 				timeline:this.options?this.options.timeline:null
 			});
 			settings.extend(options);
-			var frameElements=new dx.Selection([],this.options);
-			var elements=new dx.Selection(this,this.options);
-			var byFrame=new dx.Array();
-			var frames=new dx.Array();
+			var frameElements=new ext.Selection([],this.options);
+			var elements=new ext.Selection(this,this.options);
+			var byFrame=new ext.Array();
+			var frames=new ext.Array();
 			for(var i=0;i<elements.length;i++){
 				frames.push(elements[i].frame,{timeline:this});
 			}
 			var fast=false;
 			if(settings.timeline){//check to see if we can use a faster method of identifying layers
 				fast=true;
-				var checklist=new dx.Array([
+				var checklist=new ext.Array([
 					'name','frameCount','layerType','locked','visible','color','height','outline'
 				]);
 				var layers=settings.timeline.layers;
@@ -128,7 +128,7 @@
 				while(layers.length>1){
 					var l=layers.pop();
 					for(var i=0;i<layers.length;i++){
-						if(dx.Object.prototype.is.call(l,layers[i],{checklist:checklist})){
+						if(ext.Object.prototype.is.call(l,layers[i],{checklist:checklist})){
 							falseMatch=true;
 							break;
 						}
@@ -157,7 +157,7 @@
 				}
 				if(!caught){
 					var f=elements[i].frame;
-					byFrame.push(new dx.Selection([elements[i]],this.options));
+					byFrame.push(new ext.Selection([elements[i]],this.options));
 				}
 			}
 			return byFrame;
@@ -174,7 +174,7 @@
 			return c;
 		}
 	}
-	dx.extend({
+	ext.extend({
 		Selection:Selection
 	});
-})(dx)
+})(extensible)

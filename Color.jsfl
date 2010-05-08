@@ -1,14 +1,14 @@
-(function(dx){
+(function(ext){
 	function Color(){
 		var args=Array.prototype.slice.call(arguments);
-		this.amount=new dx.Array([0,0,0,0]);
-		this.percent=new dx.Array([100,100,100,100]);
+		this.amount=new ext.Array([0,0,0,0]);
+		this.percent=new ext.Array([100,100,100,100]);
 		if(args.length==1){
 			if(args[0] instanceof this.type){
-				dx.Object.apply(this,args);
-			}else if(args[0] instanceof dx.Fill){
+				ext.Object.apply(this,args);
+			}else if(args[0] instanceof ext.Fill){
 				this.hex=args[0].color;
-			}else if(args[0] instanceof dx.Shape){
+			}else if(args[0] instanceof ext.Shape){
 				this.hex=args[0].contours[0].color;
 			}else{
 				var sel=args[0].$?args[0].$:args[0];
@@ -30,7 +30,7 @@
 						for(var n=0;n<4;n++){this.percent[n]=sel[rgbaX[n]];}
 						break;
 					case 'Shape':
-						var sh=new dx.Shape(sel);
+						var sh=new ext.Shape(sel);
 						this.hex=sh.contours[0].fill.color;
 						break;
 					case 'String':
@@ -41,7 +41,7 @@
 		return this;
 	};
 	Color.prototype={
-		__proto__:dx.Object.prototype,
+		__proto__:ext.Object.prototype,
 		type:Color,
 		set hex(hstring){
 			var hexDigit=['0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'];
@@ -123,7 +123,7 @@
 		},
 		set idString(){}
 	};
-	dx.extend({
+	ext.extend({
 		Color:Color
 	});
-})(dx)
+})(extensible)

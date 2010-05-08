@@ -1,11 +1,11 @@
-(function(dx){
+(function(ext){
 	function ExtensibleText(text,options){
-		dx.Element.apply(this,arguments);
+		ext.Element.apply(this,arguments);
 		return this;
 	}
 	ExtensibleText.prototype={
-		__proto__:dx.Element.prototype,
+		__proto__:ext.Element.prototype,
 		type:ExtensibleText
 	}
-	dx.extend({Text:ExtensibleText});
-})(dx);
+	ext.extend({Text:ExtensibleText});
+})(extensible);

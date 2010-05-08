@@ -1,10 +1,10 @@
-(function(dx){
+(function(ext){
 	function ExtensibleSymbolInstance(instance,options){
-		dx.Element.apply(this,arguments);
+		ext.Element.apply(this,arguments);
 		return this;
 	}
 	ExtensibleSymbolInstance.prototype={
-		__proto__:dx.Instance.prototype,
+		__proto__:ext.Instance.prototype,
 		type:ExtensibleSymbolInstance,
 		//built in properties
 		get accName(){return this.$.accName;},
@@ -55,9 +55,9 @@
 		set tabIndex(s){this.$.tabIndex=s;},
 		get timeline(){
 			return(
-				(this.libraryItem.timeline instanceof dx.Timeline)?
+				(this.libraryItem.timeline instanceof ext.Timeline)?
 				this.libraryItem.timeline:
-				new dx.Timeline(this.libraryItem.timeline)
+				new ext.Timeline(this.libraryItem.timeline)
 			);
 		},
 		set timeline(s){return;},
@@ -87,5 +87,5 @@
 			return frame;
 		}
 	}
-	dx.extend({SymbolInstance:ExtensibleSymbolInstance});
-})(dx);
+	ext.extend({SymbolInstance:ExtensibleSymbolInstance});
+})(extensible);

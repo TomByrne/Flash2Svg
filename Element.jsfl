@@ -1,7 +1,7 @@
-(function(dx){
+(function(ext){
 	function ExtensibleElement(element,options){
 		var type=this.type;
-		var settings=new dx.Object({
+		var settings=new ext.Object({
 			$:(
 				(element instanceof Element)?
 				element:
@@ -11,20 +11,20 @@
 					null
 				)
 			),
-			cache:new dx.Object({})
+			cache:new ext.Object({})
 		});
 		settings.extend(options);
 		if(options){
-			settings.cache=settings.cache||new dx.Object();
+			settings.cache=settings.cache||new ext.Object();
 			if(settings.frame){
 				if(settings.frame instanceof Frame){
-					settings.cache.frame=new dx.Frame(
+					settings.cache.frame=new ext.Frame(
 						settings.frame,
 						{
 							timeline:settings.timeline
 						}
 					);
-				}else if(settings.frame instanceof dx.Frame){
+				}else if(settings.frame instanceof ext.Frame){
 					settings.cache.frame=settings.frame;
 					if(!settings.cache.frame.timeline ){
 						settings.cache.frame.timeline=settings.timeline;
@@ -34,18 +34,18 @@
 			}
 			if(settings.timeline){
 				if(settings.timeline instanceof Timeline){
-					settings.cache.timeline=new dx.Timeline(settings.timeline);
-				}else if(settings.timeline instanceof dx.Timeline){
+					settings.cache.timeline=new ext.Timeline(settings.timeline);
+				}else if(settings.timeline instanceof ext.Timeline){
 					settings.cache.timeline=settings.timeline;
 				}
 				delete settings.timeline;
 			}
 		}
-		dx.Object.apply(this,[settings]);
+		ext.Object.apply(this,[settings]);
 		return this;
 	}
 	ExtensibleElement.prototype={
-		__proto__:dx.Object.prototype,
+		__proto__:ext.Object.prototype,
 		type:ExtensibleElement,
 		time:0,
 		getPersistentData:function(name){
@@ -78,9 +78,9 @@
 			return this.$.setTransformationPoint(transformationPoint);
 		},
 		getFilters:function(){
-			var filters=new dx.Array(this.$.getFilters());
+			var filters=new ext.Array(this.$.getFilters());
 			for(var i=0;i<filters.length;i++){
-				filters[i]=new dx.Object(filters[i]);	
+				filters[i]=new ext.Object(filters[i]);	
 			}
 			return filters;
 		},
@@ -114,7 +114,7 @@
 		get layer(){
 			var options={};
 			if(this.timeline){options.timeline=this.timeline;}
-			return new dx.Layer(this.$.layer,options);
+			return new ext.Layer(this.$.layer,options);
 		},
 		set layer(s){
 			return;
@@ -145,7 +145,7 @@
 		},
 		//transformation
 		get matrix(){
-			return new dx.Matrix(this.$.matrix);
+			return new ext.Matrix(this.$.matrix);
 		},
 		set matrix(s){
 			this.$.matrix=s;
@@ -217,7 +217,7 @@
 			this.$.width=s;
 		},
 		get transformationPoint(){
-			return new dx.Point(this.$.transformationPoint);
+			return new ext.Point(this.$.transformationPoint);
 		},
 		set transformationPoint(p){
 			this.$.transformationPoint=p;
@@ -235,11 +235,11 @@
 			this.$.y=s;
 		},
 		get center(){
-			return new dx.Point({x:this.left+this.width/2,y:this.top+this.height/2});
+			return new ext.Point({x:this.left+this.width/2,y:this.top+this.height/2});
 		},
 		set center(point){
-			if(!point instanceof dx.Point){
-				point=new dx.Point(point);
+			if(!point instanceof ext.Point){
+				point=new ext.Point(point);
 			}
 			var offset=p.difference(this.center);
 			this.x+=offset.x;
@@ -257,9 +257,9 @@
 			}
 		},
 		get frame(){
-			if(this.cache.frame instanceof dx.Frame){
+			if(this.cache.frame instanceof ext.Frame){
 				return this.cache.frame;
-			}else if(this.parent instanceof dx.Shape){
+			}else if(this.parent instanceof ext.Shape){
 				return this.parent.frame;
 			}else{
 				return this.getFrame();
@@ -267,13 +267,13 @@
 		},
 		set frame(frame){
 			if(frame instanceof Frame){
-				this.cache.frame=new dx.Frame(
+				this.cache.frame=new ext.Frame(
 					settings.frame,
 					{
 						timeline:this.timeline
 					}
 				);
-			}else if(frame instanceof dx.Frame){
+			}else if(frame instanceof ext.Frame){
 				this.cache.frame=frame;
 				if(!frame.timeline){
 					this.cache.frame.timeline=this.timeline;
@@ -291,13 +291,13 @@
 			}
 		},
 		set timeline(s){
-			this.cache.timeline=(s instanceof dx.Timeline)?s:new dx.Timeline(s);
+			this.cache.timeline=(s instanceof ext.Timeline)?s:new ext.Timeline(s);
 		},
 		is:function(element,options){
 			if(!(element instanceof this.type)){
 				element=new this.type(element);
 			}
-			if(!(this instanceof dx.Shape)){
+			if(!(this instanceof ext.Shape)){
 				var id=this.uniqueDataName(String('temporaryID_'+String(Math.floor(Math.random()*9999))));
 				var pd=Math.floor(Math.random()*99999999);
 				this.setPersistentData(id,'integer',pd);
@@ -308,7 +308,7 @@
 				this.removePersistentData(id);
 				return matched;
 			}
-			var settings=new dx.Object({
+			var settings=new ext.Object({
 				checklist:[
 					'matrix',
 					'width',
@@ -321,8 +321,8 @@
 				]		
 			});
 			settings.extend(options,true);
-			return dx.Object.prototype.is.call(this,element,settings);
+			return ext.Object.prototype.is.call(this,element,settings);
 		}		
 	}
-	dx.extend({Element:ExtensibleElement});
-})(dx);
+	ext.extend({Element:ExtensibleElement});
+})(extensible);

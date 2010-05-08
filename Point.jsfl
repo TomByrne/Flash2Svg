@@ -1,17 +1,17 @@
-(function(dx){
+(function(ext){
 	function ExtensiblePoint(point){
 		this.x=point && point.x ? point.x : 0.0;
 		this.y=point && point.y ? point.y : 0.0;
 		return this;
 	}
 	ExtensiblePoint.prototype={
-		__proto__:dx.Object.prototype,
+		__proto__:ext.Object.prototype,
 		type:ExtensiblePoint,
 		is:function(p){
 			return(p.x==this.x && p.y==this.y);	
 		},
 		transform:function(mx){
-			mx=new dx.Matrix(mx);
+			mx=new ext.Matrix(mx);
 			return new this.type({
 				x:this.x*mx.a+this.y*mx.c+mx.tx,
 				y:this.x*mx.b+this.y*mx.d+mx.ty
@@ -38,11 +38,11 @@
 		},
 		get normalized(){
 			var length=this.length;
-			return new dx.Point({
+			return new ext.Point({
 				x:this.x/length,
 				y:this.y/length
 			});
 		},
 	}
-	dx.extend({Point:ExtensiblePoint});
-})(dx)
+	ext.extend({Point:ExtensiblePoint});
+})(extensible)

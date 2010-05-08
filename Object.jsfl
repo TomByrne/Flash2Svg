@@ -1,4 +1,4 @@
-(function(){
+(function(ext){
 	function ExtensibleObject(obj){
 		if(obj){
 			for(var i in obj){
@@ -7,7 +7,7 @@
 					if(element && !element.type){
 						switch(element.constructor.name){
 							case 'Array':
-								this[i]=new dx.Array(obj[i]);
+								this[i]=new ext.Array(obj[i]);
 								break;
 							case 'Object':
 								this[i]=new this.type(obj[i]);
@@ -54,7 +54,7 @@
 			}
 		},
 		get keys(){
-			var keys=new dx.Array();
+			var keys=new ext.Array();
 			for(k in this){
 				if(
 					this.hasOwnProperty(k)
@@ -78,10 +78,10 @@
 						typeof(this[n])==typeof(obj[n])
 					){
 						if(this[n].constructor.name=='Object'){
-							this[n]=new dx.Object(this[n]);
+							this[n]=new ext.Object(this[n]);
 							this[n].extend(obj[n],recursive);
 						}else if(this[n].constructor.name=='Array'){
-							this[n]=new dx.Array(this[n]);
+							this[n]=new ext.Array(this[n]);
 							this[n].extend(obj[n],recursive);
 						}else{
 							this[n]=obj[n];
@@ -118,18 +118,18 @@
 		is:function(o,options){
 			if(typeof(o)!='object'){return;}
 			if(!(o instanceof this.type)){
-				o=new dx.Object(o);	
+				o=new ext.Object(o);	
 			}
-			var settings=new dx.Object({
+			var settings=new ext.Object({
 				ignore:null,//list of attributes to ignore, defaults to none
 				checklist:null//list of attributes to check, defaults to all
 			});
 			settings.extend(options);
-			if(settings.ignore && !(settings.ignore instanceof dx.Array)){
-				settings.ignore=new dx.Array(settings.ignore)
+			if(settings.ignore && !(settings.ignore instanceof ext.Array)){
+				settings.ignore=new ext.Array(settings.ignore)
 			}
-			if(settings.checklist && !(settings.checklist instanceof dx.Array)){
-				settings.checklist=new dx.Array(settings.checklist)
+			if(settings.checklist && !(settings.checklist instanceof ext.Array)){
+				settings.checklist=new ext.Array(settings.checklist)
 			}
 			var keys=settings.checklist||o.keys;
 			for(var i=0;i<keys.length;i++){
@@ -150,5 +150,5 @@
 			return true;
 		}
 	}
-	dx.extend({Object:ExtensibleObject});
-})()
+	ext.extend({Object:ExtensibleObject});
+})(extensible)

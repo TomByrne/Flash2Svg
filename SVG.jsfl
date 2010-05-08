@@ -1,53 +1,52 @@
-(function(dx){
+(function(ext){
 	function SVG(options){
-		var settings=new dx.Object({
-			flatten:true,// If true, symbols are converted to graphic elements for compatibility w/ Webkit browsers & Adobe Illustrator.
-			degree:2,// Determines whether curves are created as Quadratic (2) or Cubic (3). Quadratic is faster for large documents.
-			masking:'alpha', // Determines how masks are applied: 'alpha','clipping',or 'luminance'. Clipping mimicks the way flash displays masks.
-			timeline:dx.timeline, // The base timeline for export. Defaults to the currently open timeline.
-			frame:dx.frame, // The index of the frame for which SVG markup will be generated. Defaults to the current frame.
-			backgroundColor:dx.doc.backgroundColor, // RGB/Hexadecimal. Defaults to the current background color.
-			includeHiddenLayers:dx.includeHiddenLayers,
+		var settings=new ext.Object({
+			globalStrokeWidths:false, // if true, stroke widths are specified as document-relative widths for Illustrator
+			flatten:true, // if true, symbols are converted to graphic elements for compatibility w/ Illustrator & Webkit browsers
+			degree:2, // determines whether curves are created as Quadratic (2) or Cubic (3) beziers - Quadratic is faster
+			masking:'clipping', // determines how masks are applied: 'alpha','clipping',or 'luminance'. Clipping mimicks the way flash displays masks.
+			timeline:ext.timeline, // root timeline - defaults to the currently open timeline
+			frame:ext.frame, // current frame index - defaults to the current frame
+			backgroundColor:ext.doc.backgroundColor,
+			includeHiddenLayers:ext.includeHiddenLayers,
 			includeGuides:false,
-			selection:null, // A dx.Selection object. Limits content to specified elements.
-			matrix:dx.viewMatrix, // The matrix applied to the root element, defaults to the current viewMatrix.
-			id:String(dx.doc.name.stripExtension().camelCase()), // Root element ID.
-			x:0,y:0, // Root element registration point.
-			width:dx.doc.width, // Document width.
-			height:dx.doc.height, // Document height.
-			docString:( // DOCTYPE
+			selection:null, // A ext.Selection object. Limits content to specified elements.
+			matrix:ext.viewMatrix, // The matrix applied to the root element, defaults to the current viewMatrix.
+			id:String(ext.doc.name.stripExtension().camelCase()), // root element ID
+			x:0,y:0, // root element registration point
+			width:ext.doc.width, // Document width.
+			height:ext.doc.height, // Document height.
+			docString:( // Header & DOCTYPE
 				'<?xml version="1.0" encoding="utf-8"?>\n'+
 				'<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">\n'
 			),
-			log:undefined,// URI to write debugging log.
-			version:'1.1',// SVG Version.
-			defaultMatrixString:'matrix(1 0 0 1 0 0)', 
-			defaultGradientLength:819.2,//Pre-transformation length of ALL linear gradients in flash.
-			defaultGradientRadius:810.7//Pre-transformation radius of ALL radial gradients in flash.
+			version:'1.1', // SVG Version
+			baseProfile:'basic',
+			log:undefined // URI for writing a log
 		});
 		settings.extend(options);
-		if(typeof(settings.log)=='string'){
-			settings.log=new dx.Log({url:settings.log});
-			if(!settings.log.url){
-				settings.log=null;
-			}
-		}
-		dx.Object.apply(this,[settings]);
-		this.symbols=new dx.Array([]);
-		this.ids=new dx.Array([]);
-		this.tempFolder='';
+		ext.Object.apply(this,[settings]);
+		this._defaultGradientLength=819.2;//Pre-transformation length of ALL linear gradients in flash.
+		this._defaultGradientRadius=810.7;//Pre-transformation radius of ALL radial gradients in flash.
+		this._defaultMatrixString='matrix(1 0 0 1 0 0)';
+		this._symbols=new ext.Array([]);
+		this._ids=new ext.Array([]);
+		this._tempFolder=ext.lib.uniqueName('temp');
 		this.getSVG();
 		return this;
 	}
 	SVG.prototype={
-		__proto__:dx.Object,
+		__proto__:ext.Object,
 		type:SVG,
 		getSVG:function(){
-			if(this.log){var timer=this.log.startTimer('SVG.getSVG');}
-			var origSelection=dx.sel;
-			dx.doc.selectNone();
+			if(typeof(this.log)=='string'){
+				ext.startLog({url:this.log});
+			}
+			var origSelection=ext.sel;
+			ext.doc.selectNone(); // selection slows performance & can cause crashes
 			fl.showIdleMessage(false);
 			this.xml=new XML('<svg xmlns:xlink="http://www.w3.org/1999/xlink"/>');
+			this.xml['@baseProfile']=this.baseProfile;
 			this.xml['@version']=this.version;
 			this.xml['@style']="background-color:"+this.backgroundColor;
 			this.xml['@x']=String(this.x)+'px';
@@ -64,52 +63,127 @@
 				frame:this.frame,
 				selection:this.selection
 			});
-			if(this.matrix.is(new dx.Matrix())){
+			if(this.matrix.is(new ext.Matrix())){ // skip unnecessary identity matrix
 				for each(var e in x.*){
 					this.xml.appendChild(e);
 				}
 			}else{
 				this.xml.appendChild(x);
 			}
-			if(this.flatten){
+			if(this.flatten || this.baseProfile=='tiny'){ // expand symbol instances
 				this.expandUse(this.xml);
 				delete this.xml.defs.symbol;
 			}
-			this.xml['@xmlns']="http://www.w3.org/2000/svg";
+			this.xml['@xmlns']="http://www.w3.org/2000/svg"; // namespace defined after content has been generated for brevity
+			if(ext.lib.itemExists(this._tempFolder)){ // cleanup temporary items
+				ext.lib.deleteItem(this._tempFolder);	
+			}
 			fl.showIdleMessage(true);
-			if(this.log){this.log.stopTimer(timer);}
-			dx.sel=origSelection;
+			ext.sel=origSelection;
+			if(typeof(this.log)=='string'){
+				ext.stopLog();
+			}
 			return this.xml;
 		},
-		createTemporaryTimelines:function(){//breaks apart tweens
-			
-		},
 		getTimeline:function(timeline,options){
-			var settings=new dx.Object({
+			var settings=new ext.Object({
 				frame:0,
-				selection:null,
-				id:null,
-				matrix:new dx.Matrix(),
-				libraryItem:null,
-				color:null
+				selection:undefined,
+				id:undefined,
+				matrix:new ext.Matrix(),
+				libraryItem:undefined,
+				color:undefined
 			});
 			settings.extend(options);
-			if(this.log){
-				var timer=this.log.startTimer(
-					'SVG.getTimeline('+
-					((timeline && timeline.name)?timeline.name:'')+')'
-				);
+			if(typeof(settings.color)=='string'){ // tint color
+				settings.color=new ext.Color(settings.color);
 			}
-			if(settings.color){settings.color=new dx.Color(settings.color);}
-			var fast=false;
-			if(!settings.selection){
-				settings.selection=timeline.getElements({
-					frame:settings.frame,
+			var hasTweens=false;
+			var frames,tempName;
+			if(settings.libraryItem){ // it's a symbol
+				tempName=this._tempFolder+'/'+settings.libraryItem.name;
+			}
+			if(tempName && ext.lib.itemExists(tempName)){ // a temporary symbol has already been created
+				hasTweens=true;
+			}else{
+				frames=timeline.getFrames({ // get a list of currently visible frames
+					position:settings.frame,
 					includeHiddenLayers:this.includeHiddenLayers,
 					includeGuides:this.includeGuides
 				});
+				for(var i=0;i<frames.length;i++){ // check for tweens
+					if(
+						frames[i].tweenType!='none' &&
+						settings.frame!=frames[i].startFrame
+					){
+						hasTweens=true;
+						break;
+					}
+				}
 			}
-			var selection=settings.selection.byFrame({stacked:true});
+			var originalScene,timelines;
+			if(hasTweens){ // create temporary timelines for converting frames to keyframes
+				if(settings.libraryItem==undefined){
+					originalScene=timeline.name;
+					ext.doc.duplicateScene();
+					timelines=ext.doc.timelines;
+					timeline=new ext.Timeline(timelines[timelines.length-1]);
+				}else{
+					if(ext.lib.itemExists(tempName)){
+						ext.lib.selectItem(tempName);
+					}else{
+						if(!ext.lib.itemExists(tempName.dir)){
+							ext.lib.addNewItem('folder',tempName.dir);
+						}
+						ext.lib.selectItem(settings.libraryItem.name);
+						ext.lib.duplicateItem();
+						ext.lib.moveToFolder(tempName.dir);
+						ext.lib.renameItem(tempName.basename);
+					}
+					timeline=new ext.Timeline(ext.lib.getSelectedItems()[0].timeline);
+				}
+				var layers=timeline.layers;
+				var ranges=new ext.Array();
+				for(var i=0;i<layers.length;i++){
+					var range=new ext.Array();
+					var l=layers[i];
+					if(l.frameCount>settings.frame){
+						var f=l.frames[settings.frame];
+						if(f.tweenType!='none'){
+							var start=f.startFrame;
+							var end=start+f.duration;
+							while(
+								l.frames[end] &&
+								l.frames[end].tweenType!='none'
+							){
+								var pEnd = end + l.frames[end].duration;
+								if (l.frames[pEnd]){
+									end=pEnd;
+								}else{
+									break;
+								}
+							}
+							range.push(start);
+							range.push(end);						
+						}
+					}
+					ranges.push(range);
+				}
+				timeline.convertToKeyframes(ranges);
+			}
+			if(!settings.selection){ // get elements in the currently visible frames
+				var options={
+					includeHiddenLayers:this.includeHiddenLayers,
+					includeGuides:this.includeGuides
+				};
+				if(hasTweens){
+					options.frame=settings.frame;
+				}else{
+					options.frames=frames;
+				}
+				settings.selection=timeline.getElements(options);
+			}
+			var selection=settings.selection.byFrame({stacked:true}); // group elements by layer
 			var xml;
 			var instanceXML;
 			var boundingBox;
@@ -121,7 +195,7 @@
 				settings.matrix.tx+' '+
 				settings.matrix.ty+')'
 			);
-			if(settings.libraryItem){
+			if(settings.libraryItem){  // create symbol definition if not already available
 				var id=settings.libraryItem.name.replace('/','_').camelCase();
 				if(settings.frame!=0){
 					id+='_'+String(settings.frame);
@@ -131,7 +205,7 @@
 				}
 				id=this.uniqueID(id);
 				xml=new XML('<use xlink-href="#'+id+'"/>');
-				if(this.symbols.indexOf(id)<0){
+				if(this._symbols.indexOf(id)<0){
 					instanceXML=xml;
 					instanceXML['@width']=0;
 					instanceXML['@height']=0;
@@ -139,10 +213,10 @@
 					instanceXML['@y']=0;
 					instanceXML['@transform']=transformString;
 					instanceXML['@overflow']="visible";
-					this.symbols.push(id);
+					this._symbols.push(id);
 					xml=new XML('<symbol/>');
 					xml['@id']=id;
-					boundingBox=new dx.Object({left:0,top:0,right:0,bottom:0});
+					boundingBox=new ext.Object({left:0,top:0,right:0,bottom:0});
 				}else{
 					var vb=String(this.xml.defs.symbol.(@id==id)[0]['@viewBox']).split(' ');
 					xml['@width']=vb[2];
@@ -155,11 +229,11 @@
 				}
 			}else{
 				xml=new XML('<g/>');
-				if(settings.matrix && !settings.matrix.is(new dx.Matrix())){
+				if(settings.matrix && !settings.matrix.is(new ext.Matrix())){
 					xml['@transform']=transformString;
 				}
 			}
-			var masked=new dx.Array();
+			var masked=new ext.Array();
 			for(var i=0;i<selection.length;i++){
 				if(selection[i] && selection[i].length>0){
 					var layer=selection[i][0].layer;
@@ -174,9 +248,9 @@
 					if(layer.layerType=='mask'){
 						layerXML=new XML('<mask id="'+id+'" />');
 						if(this.masking=='alpha'){
-							colorX=new dx.Color('#FFFFFF00');
+							colorX=new ext.Color('#FFFFFF00');  // isolate the alpha channel by tinting the element white 
 						}else if(this.masking=='clipping'){
-							colorX=new dx.Color('#FFFFFFFF');
+							colorX=new ext.Color('#FFFFFFFF'); // make the mask opaque
 						}
 					}else if(layer.layerType=='masked'){
 						layerXML=new XML('<g id="'+id+'" />');
@@ -184,13 +258,13 @@
 						layerXML=new XML('<g id="'+id+'" />');
 					}
 					for(var n=0;n<selection[i].length;n++){
-						if(boundingBox){
+						if(boundingBox){ // get the timeline's bounding box
 							if(selection[i][n].left<boundingBox.left){boundingBox.left=selection[i][n].left;}
 							if(selection[i][n].top<boundingBox.top){boundingBox.top=selection[i][n].top;}
 							if(selection[i][n].right>boundingBox.right){boundingBox.right=selection[i][n].right;}
 							if(selection[i][n].bottom>boundingBox.bottom){boundingBox.bottom=selection[i][n].bottom;}
 						}
-						var element=this.getElement(selection[i][n],{
+						var element=this.getElement(selection[i][n],{ // get the XML for the element
 							colorTransform:colorX,
 							frame:settings.frame
 						});
@@ -198,18 +272,16 @@
 							layerXML.appendChild(element);
 						}
 					}
-					if(layer.layerType=='masked'){
+					if(layer.layerType=='masked'){  // masked layers are grouped together
 						masked.push(layerXML);
 					}else if(layerXML){
 						xml.appendChild(layerXML);
-						if(layer.layerType=='mask'){
+						if(layer.layerType=='mask'){ // masked layers must come after the mask
 							var mg=new XML('<g mask="url(#'+id+')"/>');
 							for(var m=0;m<masked.length;m++){
 								mg.appendChild(masked[m]);
 							}
-							if(mg){
-								xml.appendChild(mg);
-							}
+							xml.appendChild(mg);
 							masked.clear();
 						}
 					}
@@ -217,10 +289,17 @@
 					if(layer.locked!=lLocked){layer.locked=lLocked;}
 				}
 			}
-			if(this.log){
-				this.log.stopTimer(timer);
+			if(originalScene!==undefined){ // this is a temporary scene, delete it and return to the original
+				var timelines=ext.timelines;
+				ext.doc.deleteScene();
+				for(i=0;i<ext.timelines.length;i++){
+					if(timelines[i].name==originalScene){
+						ext.doc.editScene(i);
+						break;	
+					}
+				}
 			}
-			if(instanceXML){
+			if(instanceXML){ // set the viewBox
 				instanceXML['@width']=String(boundingBox.right-boundingBox.left);
 				instanceXML['@height']=String(boundingBox.bottom-boundingBox.top);
 				instanceXML['@x']=String(boundingBox.left);
@@ -255,10 +334,9 @@
 			
 		},
 		getSymbolInstance:function(instance,options){
-			//return;
-			var settings=new dx.Object({
+			var settings=new ext.Object({
 				frame:0,
-				matrix:new dx.Matrix(),
+				matrix:new ext.Matrix(),
 				colorTransform:null,
 				libraryItem:instance.libraryItem
 			});
@@ -273,14 +351,14 @@
 			return new XML('<g/>');
 		},
 		getShape:function(shape,options){
-			var settings=new dx.Object({
-				matrix:new dx.Matrix(),
+			var settings=new ext.Object({
+				matrix:new ext.Matrix(),
 				colorTransform:null,
 				frame:null
 			});
 			settings.extend(options);
 			var matrix=shape.matrix;
-			var descendantMatrix=new dx.Matrix();
+			var descendantMatrix=new ext.Matrix();
 			var pathMatrix=null;
 			var layerLocked=shape.layer.locked;
 			if(shape.isDrawingObject){
@@ -291,14 +369,14 @@
 				matrix.ty=shape.top;
 				matrix=matrix.concat(settings.matrix);
 				if(shape.objectSpaceBounds.left!=0 || shape.objectSpaceBounds.top!=0){
-					pathMatrix=new dx.Matrix({
+					pathMatrix=new ext.Matrix({
 						tx:-shape.objectSpaceBounds.left,
 						ty:-shape.objectSpaceBounds.top}
 					);
 				}
 			}else if(shape.isGroup){
 				descendantMatrix=matrix.invert();
-				pathMatrix=new dx.Matrix({
+				pathMatrix=new ext.Matrix({
 					tx:(shape.objectSpaceBounds.left+shape.objectSpaceBounds.right)/2.0,
 					ty:(shape.objectSpaceBounds.top+shape.objectSpaceBounds.bottom)/2.0
 				});
@@ -309,13 +387,13 @@
 				matrix.ty=shape.top;
 				matrix=matrix.concat(settings.matrix);
 				if(shape.objectSpaceBounds.left!=0 || shape.objectSpaceBounds.top!=0){
-					pathMatrix=new dx.Matrix({tx:shape.objectSpaceBounds.left,ty:shape.objectSpaceBounds.top});
+					pathMatrix=new ext.Matrix({tx:shape.objectSpaceBounds.left,ty:shape.objectSpaceBounds.top});
 					pathMatrix=pathMatrix.invert();
 				}
 			}
 			var contours=shape.contours;
-			var svgArray=new dx.Array();
-			var filled=new dx.Array();
+			var svgArray=new ext.Array();
+			var filled=new ext.Array();
 			var tobeCut=null;
 			for(var i=0;i<contours.length;i++){
 				svgArray.push(this.getCountour(contours[i],{
@@ -411,7 +489,7 @@
 			return svg;		
 		},
 		getCountour:function(contour,options){
-			var settings=new dx.Object({
+			var settings=new ext.Object({
 				matrix:null,
 				reversed:false,
 				colorTransform:null
@@ -432,10 +510,10 @@
 					edgs=edges.reverse();
 				}
 			}else{
-				var points=new dx.Array();
-				var strokes=new dx.Array();
-				var edgs=new dx.Array();
-				var edgeIDs=new dx.Array();
+				var points=new ext.Array();
+				var strokes=new ext.Array();
+				var edgs=new ext.Array();
+				var edgeIDs=new ext.Array();
 				var he=contour.getHalfEdge();
 				var used=[];
 				var start=he.id;
@@ -453,22 +531,22 @@
 					var cp;
 					if(this.degree==3){
 						if(e.isLine){
-							cp=new dx.Array([e.getControl(0),e.getControl(2)]);
+							cp=new ext.Array([e.getControl(0),e.getControl(2)]);
 						}else{
 							if(e.cubicSegmentIndex){
 								cp=contour.shape.getCubicSegmentPoints(e.cubicSegmentIndex);
 							}else{
-								var c0=new dx.Point(e.getControl(0));
-								var c1=new dx.Point(e.getControl(1));
-								var c2=new dx.Point(e.getControl(2));
+								var c0=new ext.Point(e.getControl(0));
+								var c1=new ext.Point(e.getControl(1));
+								var c2=new ext.Point(e.getControl(2));
 								if(c0 && c1 && c2){
-									cp=new dx.Array([c0,c1,c2]);
+									cp=new ext.Array([c0,c1,c2]);
 								}else{
 									var ohe=he.getOppositeHalfEdge();
 									if(ohe){
 										var ov=ohe.getVertex();
 										if(ov){
-											cp=new dx.Array([new dx.Point(v),new dx.Point(ov)]);
+											cp=new ext.Array([new ext.Point(v),new ext.Point(ov)]);
 										}
 									}
 								}
@@ -476,7 +554,7 @@
 							}
 						}
 					}else{
-						cp=new dx.Array([e.getControl(0),e.getControl(1),e.getControl(2)]);
+						cp=new ext.Array([e.getControl(0),e.getControl(1),e.getControl(2)]);
 					}
 					var direction=v.is(e.getHalfEdge(0).getVertex())?0:1;
 					if(direction==1){cp=cp.reverse();}
@@ -492,10 +570,10 @@
 				if(points.length==0){return;}
 			}
 			if(!useCache || settings.reversed){
-				controlPoints=new dx.Array([points[0]]);
+				controlPoints=new ext.Array([points[0]]);
 				var deg=points[0].length-1;
 				var deg0=deg;
-				var edges=new dx.Array([edgs[0]]);
+				var edges=new ext.Array([edgs[0]]);
 				for(var i=1;i<points.length;i++){//Check to make sure that all points are correctly ordered and do not overlap.
 					var prevdegree=deg;
 					deg=points[i].length-1;
@@ -532,8 +610,8 @@
 				contour.cache.controlPoints=controlPoints;
 				contour.cache.edges=edges;
 			}
-			var fills=new dx.Array();
-			var paths=new dx.Array();
+			var fills=new ext.Array();
+			var paths=new ext.Array();
 			var interior=false;
 			var xform='';
 			if(settings.matrix){
@@ -559,7 +637,7 @@
 					if(fill.name()=='solidColor'){
 						fillString=String(fill['@solid-color']);
 						opacityString=String(fill['@solid-opacity']);
-						this.ids.pop();
+						this._ids.pop();
 					}else{
 						fills.push(fill);
 						fillString='url(#'+String(fill['@id'])+')';
@@ -570,7 +648,7 @@
 				paths.push('<path  '+xform+'fill="'+fillString+'" opacity="'+opacityString+'" d="'+cdata+'"/>\n');
 			}
 			if(edges.length>0 && !settings.reversed){//Create a contour for each length of contiguous edges w/ the same stroke attributes. Skipped for settings.reversed, which is only used for creating hollows.
-				var cp=new dx.Array([]);
+				var cp=new ext.Array([]);
 				var stroke=null;
 				if(edges[0].stroke && edges[0].stroke.style!='noStroke'){
 					cp.push(controlPoints[0]);
@@ -592,7 +670,7 @@
 								);
 							}
 							stroke=edges[i].stroke;
-							cp=new dx.Array([controlPoints[i]]);
+							cp=new ext.Array([controlPoints[i]]);
 						}
 					}else{
 						if(stroke && cp.length>0){
@@ -685,14 +763,14 @@
 			return curveString.join('');
 		},
 		getFill:function(fillObj,options){
-			var settings=new dx.Object({
+			var settings=new ext.Object({
 				shape:undefined,
 				gradientUnits:'userSpaceOnUse'
 				//gradientUnits:'objectBoundingBox'
 			});
 			settings.extend(options);
 			if(typeof fillObj=='string'){
-				fillObj=new dx.Fill(fillObj);
+				fillObj=new ext.Fill(fillObj);
 			}else if(fillObj.style=='noFill'){
 				return;
 			}
@@ -702,9 +780,9 @@
 			var matrix=fillObj.matrix;
 			switch(fillObj.style){
 				case 'linearGradient':
-					defaultMeasurement=this.defaultGradientLength;
+					defaultMeasurement=this._defaultGradientLength;
 				case 'radialGradient':
-					defaultMeasurement=defaultMeasurement||this.defaultGradientRadius;
+					defaultMeasurement=defaultMeasurement||this._defaultGradientRadius;
 					if(!shape){return;}
 					xml=new XML('<'+fillObj.style+'/>');
 					xml['@gradientUnits']=settings.gradientUnits;
@@ -722,7 +800,7 @@
 					}
 					for(var i=0;i<fillObj.colorArray.length;i++){
 						var stop=new XML('<stop/>');
-						var c=new dx.Color(fillObj.colorArray[i]);
+						var c=new ext.Color(fillObj.colorArray[i]);
 						stop['@stop-color']=c.hex;
 						stop['@stop-opacity']=c.opacity;
 						if(i<fillObj.posArray.length){
@@ -732,9 +810,9 @@
 					}
 					var width=shape.objectSpaceBounds.right-shape.objectSpaceBounds.left;
 					var height=shape.objectSpaceBounds.bottom-shape.objectSpaceBounds.top;
-					var p0=new dx.Point();
-					var p1=new dx.Point({x:0,y:0});
-					var p2=new dx.Point();
+					var p0=new ext.Point();
+					var p1=new ext.Point({x:0,y:0});
+					var p2=new ext.Point();
 					var unitID='';
 					if(settings.gradientUnits=='objectBoundingBox'){
 						unitID='%';
@@ -778,7 +856,7 @@
 					xml=new XML('<pattern/>');
 					break;
 				case 'solid':
-					var color=new dx.Color(fillObj.color);
+					var color=new ext.Color(fillObj.color);
 					xml=new XML('<solidColor/>');
 					xml['@solid-color']=color.hex;
 					xml['@solid-opacity']=color.opacity;
@@ -788,7 +866,7 @@
 			return xml;
 		},
 		getStroke:function(stroke,options){
-			var color=new dx.Color(stroke.color);
+			var color=new ext.Color(stroke.color);
 			var svg='';
 			//if(stroke.fill && stroke.fill!='noFill'){
 				
@@ -806,7 +884,10 @@
 			}
 			return svg;
 		},
-		globalizeStrokeWidths:function(xml){
+		globalizeStrokeWidths:function(xml,matrix){// vector-effect non-scaling-stroke
+			xml=xml||this.xml;
+		},
+		convertMatrices:function(xml){
 			xml=xml||this.xml;
 		},
 		expandUse:function(xml){
@@ -824,14 +905,14 @@
 				delete use['@height'];
 				delete use['@x'];
 				delete use['@y'];
-				if(use['@transform']==this.defaultMatrixString){
+				if(use['@transform']==this._defaultMatrixString){
 					delete use['@transform'];
 				}
 			}
 			return xml;
 		},
 		idExists:function(svgID,xml){
-			if(this.ids.indexOf(svgID)>-1){
+			if(this._ids.indexOf(svgID)>-1){
 				return true;
 			}
 			/*
@@ -855,12 +936,12 @@
 					return  this.uniqueID(svgID+"_1");
 				}
 			}
-			this.ids.push(svgID);
+			this._ids.push(svgID);
 			return svgID;
 		},
 		toString:function(){
 			return this.docString+'\n'+this.xml.toXMLString().replace('<use xlink-href="#','<use xlink:href="#','g');
 		}
 	}
-	dx.extend({SVG:SVG});
-})(dx);
+	ext.extend({SVG:SVG});
+})(extensible);

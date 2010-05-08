@@ -1,34 +1,32 @@
-(function(dx){
+(function(ext){
 	function ExtensibleContour(contour,options){
 		if(contour instanceof Contour){
 			this.$=contour;
 		}else if(contour instanceof this.type){
 			this.$=contour.$;
+			ext.Object.apply(this,contour);
 		}else{
 			this.$=new Contour();
 		}
-		if(options.shape instanceof dx.Shape){
+		if(options.shape instanceof ext.Shape){
 			this.shape=options.shape;
 		}else if(options.shape instanceof Shape){
-			this.shape=new dx.Shape(options.shape);
+			this.shape=new ext.Shape(options.shape);
 		}
-		this.cache=new dx.Object({controlPoints:new dx.Array()});
+		this.cache=new ext.Object({controlPoints:new ext.Array()});
 		return this;
 	}
 	ExtensibleContour.prototype={
-		__proto__:dx.Object.prototype,
+		__proto__:ext.Object.prototype,
 		$:Contour,
 		type:ExtensibleContour,
-		//built in methods
-		getHalfEdge:function(){return new dx.HalfEdge(this.$.getHalfEdge(),{shape:this.shape});},
-		//built in properties
-		get fill(){return new dx.Fill(this.$.fill);},
+		getHalfEdge:function(){return new ext.HalfEdge(this.$.getHalfEdge(),{shape:this.shape});},
+		get fill(){return new ext.Fill(this.$.fill);},
 		set fill(s){this.$.fill=s;},
 		get interior(){return this.$.interior;},
 		set interior(){},
 		get orientation(){return this.$.orientation;},
 		set orientation(){},
-		//properties
 		get edgeIDs(){
 			if(this.cache && this.cache['edgeIDs']){return this.cache.edgeIDs;}
 			return this.getEdgeIDs();
@@ -52,12 +50,11 @@
 		set oppositeContours(s){
 			this.cache.oppositeContours=s;
 		},
-		//methods
 		getEdgeIDs:function(){
-			var edges=new dx.Array();
+			var edges=new ext.Array();
 			var he=this.getHalfEdge();
 			var prevPoints;
-			var ctrlPoints=new dx.Array();
+			var ctrlPoints=new ext.Array();
 			var start=he.id;
 			var id;
 			while(id!=start){
@@ -76,16 +73,15 @@
 			var edgeIDs=this.edgeIDs;
 			var contours=this.shape.contours;
 			for(var i=0;i<contours.length;i++){
-				if(contours[i].edgeIDs.is(edgeIDs) ){//&& contours[i].fill.style!='noFill'
+				if(contours[i].edgeIDs.is(edgeIDs)){
 					this.cache.oppositeFill=contours[i].fill;
 					return contours[i].fill;
 				}
 			}
-			return null;
 		},
 		getOppositeContours:function(){
 			var edgeIDs=this.edgeIDs;
-			this.cache.oppositeContours=new dx.Array();
+			this.cache.oppositeContours=new ext.Array();
 			var contours=this.shape.contours;
 			for(var i=0;i<contours.length;i++){
 				if(contours[i].fill.is(this.fill) && !contours[i].edgeIDs.intersect(edgeIDs).length==0){
@@ -98,5 +94,5 @@
 			return(this.edgeIDs.is(c.edgeIDs) && this.fill.is(c.fill));
 		}
 	}
-	dx.extend({Contour:ExtensibleContour});
-})(dx);
+	ext.extend({Contour:ExtensibleContour});
+})(extensible);

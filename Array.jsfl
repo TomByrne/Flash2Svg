@@ -1,4 +1,4 @@
-(function(dx){
+(function(ext){
 	var ExtensibleArray=function(){
 		if(arguments.length==1 && arguments[0] instanceof Array){
 			Array.prototype.splice.apply(
@@ -100,5 +100,5 @@
 			return true;
 		}
 	}
-	dx.extend({Array:ExtensibleArray});
-})(dx)
+	ext.extend({Array:ExtensibleArray});
+})(extensible)

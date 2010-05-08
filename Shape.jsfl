@@ -1,11 +1,11 @@
-(function(dx){
+(function(ext){
 	function ExtensibleShape(shape,options){
-		dx.Element.apply(this,arguments);
-		this.cache.cubicSegmentPoints=this.cache.cubicSegmentPoints||new dx.Array();
+		ext.Element.apply(this,arguments);
+		this.cache.cubicSegmentPoints=this.cache.cubicSegmentPoints||new ext.Array();
 		return this;
 	}
 	ExtensibleShape.prototype={
-		__proto__:dx.Element.prototype,
+		__proto__:ext.Element.prototype,
 		type:ExtensibleShape,
 		beginEdit:function(){return this.$.beginEdit();},
 		deleteEdge:function(index){return this.$.deleteEdge(index);},
@@ -16,9 +16,9 @@
 					return  this.cache.cubicSegmentPoints[cubicSegmentIndex];
 				}
 				var csp=this.$.getCubicSegmentPoints(cubicSegmentIndex);
-				var points=new dx.Array();
+				var points=new ext.Array();
 				for(var i=0;i<csp.length;i++){
-					points.push(new dx.Point(csp[i]));
+					points.push(new ext.Point(csp[i]));
 				}
 				this.cache.cubicSegmentPoints[cubicSegmentIndex]=points;
 				return points;
@@ -29,9 +29,9 @@
 		get contours(){
 			if(!this.$){return;}
 			if(this.cache['contours']){return this.cache.contours;}
-			var contours=new dx.Array();
+			var contours=new ext.Array();
 			for(var i=0;i<this.$.contours.length;i++){
-				var c=new dx.Contour(this.$.contours[i],{shape:this});
+				var c=new ext.Contour(this.$.contours[i],{shape:this});
 				var matched=false;
 				for(var n=0;n<contours.length;n++){
 					if(c.edgeIDs.is(contours[n].edgeIDs)){
@@ -51,10 +51,10 @@
 		set contours(c){this.cache.contours=c;},
 		get edges(){
 			if(this.$){
-				var edges=new dx.Array();
+				var edges=new ext.Array();
 				var e=this.$.edges;
 				for(var i=0;i<e.length;i++){
-					edges.push(new dx.Edge(this.$.edges[i]));
+					edges.push(new ext.Edge(this.$.edges[i]));
 				}
 				return edges;
 			}
@@ -69,7 +69,7 @@
 		set isRectangleObject(){},
 		get members(){
 			if(this.$){
-				var members = new dx.Selection(this.$.members,this.options);
+				var members = new ext.Selection(this.$.members,this.options);
 				for(var i=0;i<members.length;i++){
 					members[i].parent=this;	
 				}
@@ -82,13 +82,13 @@
 		get vertices(){if(this.$){return this.$.vertices;}},
 		set vertices(s){return;},
 		get objectSpaceBounds(){
-			return new dx.Object(this.$.objectSpaceBounds);
+			return new ext.Object(this.$.objectSpaceBounds);
 		},
 		set objectSpaceBounds(s){
 			this.$.objectSpaceBounds=s;
 		},
 		is:function(element,options){
-			var settings=new dx.Object({
+			var settings=new ext.Object({
 				checklist:[
 					'objectSpaceBounds',
 					'numCubicSegments',
@@ -98,8 +98,8 @@
 				]		
 			});
 			settings.extend(options,true);
-			return dx.Element.prototype.is.call(this,element,settings);
+			return ext.Element.prototype.is.call(this,element,settings);
 		}
 	}
-	dx.extend({Shape:ExtensibleShape});
-})(dx);
+	ext.extend({Shape:ExtensibleShape});
+})(extensible);

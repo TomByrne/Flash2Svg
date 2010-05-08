@@ -1,4 +1,4 @@
-(function(dx){
+(function(ext){
 	function ExtensibleLayer(layer,options){
 		if(layer instanceof Layer){
 			this.$=layer;
@@ -7,16 +7,16 @@
 		}else{
 			this.$=new Layer();
 		}
-		this.cache=new dx.Object({});
+		this.cache=new ext.Object({});
 		if(options && options.timeline instanceof Timeline){
-			this.cache.timeline=new dx.Timeline(options.timeline);
+			this.cache.timeline=new ext.Timeline(options.timeline);
 		}else if(options && options.timeline && options.timeline.$ instanceof Timeline){
 			this.cache.timeline=options.timeline;	
 		}
 		return this;
 	}
 	ExtensibleLayer.prototype={
-		__proto__:dx.Object.prototype,
+		__proto__:ext.Object.prototype,
 		$:Layer,
 		type:ExtensibleLayer,
 		//built-in properties
@@ -26,11 +26,11 @@
 		set frameCount(s){this.$.frameCount=s;},
 		getFrames:function(){
 			var inputFrames=this.$.frames;
-			var frames=new dx.Array();
+			var frames=new ext.Array();
 			var options={};
 			if(this.timeline){options.timeline=this.timeline;}
 			for(var i=0;i<inputFrames.length;i++){
-				frames.push(new dx.Frame(inputFrames[i],options));
+				frames.push(new ext.Frame(inputFrames[i],options));
 			}
 			this.cache.frames=frames;
 			return frames;
@@ -39,12 +39,12 @@
 			if(this.cache.frames){return this.cache.frames;}
 			else{return this.getFrames();}
 		},
-		set frames(s){this.cache.frames=new dx.Array(frames[i].elements);},
+		set frames(s){this.cache.frames=new ext.Array(frames[i].elements);},
 		getElements:function(){
 			var frames=this.frames;
 			var options={};
 			if(this.timeline){options.timeline=this.timeline;}
-			var elements=new dx.Selection([],options);
+			var elements=new ext.Selection([],options);
 			for(var i=0;i<frames.length;i++){
 				elements.extend(frames[i].elements,options);
 			}
@@ -66,6 +66,7 @@
 		get locked(){return this.$.locked;},
 		set locked(s){this.$.locked=s;},
 		get name(){return this.$.name;},
+		set name(name){this.$.name=name;},
 		set outline(s){this.$.outline=s;},
 		get parentLayer(){return this.$.parentLayer;},
 		set parentLayer(s){this.$.parentLayer=s;},
@@ -78,7 +79,7 @@
 				return this.getTimeline();	
 			}
 		},
-		set timeline(s){this.cache.timeline=new dx.Timeline(s);},
+		set timeline(s){this.cache.timeline=new ext.Timeline(s);},
 		get index(){
 			if(this.timeline){return this.timeline.layers.indexOf(this);}
 		},
@@ -86,27 +87,27 @@
 		//methods
 		getTimeline:function(){},
 		is:function(l,options){
-			var settings=new dx.Object({
+			var settings=new ext.Object({
 				timeline:null,
 				fast:false,
 				duplicateEntriesPossible:false
 			});
 			settings.extend(options);
 			if(!l.$){l=new this.type(f);}
-			var checklist=new dx.Array([
+			var checklist=new ext.Array([
 				'name','frameCount','layerType','locked','visible','color','height','outline'
 			]);
-			if(!dx.Object.prototype.is.call(this,l,{checklist:checklist})){
+			if(!ext.Object.prototype.is.call(this,l,{checklist:checklist})){
 				return false;
 			}
 			if(settings.fast){return true;}
 			var layers=null;
 			if(settings.timeline && !settings.duplicateEntriesPossible){
-				layers=new dx.Array();
+				layers=new ext.Array();
 				var tlayers=settings.timeline.layers;
 				for(i=0;i<tlayers.length;i++){
 					var layer=tlayers[i];
-					if(dx.Object.prototype.is.call(this,layer,{checklist:checklist})){
+					if(ext.Object.prototype.is.call(this,layer,{checklist:checklist})){
 						layers.push(layer);
 					}
 				}
@@ -127,7 +128,7 @@
 				if(eeg.getShapes().length!=leeg.getShapes().length){return false;}
 			}
 			if(settings.timeline && !settings.duplicateEntriesPossible){
-				var mLayers=new dx.Array();
+				var mLayers=new ext.Array();
 				for(var n=0;n<layers.length;n++){
 					var nframes=layers[n].frames;
 					var matched=true;
@@ -166,5 +167,5 @@
 			return true;
 		}	
 	}
-	dx.extend({Layer:ExtensibleLayer});
-})(dx);
+	ext.extend({Layer:ExtensibleLayer});
+})(extensible);

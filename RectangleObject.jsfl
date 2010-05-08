@@ -1,10 +1,10 @@
-(function(dx){
+(function(ext){
 	function ExtensibleRectangleObject(shape,options){
-		dx.Shape.apply(this,arguments);
+		ext.Shape.apply(this,arguments);
 		return this;
 	}
 	ExtensibleRectangleObject.prototype={
-		__proto__:dx.Shape.prototype,
+		__proto__:ext.Shape.prototype,
 		type:ExtensibleRectangleObject,
 		get topLeftRadius(){return this.$.topLeftRadius;},
 		set topLeftRadius(s){this.$.topLeftRadius=s;},
@@ -17,7 +17,7 @@
 		get lockFlag(){return this.$.lockFlag;},
 		set lockFlag(s){this.$.lockFlag=s;},
 		is:function(element,options){
-			var settings=new dx.Object({
+			var settings=new ext.Object({
 				checklist:[
 					'objectSpaceBounds',
 					'topLeftRadius',
@@ -28,8 +28,8 @@
 				]		
 			});
 			settings.extend(options,true);
-			return dx.Element.prototype.is.call(this,element,settings);
+			return ext.Element.prototype.is.call(this,element,settings);
 		}
 	}
-	dx.extend({RectangleObject:ExtensibleRectangleObject});
-})(dx);
+	ext.extend({RectangleObject:ExtensibleRectangleObject});
+})(extensible);

@@ -1,10 +1,10 @@
-(function(dx){
+(function(ext){
 	function ExtensibleOvalObject(shape,options){
-		dx.Shape.apply(this,arguments);
+		ext.Shape.apply(this,arguments);
 		return this;
 	}
 	ExtensibleOvalObject.prototype={
-		__proto__:dx.Shape.prototype,
+		__proto__:ext.Shape.prototype,
 		type:ExtensibleOvalObject,
 		get startAngle(){return this.$.startAngle;},
 		set startAngle(s){this.$.startAngle=s;},
@@ -13,7 +13,7 @@
 		get innerRadius(){return this.$.innerRadius;},
 		set innerRadius(s){this.$.innerRadius=s;},
 		is:function(element,options){
-			var settings=new dx.Object({
+			var settings=new ext.Object({
 				checklist:[
 					'objectSpaceBounds',
 					'startAngle',
@@ -23,8 +23,8 @@
 				]		
 			});
 			settings.extend(options,true);
-			return dx.Element.prototype.is.call(this,element,settings);
+			return ext.Element.prototype.is.call(this,element,settings);
 		}
 	}
-	dx.extend({OvalObject:ExtensibleOvalObject});
-})(dx);
+	ext.extend({OvalObject:ExtensibleOvalObject});
+})(extensible);

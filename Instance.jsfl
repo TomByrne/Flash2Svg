@@ -1,10 +1,10 @@
-(function(dx){
+(function(ext){
 	function ExtensibleInstance(instance,options){
-		dx.Element.apply(this,arguments);
+		ext.Element.apply(this,arguments);
 		return this;
 	}
 	ExtensibleInstance.prototype={
-		__proto__:dx.Element.prototype,
+		__proto__:ext.Element.prototype,
 		type:ExtensibleInstance,
 		//built in functions
 		get instanceType(){return this.$.instanceType;},
@@ -12,5 +12,5 @@
 		get libraryItem(){return this.$.libraryItem;},
 		set libraryItem(s){this.$.libraryItem=s;}
 	}
-	dx.extend({Instance:ExtensibleInstance});
-})(dx);
+	ext.extend({Instance:ExtensibleInstance});
+})(extensible);

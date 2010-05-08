@@ -1,9 +1,9 @@
-(function(dx){
+(function(ext){
 	function Log(options){
-		var settings=new dx.Object({
+		var settings=new ext.Object({
 			url:(
-				dx.doc.pathURI?
-				dx.doc.pathURI.stripExtension()+"_log.csv":
+				ext.doc.pathURI?
+				ext.doc.pathURI.stripExtension()+"_log.csv":
 				null
 			),
 			append:true
@@ -13,46 +13,35 @@
 			FLfile.write(settings.url,'');
 		}
 		delete settings.append;
-		dx.Object.apply(this,[settings]);
-		this.timers=new dx.Object({});
+		ext.Object.apply(this,[settings]);
+		this.timers=new ext.Object({});
 		return this;
 	}
 	Log.prototype={
-		__proto__:dx.Object.prototype,
+		__proto__:ext.Object.prototype,
 		type:Log,
 		append:function(s){
 			FLfile.write(this.url,s,'append');
 		},
-		startTimer:function(options){
+		startTimer:function(id){
 			var date=new Date();
-			if(typeof(options)=='string'){
-				options=new dx.Object({description:options});
-			}
-			var settings=new dx.Object({
-				id:undefined,
-				description:undefined
-			});
-			settings.extend(options);
-			if(settings.id!==undefined){
-				var t=this.timers[settings.id];
-				t.elapsed=date.getTime()-t.startTime+t.elapsed;
+			if(id!==undefined && this.timers[id]){
+				var t=this.timers[id];
+				t.startTime=date.getTime();
 			}else{
-				settings.id=this.timers.uniqueKey('t');
-				var t=new dx.Object({elapsed:0,desciption:''});
+				id=this.timers.uniqueKey(id);
+				var t=new ext.Object({elapsed:0,startTime:date.getTime()});
 			}
-			if(settings.description!==undefined){
-				t.description=settings.description;
-			}
-			t.startTime=date.getTime();
-			this.timers[settings.id]=t;
-			return settings.id;
+			this.timers[id]=t;
+			return id;
 		},
 		stopTimer:function(id){
 			var t=this.timers[id];
 			if(t){
 				var time=t.elapsed;
 				if(t.startTime){time+=(new Date()).getTime()-t.startTime;}
-				this.append(t.description+','+String(time/1000)+'\n');
+				this.append(id+','+String(time/1000)+'\n');
+				delete(this.timers[id]);
 			}
 		},
 		pauseTimer:function(id){
@@ -61,7 +50,13 @@
 				this.timers[id].elapsed=(new Date()).getTime()-t.startTime+t.elapsed;
 				delete this.timers[id].startTime;
 			}
+		},
+		stop:function(){
+			var keys=this.timers.keys;
+			for(var k=0;k<keys.length;k++){
+				this.stopTimer(keys[k]);
+			}
 		}
 	}
-	dx.extend({Log:Log});
-})(dx)
+	ext.extend({Log:Log});
+})(extensible)

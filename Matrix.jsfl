@@ -1,4 +1,4 @@
-(function(dx){
+(function(ext){
 	function ExtensibleMatrix(matrix){
 		matrix=matrix||{};
 		this.a=matrix.a||1;
@@ -10,7 +10,7 @@
 		return this;
 	}
 	ExtensibleMatrix.prototype={
-		__proto__:dx.Object.prototype,
+		__proto__:ext.Object.prototype,
 		type:ExtensibleMatrix,
 		is:function(m){
 			return(
@@ -30,5 +30,5 @@
 			return new this.type(fl.Math.invertMatrix(this));
 		}
 	}
-	dx.extend({Matrix:ExtensibleMatrix});
-})(dx)
+	ext.extend({Matrix:ExtensibleMatrix});
+})(extensible)

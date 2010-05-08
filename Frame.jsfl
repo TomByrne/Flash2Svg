@@ -1,4 +1,4 @@
-(function(dx){
+(function(ext){
 	function ExtensibleFrame(frame,options){
 		if(frame && frame.constructor.name=='Frame'){
 			this.$=frame;
@@ -7,11 +7,11 @@
 		}else{
 			this.$=new Frame();
 		}
-		dx.Object.apply(this,[options]);
-		this.cache=new dx.Object({});
+		ext.Object.apply(this,[options]);
+		this.cache=new ext.Object({});
 		if(options && options.layer){
 			if(options.layer instanceof Layer){
-				this.cache.layer=new dx.Layer(options.layer,{timeline:options.timeline});
+				this.cache.layer=new ext.Layer(options.layer,{timeline:options.timeline});
 			}else if(options.layer.$ && options.layer.$ instanceof Layer){
 				options.layer.timeline=options.timeline;
 				this.cache.layer=options.layer;
@@ -19,7 +19,7 @@
 		}
 		if(options && options.timeline){
 			if(options.timeline instanceof Timeline){
-				this.cache.timeline=new dx.Timeline(options.timeline);
+				this.cache.timeline=new ext.Timeline(options.timeline);
 			}else if(options.timeline.$ && options.timeline.$ instanceof Timeline){
 				this.cache.timeline=options.timeline;
 			}
@@ -27,7 +27,7 @@
 		return this;
 	}
 	ExtensibleFrame.prototype={
-		__proto__:dx.Object.prototype,
+		__proto__:ext.Object.prototype,
 		type:ExtensibleFrame,
 		//built in methods
 		getCustomEase:function(property){return this.$.getCustomEase(property);},
@@ -47,7 +47,7 @@
 		get elements(){
 			var options={};
 			if(this.timeline){options.timeline=this.timeline;}
-			return(new dx.Selection(this.$.elements,options));
+			return(new ext.Selection(this.$.elements,options));
 		},
 		set elements(s){},
 		get hasCustomEase(){return this.$.hasCustomEase;},
@@ -102,7 +102,7 @@
 			}
 		},
 		set timeline(s){
-			if(this.cache){this.cache.timeline=new dx.Timeline(s);}
+			if(this.cache){this.cache.timeline=new ext.Timeline(s);}
 		},
 		//
 		get layer(){
@@ -114,7 +114,7 @@
 		},
 		//methods
 		is:function(f,options){
-			var settings=new dx.Object({
+			var settings=new ext.Object({
 				fast:false,
 				stacked:false,
 				timeline:null,
@@ -122,14 +122,14 @@
 			});
 			settings.extend(options);
 			if(!f.$){f=new this.type(f);}
-			var checklist=new dx.Array([
+			var checklist=new ext.Array([
 				'name','startFrame','actionScript','hasCustomEase','labelType',
 				'motionTweenOrientToPath','motionTweenRotate','motionTweenRotateTimes',
 				'motionTweenScale','motionTweenSnap','motionTweenSync','shapeTweenBlend',
 				'soundEffect','soundLoop','soundLoopMode','soundName','soundSync','tweenEasing',
 				'tweenInstanceName','tweenType','useSingleEaseCurve'
 			]);
-			if(!dx.Object.prototype.is.call(this,f,{checklist:checklist})){
+			if(!ext.Object.prototype.is.call(this,f,{checklist:checklist})){
 				return false;
 			}		
 			if(
@@ -150,5 +150,5 @@
 			return true;	
 		}
 	}
-	dx.extend({Frame:ExtensibleFrame});
-})(dx);
+	ext.extend({Frame:ExtensibleFrame});
+})(extensible);

@@ -1,6 +1,6 @@
-(function(dx){
+(function(ext){
 	function ExtensibleFill(fill){
-		var settings=new dx.Object({
+		var settings=new ext.Object({
 			style:'solid',
 			color:'#000000',
 			bitmapIsClipped:undefined,
@@ -17,14 +17,14 @@
 		}else{
 			settings.extend(fill);
 		}
-		dx.Object.apply(this,[settings]);
-		if(this.matrix && !(this.matrix instanceof dx.Matrix)){
-			this.matrix=new dx.Matrix(this.matrix);
+		ext.Object.apply(this,[settings]);
+		if(this.matrix && !(this.matrix instanceof ext.Matrix)){
+			this.matrix=new ext.Matrix(this.matrix);
 		}
 		return this;
 	}
 	ExtensibleFill.prototype={
-		__proto__:dx.Object.prototype,
+		__proto__:ext.Object.prototype,
 		type:ExtensibleFill,
 		is:function(f){
 			if(this.style!=f.style){
@@ -56,5 +56,5 @@
 			return true;
 		}
 	}
-	dx.extend({Fill:ExtensibleFill});
-})(dx)
+	ext.extend({Fill:ExtensibleFill});
+})(extensible)
