@@ -72,7 +72,11 @@
 		},
 		extend:function(obj,recursive){
 			for(var n in obj){
-				if(obj.hasOwnProperty(n)){
+				if(
+					obj.hasOwnProperty(n) &&
+					obj[n]!==null &&
+					obj[n]!==undefined
+				){
 					if(
 						recursive && 
 						typeof(this[n])==typeof(obj[n])
@@ -83,7 +87,7 @@
 						}else if(this[n].constructor.name=='Array'){
 							this[n]=new ext.Array(this[n]);
 							this[n].extend(obj[n],recursive);
-						}else{
+						}else if(this[n]!==null){
 							this[n]=obj[n];
 						}
 					}else{
@@ -118,7 +122,7 @@
 		is:function(o,options){
 			if(typeof(o)!='object'){return;}
 			if(!(o instanceof this.type)){
-				o=new ext.Object(o);	
+				o=new this.type(o);
 			}
 			var settings=new ext.Object({
 				ignore:null,//list of attributes to ignore, defaults to none

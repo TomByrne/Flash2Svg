@@ -126,12 +126,24 @@
 			return this.$.insertFrames.apply(this.$,arguments);
 		},
 		insertKeyframe:function(frameNumIndex){return this.$.insertKeyframe(frameNumIndex);},
-		pasteFrames:function(startFrameIndex,endFrameIndex){return this.$.pasteFrames(startFrameIndex,endFrameIndex);},
-		pasteMotion:function(){return this.$.pasteMotion();},
-		removeFrames:function(startFrameIndex,endFrameIndex){return this.$.removeFrames(startFrameIndex,endFrameIndex);},
-		removeMotionObject:function(){return this.$.removeMotionObject();},
-		reorderLayer:function(layerToMove,layerToPutItBy,bAddBefore){return this.$.reorderLayer(layerToMove,layerToPutItBy,bAddBefore);},
-		reverseFrames:function(startFrameIndex,endFrameIndex){return this.$.reverseFrames(startFrameIndex,endFrameIndex);},
+		pasteFrames:function(){
+			return this.$.pasteFrames.apply(this.$,arguments);
+		},
+		pasteMotion:function(){
+			return this.$.pasteMotion();
+		},
+		removeFrames:function(){
+			return this.$.removeFrames.apply(this.$,arguments);
+		},
+		removeMotionObject:function(){
+			return this.$.removeMotionObject();
+		},
+		reorderLayer:function(){
+			return this.$.reorderLayer.apply(this.$,arguments);
+		},
+		reverseFrames:function(){
+			return this.$.reverseFrames.apply(this.$,arguments);
+		},
 		selectAllFrames:function(){return this.$.selectAllFrames();},
 		setFrameProperty:function(property,value,startFrameIndex,endFrameIndex){return this.$.setFrameProperty(property,value,startFrameIndex,endFrameIndex);},
 		setGuidelines:function(xmlString){return this.$.setGuidelines(xmlString);},

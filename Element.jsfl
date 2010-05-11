@@ -11,7 +11,8 @@
 					null
 				)
 			),
-			cache:new ext.Object({})
+			cache:new ext.Object({}),
+			parent:undefined
 		});
 		settings.extend(options);
 		if(options){
@@ -47,7 +48,6 @@
 	ExtensibleElement.prototype={
 		__proto__:ext.Object.prototype,
 		type:ExtensibleElement,
-		time:0,
 		getPersistentData:function(name){
 			return this.$.getPersistentData(name);
 		},
@@ -55,6 +55,7 @@
 			return this.$.getTransformationPoint();
 		},
 		hasPersistentData:function(name){
+			
 			return this.$.hasPersistentData(name);
 		},
 		removePersistentData:function(name){
@@ -145,7 +146,12 @@
 		},
 		//transformation
 		get matrix(){
-			return new ext.Matrix(this.$.matrix);
+			if(this.$){
+				var mx=this.$.matrix
+				if(mx){
+					return new ext.Matrix(mx);
+				}
+			}
 		},
 		set matrix(s){
 			this.$.matrix=s;
@@ -284,7 +290,9 @@
 			return;
 		},
 		get timeline(){
-			if(this.cache.timeline){
+			if(this.parent){
+				return this.parent.timeline;
+			}else if(this.cache.timeline){
 				return this.cache.timeline;
 			}else{
 				return this.getTimeline();
@@ -293,10 +301,23 @@
 		set timeline(s){
 			this.cache.timeline=(s instanceof ext.Timeline)?s:new ext.Timeline(s);
 		},
+		getParentGroups:function(groups){
+			groups=groups||new ext.Selection();
+			if(this.parent && this.parent.getParentGroups){
+				groups.unshift(this);
+				return this.parent.getParentGroups(groups);	
+			}else{
+				groups.unshift(this);
+				groups.pop();
+				return groups;
+			}
+		},
 		is:function(element,options){
+			if(!element){return;}
 			if(!(element instanceof this.type)){
 				element=new this.type(element);
 			}
+			if(!element.$){return;}
 			if(!(this instanceof ext.Shape)){
 				var id=this.uniqueDataName(String('temporaryID_'+String(Math.floor(Math.random()*9999))));
 				var pd=Math.floor(Math.random()*99999999);
@@ -322,7 +343,7 @@
 			});
 			settings.extend(options,true);
 			return ext.Object.prototype.is.call(this,element,settings);
-		}		
+		}	
 	}
 	ext.extend({Element:ExtensibleElement});
 })(extensible);

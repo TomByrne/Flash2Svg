@@ -37,7 +37,7 @@
 					default:
 						sel.push(new ext.Element(s[i],options));
 				}
-			}else if(s[i] instanceof ext.Element){
+			}else if((s[i] instanceof ext.Element) && s[i].$){
 				ext.Object.apply(s[i],[options]);
 				sel.push(s[i]);
 			}

@@ -147,7 +147,7 @@
 		}
 	};
 	dom.extensible=new Extensible();
-})(this)
+})(this);
 extensible.load(
 	[
 		'String',
@@ -177,6 +177,7 @@ extensible.load(
 		'Library',
 		'Item',
 		'Clipboard',
+		'Math',
 		'SVG',
 		'Log'
 	],

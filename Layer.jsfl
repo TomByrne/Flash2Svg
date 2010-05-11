@@ -36,10 +36,16 @@
 			return frames;
 		},
 		get frames(){
-			if(this.cache.frames){return this.cache.frames;}
-			else{return this.getFrames();}
+			if(this.cache.frames){
+				return this.cache.frames;
+			}
+			else{
+				return this.getFrames();
+			}
 		},
-		set frames(s){this.cache.frames=new ext.Array(frames[i].elements);},
+		set frames(s){
+			this.cache.frames=new ext.Array(frames[i].elements);
+		},
 		getElements:function(){
 			var frames=this.frames;
 			var options={};
