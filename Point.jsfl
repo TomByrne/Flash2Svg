@@ -1,33 +1,80 @@
 (function(ext){
-	function ExtensiblePoint(point){
-		point=point||{};
+	function ExtensiblePoint(point,options){		
+		var settings=new ext.Object({
+			//halfEdge:undefined,
+			//edge:undefined,
+			//id:undefined
+		});
+		settings.extend(options);
+		ext.Object.apply(this,[settings]);
+		point=point!==undefined?point:{};
 		if(typeof(point)=='string'){
 			point=point.match(/[\d\.\-]*[\d\.]/g);
 		}
 		if(point instanceof Array){
 			this.x=point[0]!==undefined?Number(point[0]):0.0;
 			this.y=point[1]!==undefined?Number(point[1]):0.0;	
+		}else if(typeof(point)=='number'){
+			this.x=point;
+			if(typeof(options)=='number'){
+				this.y=options;
+				delete options;
+			}
 		}else{
 			this.x=point.x!==undefined?Number(point.x):0.0;
 			this.y=point.y!==undefined?Number(point.y):0.0;
+		}
+		if(isNaN(this.x)){this.x=0;}
+		if(isNaN(this.y)){this.y=0;}
+		if(settings.edge instanceof Edge){
+			settings.edge=new ext.Edge(
+				edge,
+				{
+					shape:settings.shape	
+				}
+			);	
 		}
 		return this;
 	}
 	ExtensiblePoint.prototype={
 		__proto__:ext.Object.prototype,
 		type:ExtensiblePoint,
-		is:function(p){
-			return(p.x==this.x && p.y==this.y);
+		is:function(p,options){
+			var settings=new ext.Object({
+				tolerance:0.1
+			});
+			settings.extend(options);
+			if(p){
+				if(settings.tolerance){
+					return(this.distanceTo(p)<=settings.tolerance);
+				}else{
+					return(
+						p.x==this.x && 
+						p.y==this.y
+					);
+				}
+			}
+		},
+		set:function(p){
+			var p=new this.type(p);
+			this.x=p.x;
+			this.y=p.y;
 		},
 		transform:function(mx){
 			mx=new ext.Matrix(mx);
-			return new this.type({
+			var mx=new this.type({
 				x:this.x*mx.a+this.y*mx.c+mx.tx,
 				y:this.x*mx.b+this.y*mx.d+mx.ty
-			});
+			},this);
+			return mx;
 		},
 		difference:function(p){
-			return new this.type({x:this.x-p.x,y:this.y-p.y});
+			return new this.type({x:this.x-p.x,y:this.y-p.y},this);
+		},
+		add:function(p){
+			return new this.type(
+				{x:this.x+p.x,y:this.y+p.y},this
+			);
 		},
 		distanceTo:function(p){
 			return fl.Math.pointDistance(this,p);
@@ -47,15 +94,27 @@
 		},
 		set length(length){
 			var l=this.length;
-			this.x=(this.x/l)*length;
-			this.y=(this.y/l)*length;
+			var p=new this.type(this);
+			p=p.normalized;
+			this.x=p.x*length;
+			this.y=p.y*length;
+		},
+		getTangent:function(p){
+			return p.difference(this).normalized;
+		},
+		rotate:function(angle){
+			angle=-angle*(Math.PI/180);
+			return new this.type({
+				x:Math.roundTo(this.x*Math.cos(angle)-this.y*Math.sin(angle),10),
+				y:Math.roundTo(this.x*Math.sin(angle)+this.y*Math.cos(angle),10)
+			},this);
 		},
 		get normalized(){
 			var length=this.length;
-			return new ext.Point({
+			return new this.type({
 				x:this.x/length,
 				y:this.y/length
-			});
+			},this);
 		},
 		closestTo:function(points,bGetIndex){
 			if(!points || !points.length){
@@ -85,8 +144,8 @@
 			return new this.type({
 				x:Math.round(this.x*multiplier)/multiplier,
 				y:Math.round(this.y*multiplier)/multiplier
-			});
+			},this);
 		}
-	}
+	};
 	ext.extend({Point:ExtensiblePoint});
 })(extensible)

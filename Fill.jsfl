@@ -26,6 +26,20 @@
 	ExtensibleFill.prototype={
 		__proto__:ext.Object.prototype,
 		type:ExtensibleFill,
+		get isOpaque(){
+			var colorArray=this.colorArray||new ext.Array();
+			colorArray.unshift(this.color);
+			for(var i=0;i<colorArray.length;i++){
+				var color=new ext.Color(colorArray[i]);
+				if(color.opacity<1){
+					return false;
+				}
+			}
+			return true;
+		},
+		set isOpaque(){
+			return;
+		}, 
 		is:function(f){
 			if(this.style!=f.style){
 				return false;

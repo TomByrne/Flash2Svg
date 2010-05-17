@@ -13,6 +13,24 @@
 		var a=this.split("/");
 		return a.pop();
 	});
+	String.prototype.__defineGetter__('relativeToDocument',function(){
+		return this.relativeTo(ext.doc.pathURI.dir);
+	});
+	String.prototype.relativeTo=function(uri){
+		var str=this;
+		if(!/(^file:\/\/)/.test(str)){
+			str=FLfile.platformPathToURI(str);
+		}
+		if(!/(^file:\/\/)/.test(uri)){
+			uri=FLfile.platformPathToURI(uri);
+		}
+		var prefix='.';
+		while(str.indexOf(uri)<0 && uri.indexOf('/')>0){
+			prefix+='/..';
+			uri=uri.dir;
+		}
+		return prefix+str.replace(uri,'');
+	};
 	String.prototype.ccSplit=function(capitalize){//camelCasing >> [camel,casing]
 		var output=[""];
 		var split=this.trim().split(/([A-Z\z])/);

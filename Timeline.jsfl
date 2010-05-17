@@ -164,7 +164,28 @@
 		set currentFrames(s){},		
 		get currentLayer(){return this.$.currentLayer;},
 		set currentLayer(s){this.$.currentLayer=s;},
-		get frameCount(){return this.$.frameCount;},
+		get frameCount(options){
+			var settings=new ext.Object({
+				includeHiddenLayers:ext.includeHiddenLayers,
+				includeGuides:false
+			});
+			settings.extend(options);
+			if(settings.includeHiddenLayers && settings.includeGuides){
+				return this.$.frameCount;
+			}
+			var frameCount=0;
+			var layers=this.layers;
+			for(var l=0;l<layers.length;l++){
+				if(
+					(layers[l].visible || settings.includeHiddenLayers) && 
+					(layers[l].layerType!='guide' || settings.includeGuides) &&
+					layers[l].frameCount>frameCount
+				){
+					frameCount=layers[l].frameCount;
+				}
+			}
+			return frameCount;
+		},
 		set frameCount(s){this.$.frameCount=s;},
 		get layerCount(){return this.$.layerCount;},
 		get layers(){
@@ -303,6 +324,9 @@
 				frame:undefined
 			});
 			settings.extend(options);
+			if(ext.log){
+				var timer=ext.log.startTimer('Lookup cubic segment count.');
+			}
 			if(settings.frame && this.cache.numCubicSegments[settings.frame]){
 				return this.cache.numCubicSegments[settings.frame];
 			}
@@ -321,6 +345,9 @@
 			}
 			if(settings.frame){
 				this.cache.numCubicSegments[settings.frame]=numCubicSegments;
+			}
+			if(ext.log){
+				ext.log.pauseTimer(timer);
 			}
 			return numCubicSegments;
 		}

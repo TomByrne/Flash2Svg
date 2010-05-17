@@ -1,16 +1,19 @@
 (function(ext){
 	function Log(options){
+		if(options && typeof(options)=='string'){
+			options={url:options};	
+		}
 		var settings=new ext.Object({
 			url:(
 				ext.doc.pathURI?
 				ext.doc.pathURI.stripExtension()+"_log.csv":
 				null
 			),
-			append:true
+			append:false
 		});
 		settings.extend(options);
 		if(settings.url && !settings.append){
-			FLfile.write(settings.url,'');
+			FLfile.write(settings.url,'Operation\tTotal Time\tAverage Time\n');
 		}
 		delete settings.append;
 		ext.Object.apply(this,[settings]);
@@ -30,7 +33,7 @@
 				t.startTime=date.getTime();
 			}else{
 				id=this.timers.uniqueKey(id);
-				var t=new ext.Object({elapsed:0,startTime:date.getTime()});
+				var t=new ext.Object({elapsed:0,startTime:date.getTime(),runs:1});
 			}
 			this.timers[id]=t;
 			return id;
@@ -39,8 +42,9 @@
 			var t=this.timers[id];
 			if(t){
 				var time=t.elapsed;
+				var runs=t.runs;
 				if(t.startTime){time+=(new Date()).getTime()-t.startTime;}
-				this.append(id+','+String(time/1000)+'\n');
+				this.append(id+'\t'+String(time)+'\t'+String((time/runs))+'\n');
 				delete(this.timers[id]);
 			}
 		},
@@ -48,6 +52,7 @@
 			var t=this.timers[id];
 			if(t && t.startTime){
 				this.timers[id].elapsed=(new Date()).getTime()-t.startTime+t.elapsed;
+				this.timers[id].runs+=1;
 				delete this.timers[id].startTime;
 			}
 		},

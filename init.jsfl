@@ -8,6 +8,7 @@
 		for(var o in options){
 			this[o]=options[o];
 		}
+		this.progressbar=undefined;
 		this.dir=fl.scriptURI.replace(/\/[^\/]*?$/g,"");
 		return this;
 	}
@@ -157,6 +158,7 @@ extensible.load(
 		'Color',
 		'HalfEdge',
 		'Point',
+		'Vertex',
 		'Edge',
 		'Fill',
 		'Stroke',
@@ -179,7 +181,8 @@ extensible.load(
 		'Clipboard',
 		'Math',
 		'SVG',
-		'Log'
+		'Log',
+		'ProgressBar'
 	],
 	true
 );

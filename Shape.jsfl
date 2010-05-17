@@ -2,6 +2,7 @@
 	function ExtensibleShape(shape,options){
 		ext.Element.apply(this,arguments);
 		this.cache.cubicSegmentPoints=this.cache.cubicSegmentPoints||new ext.Array();
+		this.cache.gapFilled=this.cache.gapFilled||new ext.Array([]);
 		return this;
 	}
 	ExtensibleShape.prototype={
@@ -10,17 +11,37 @@
 		beginEdit:function(){return this.$.beginEdit();},
 		deleteEdge:function(index){return this.$.deleteEdge(index);},
 		endEdit:function(){return this.$.endEdit();},
-		getCubicSegmentPoints:function(cubicSegmentIndex){
+		getCubicSegmentPoints:function(cubicSegmentIndex,options){
 			if(cubicSegmentIndex){
-				if(this.cache.cubicSegmentPoints[cubicSegmentIndex]){
-					return  this.cache.cubicSegmentPoints[cubicSegmentIndex];
+				if(ext.log){
+					var timerCSPL=ext.log.startTimer('Cubic segment point lookup.');	
+				}
+				var settings=new ext.Object({
+					shape:this,
+					edge:undefined
+				});
+				settings.extend(options);
+				var cachePoints;
+				var useCache=true;
+				if(useCache){
+					cachePoints=this.cache.cubicSegmentPoints[cubicSegmentIndex];
+					if(cachePoints && cachePoints.length){
+						return this.cache.cubicSegmentPoints[cubicSegmentIndex];
+					}
 				}
 				var csp=this.$.getCubicSegmentPoints(cubicSegmentIndex);
 				var points=new ext.Array();
 				for(var i=0;i<csp.length;i++){
-					points.push(new ext.Point(csp[i]));
+					points.push(
+						new ext.Point(csp[i],settings)
+					);
 				}
-				this.cache.cubicSegmentPoints[cubicSegmentIndex]=points;
+				if(useCache){
+					this.cache.cubicSegmentPoints[cubicSegmentIndex]=new ext.Array(points);
+				}
+				if(ext.log){
+					ext.log.pauseTimer(timerCSPL);
+				}
 				return points;
 			}else{
 				return;
