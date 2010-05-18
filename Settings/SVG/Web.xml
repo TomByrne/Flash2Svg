@@ -1,0 +1,9 @@
+<Settings title="Fast">
+  <maskingType>Alpha</maskingType>
+  <curveDegree>Quadratic</curveDegree>
+  <expandSymbols>true</expandSymbols>
+  <applyTransformations>false</applyTransformations>
+  <decimalPointPrecision>3</decimalPointPrecision>
+  <fillGaps>true</fillGaps>
+  <knockoutBackgroundColor>false</knockoutBackgroundColor>
+</Settings>
