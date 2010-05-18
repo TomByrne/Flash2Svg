@@ -1,0 +1,3 @@
+<dialog title="Export SVG" buttons="" >
+	<flash width="360"  src="SVG.swf"  height="300"  id="SVGExportPanel" />
+</dialog> 
