@@ -21,7 +21,6 @@
 	}
 	ExtensibleContour.prototype={
 		__proto__:ext.Object.prototype,
-		$:Contour,
 		type:ExtensibleContour,
 		getHalfEdge:function(){
 			return new ext.HalfEdge(

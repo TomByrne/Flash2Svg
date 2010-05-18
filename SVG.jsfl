@@ -1,5 +1,11 @@
 
 (function(ext){
+	/*
+	 * @this {extensible.SVG}
+	 * @extends extensible.Object
+	 * @constructor
+	 * @param {Object} options
+	 */
 	function SVG(options){
 		var settings=new ext.Object({
 			settingsFile:ext.dir+'/Settings/SVG/default.xml', // xml settings file
@@ -175,7 +181,7 @@
 					}
 					timeline=new ext.Timeline(ext.lib.getSelectedItems()[0].timeline);
 				}
-				var layers=timeline.layers;
+				var layers=timeline.getLayers();
 				var ranges=new ext.Array();
 				for(var i=0;i<layers.length;i++){
 					var range=new ext.Array();
@@ -232,8 +238,16 @@
 				if(settings.color){
 					id+='_'+settings.color.idString;
 				}
-				id=this.uniqueID(id);
-				var instanceID=this.uniqueID(id);
+				try{
+					id=this.uniqueID(id);
+				}catch(e){
+					throw new Error('\nextensible.SVG.getTimeline() - 1\n\t'+id+'\n\t'+String(e));
+				}
+				try{
+					var instanceID=this.uniqueID(id);
+				}catch(e){
+					throw new Error('\nextensible.SVG.getTimeline() - 2\n\t'+id+'\n\t'+String(e));
+				}
 				xml=new XML('<use xlink-href="#'+id+'" id="'+instanceID+'" />');
 				if(this._symbols.indexOf(id)<0){
 					instanceXML=xml;
@@ -274,7 +288,11 @@
 					var layerXML;
 					var colorX=settings.color;
 					var id=layer.name.camelCase();
-					id=this.uniqueID(id);
+					try{
+						id=this.uniqueID(id);
+					}catch(e){
+						throw new Error('\nextensible.SVG.getTimeline() - 3\n\t'+id+'\n\t'+String(e));
+					}
 					if(layer.layerType=='mask'){
 						layerXML=new XML('<mask id="'+id+'" />');
 						if(this.maskingType=='Alpha'){
@@ -442,33 +460,37 @@
 					matrix:pathMatrix,
 					fillGaps:fillGaps
 				});
-				if(s){svgArray.push(s);}
-				if(contours[i].interior){
-					if(filled.length>0 && contours[i].oppositeFill.style!='noFill' ){
-						for(var n=filled.length-1;n>-1;n-=1){
-							if(contours[i].oppositeFill.is(contours[filled[n]].fill)){
-								if(!contours[i].fill.is(contours[filled[n]].fill)){
-									var cutID=String(svgArray[filled[n]].path[0]['@id']);
-									s=this.getContour(contours[i],{
-										colorTransform:settings.colorTransform,
-										fillGaps:fillGaps,
-										reversed:cutID
-									});
-									svgArray[filled[n]].path[0]['@d']+=/^[^Zz]*[Zz]?/.exec(s.path[0]['@d'].trim())[0];
-									break;
+				if(s){
+					svgArray.push(s);
+					if(contours[i].interior){
+						if(filled.length>0 && contours[i].oppositeFill.style!='noFill' ){
+							for(var n=filled.length-1;n>-1;n-=1){
+								if(contours[i].oppositeFill.is(contours[filled[n]].fill)){
+									if(!contours[i].fill.is(contours[filled[n]].fill)){
+										var cutID=String(svgArray[filled[n]].path[0]['@id']);
+										s=this.getContour(contours[i],{
+											colorTransform:settings.colorTransform,
+											fillGaps:fillGaps,
+											reversed:cutID
+										});
+										if(s){
+											svgArray[filled[n]].path[0]['@d']+=/^[^Zz]*[Zz]?/.exec(s.path[0]['@d'].trim())[0];
+											break;
+										}
+									}
+								}
+							}
+							if(contours[i].fill.style=='noFill'){
+								for each(n in svgArray[svgArray.length-1].*){
+									if(n.stroke.length()==0){
+										delete n;
+									}
 								}
 							}
 						}
-						if(contours[i].fill.style=='noFill'){
-							for each(n in svgArray[i].*){
-								if(n.stroke.length()==0){
-									delete n;
-								}
-							}
+						if(contours[i].fill.style!='noFill'){
+							filled.push(i);
 						}
-					}
-					if(contours[i].fill.style!='noFill'){
-						filled.push(i);
 					}
 				}
 			}
@@ -670,21 +692,21 @@
 						if(ct[n].at(-1).at(-1).is(cp1n[i][0][0])){
 							ct[n].extend(cp1n[i]);
 							cp1n.splice(i,1);
-							found=true;fl.trace('found');
+							found=true;
 						}else if(ct[n][0][0].is(cp1n[i].at(-1).at(-1))){
 							ct[n].prepend(cp1n[i]);
 							cp1n.splice(i,1);
-							found=true;fl.trace('found');
+							found=true;fl.('found');
 						}else {
 							var rev=cp1n[i].getReversed(true);
 							if(ct[n].at(-1).at(-1).is(rev[0][0])){
 								ct[n].extend(rev);
 								cp1n.splice(i,1);
-								found=true;fl.trace('found');
+								found=true;
 							}else if(ct[n][0][0].is(rev.at(-1).at(-1))){
 								ct[n].prepend(rev);
 								cp1n.splice(i,1);
-								found=true;fl.trace('found');
+								found=true;
 							}else{
 								cp1nT.push(cp1n[i]);
 							}
@@ -743,7 +765,11 @@
 				}
 				var cdata;
 				cdata=this.getCurve(controlPoints,true);
-				id=this.uniqueID('path');
+				try{
+					id=this.uniqueID('path');
+				}catch(e){
+					throw new Error('\nextensible.SVG.getContour() - 1\n\tpath\n\t'+String(e));
+				}				
 				idString='id="'+id+'" ';
 				if(settings.fillGaps){
 					if(settings.reversed){
@@ -772,7 +798,11 @@
 							cp.push(controlPoints[i]);
 						}else{
 							if(stroke && cp.length>0){
-								id=this.uniqueID('path');
+								try{
+									id=this.uniqueID('path');
+								}catch(e){
+									throw new Error('\nextensible.SVG.getContour() - 2\n\tpath\n\t'+String(e));
+								}
 								idString='id="'+id+'" ';
 								paths.push(
 									'<path '+
@@ -789,7 +819,11 @@
 						}
 					}else{
 						if(stroke && cp.length>0){
-							id=this.uniqueID('path');
+							try{
+								id=this.uniqueID('path');
+							}catch(e){
+								throw new Error('\nextensible.SVG.getContour() - 3\n\tpath\n\t'+String(e));
+							}
 							idString='id="'+id+'" ';
 							paths.push(
 								'<path '+
@@ -828,7 +862,11 @@
 						}
 						paths[pathID]=x.toXMLString()+'\n';
 					}else{
-						id=this.uniqueID('path');
+						try{
+							id=this.uniqueID('path');
+						}catch(e){
+							throw new Error('\nextensible.SVG.getContour() - 4\n\tpath\n\t'+String(e));
+						}
 						idString='id="'+id+'" ';
 						paths.push(
 							'<path '+
@@ -911,7 +949,11 @@
 			}else if(fillObj.style=='noFill'){
 				return;
 			}
-			id=this.uniqueID(fillObj.style);
+			try{
+				id=this.uniqueID(fillObj.style);
+			}catch(e){
+				throw new Error('\nextensible.SVG.getFill() - 1\n\t'+fillObj.style+'\n\t'+String(e));
+			}
 			var xml,defaultMeasurement;
 			var shape=settings.shape;
 			var matrix=fillObj.matrix;
@@ -1061,7 +1103,7 @@
 					for(var i=0;i<parentGroups.length;i++){
 						ext.doc.breakApart();
 					}
-					ext.doc.selectNone()
+					ext.doc.selectNone();
 				}
 				searchElements=currentTimeline.layers[tempLayerIndex].frames[0].elements;
 				for(i=0;i<searchElements.length;i++){
@@ -1154,7 +1196,7 @@
 							}
 							if(gradientID!==undefined){
 								var gradient=this.xml.defs.*.(@id==gradientID);
-								if(gradient.name()=='radialGradient'){
+								if(gradient && gradient.name()=='radialGradient'){
 									var gtr=gradient['@gradientTransform'];
 									if(gtr){
 										gtr=String(gtr);
@@ -1276,8 +1318,12 @@
 					use.setName('g');
 					for each(child in symbol.*){
 						use.appendChild(child);	
+					}		
+					try{
+						use['@id']=this.uniqueID(String(symbol['@id']));
+					}catch(e){
+						throw new Error('\nextensible.SVG.getFill() - 1\n\t'+String(symbol['@id'])+'\n\t'+String(e));
 					}
-					use['@id']=this.uniqueID(String(symbol['@id']));
 					delete use['@xlink-href'];
 					delete use['@width'];
 					delete use['@height'];
@@ -1297,8 +1343,12 @@
 					use.setName('g');
 					for each(child in symbol.*){
 						use.appendChild(child);	
+					}		
+					try{
+						use['@id']=this.uniqueID(String(symbol['@id']));
+					}catch(e){
+						throw new Error('\nextensible.SVG.getFill() - 1\n\t'+String(symbol['@id'])+'\n\t'+String(e));
 					}
-					use['@id']=this.uniqueID(String(symbol['@id']));
 					delete use['@xlink-href'];
 					delete use['@width'];
 					delete use['@height'];
@@ -1313,28 +1363,35 @@
 			}
 		},
 		idExists:function(svgID,xml){
-			if(this._ids.indexOf(svgID)>-1){
-				return true;
-			}
-			/*
-			xml=xml||this.xml;
-			for each(id in xml..@id){
-				if(id==svgID){
+			try{
+				if(this._ids.indexOf(svgID)>-1){
 					return true;
 				}
+			}catch(e){
+				throw new Error('\nextensible.SVG.idExists()\n\t'+String(e));
 			}
-			*/
 			return false;
 		},
 		uniqueID:function(svgID,xml){
-			svgID=svgID.trim().camelCase();
-			if(!svgID.length){svgID='g';}
-			if(/^[^A-Za-z]/.test(svgID)){svgID='g'+svgID;}
-			if(this.idExists(svgID,xml)){
-				if(/\_[\d]*?$/.test(svgID)){
-					return this.uniqueID(svgID.replace(/[\d]*?$/,String(Number(/[\d]*?$/.exec(svgID)[0])+1)));
+			var orig=svgID;
+			svgID=svgID.trim();
+			svgID=svgID.camelCase();
+			if(!svgID || !svgID.length){
+				svgID='g';
+			}
+			if(/^[^A-Za-z]/.test(svgID)){
+				svgID='g'+svgID;
+			}
+			try{
+				var idExists=this.idExists(svgID,xml)
+			}catch(e){
+				throw new Error('\nextensible.SVG.uniqueID()\n\t'+String(e));
+			}
+			if(idExists){
+				if(/[\d][\d]*$/.test(svgID)){
+					return this.uniqueID(svgID.replace(/[\d][\d]*$/,String(Number(/[\d][\d]*$/.exec(svgID)[0])+1)),xml);
 				}else{
-					return  this.uniqueID(svgID+"_1");
+					return  this.uniqueID(svgID+"_1",xml);
 				}
 			}
 			this._ids.push(svgID);

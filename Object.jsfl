@@ -1,16 +1,39 @@
 (function(ext){
-	function ExtensibleObject(obj){
+	/*
+	 * @this {extensible.Object}
+	 * @extends Object
+	 * @constructor
+	 * @parameter {Object} obj A native object.
+	 * @parameter {Number,Boolean} recursive If true, converts descendant Objects
+	 * to class extensible.Object, and converts descendant Arrays to class extensible.Array.
+	 * If a Number is passed, converts descendants up to the [recursive] generation. 
+	 */
+	function ExtensibleObject(obj,recursive){
 		if(obj){
 			for(var i in obj){
 				if(obj.hasOwnProperty(i)){
 					var element=obj[i];
-					if(element && !element.type){
+					if(recursive && element && !element.type){
 						switch(element.constructor.name){
 							case 'Array':
-								this[i]=new ext.Array(obj[i]);
+								this[i]=new ext.Array(
+									obj[i],
+									(
+										typeof(recursive)=='number'?
+										recursive-1:
+										recursive
+									)
+								);
 								break;
 							case 'Object':
-								this[i]=new this.type(obj[i]);
+								this[i]=new this.type(
+									obj[i],
+									(
+										typeof(recursive)=='number'?
+										recursive-1:
+										recursive
+									)
+								);
 								break;
 							default:
 								this[i]=obj[i];
@@ -26,6 +49,12 @@
 	ExtensibleObject.prototype={
 		__proto__:Object.prototype,
 		type:ExtensibleObject,
+		clear:function(keys){
+			keys=keys||this.keys;
+			for(var i=0;i<keys.length;i++){
+				delete this[keys[i]];
+			}
+		},
 		each:function(iterator,context,args){
 			var empty=new this.type();
 			context=context || this;
@@ -39,6 +68,40 @@
 			}
 			return all;
 		},
+		extend:function(obj,recursive){
+			for(var n in obj){
+				if(
+					obj.hasOwnProperty(n) &&
+					obj[n]!==null &&
+					obj[n]!==undefined
+				){
+					if(
+						recursive  
+						&& typeof(this[n])==typeof(obj[n])
+					){
+						if(typeof(recursive)=='number'){
+							recursive-=1;
+						}
+						if(obj[n] instanceof Array){
+							this[n]=new ext.Array(this[n]);
+							this[n].extend(obj[n],recursive);
+						}else if(obj[n] instanceof Object){
+							this[n]=new ext.Object(this[n]);
+							this[n].extend(obj[n],recursive);
+						}else if(obj[n]!==null){
+							this[n]=obj[n];
+						}
+					}else{
+						this[n]=obj[n];	
+					}
+				}
+			}
+		},
+		/*
+		 * @parameter element An element to search for.
+		 * @see Array.indexOf
+		 * @return {String} The key corresponding the the given element.
+		 */
 		indexOf:function(element){
 			for(k in this){
 				if(
@@ -53,76 +116,14 @@
 				}
 			}
 		},
-		get keys(){
-			var keys=new ext.Array();
-			for(k in this){
-				if(
-					this.hasOwnProperty(k)
-				){
-					keys.push(k);
-				}
-			}
-			return keys;
-		},
-		clear:function(keys){
-			keys=keys||this.keys;
-			for(var i=0;i<keys.length;i++){
-				delete this[keys[i]];
-			}
-		},
-		extend:function(obj,recursive){
-			for(var n in obj){
-				if(
-					obj.hasOwnProperty(n) &&
-					obj[n]!==null &&
-					obj[n]!==undefined
-				){
-					if(
-						recursive && 
-						typeof(this[n])==typeof(obj[n])
-					){
-						if(this[n].constructor.name=='Object'){
-							this[n]=new ext.Object(this[n]);
-							this[n].extend(obj[n],recursive);
-						}else if(this[n].constructor.name=='Array'){
-							this[n]=new ext.Array(this[n]);
-							this[n].extend(obj[n],recursive);
-						}else if(this[n]!==null){
-							this[n]=obj[n];
-						}
-					}else{
-						this[n]=obj[n];	
-					}
-				}
-			}
-		},
-		remove:function(r){
-			if(typeof(r)=='string'){
-				r=[r];
-			}else if(typeof(r)!='array'){
-				return;
-			}
-			for(var i=0;i<r.length;i++){
-				if(this[r[i]]){
-					delete this[r[i]];
-				}	
-			}
-		},
-		uniqueKey:function(k){
-			if(typeof(k)!='string'){return;}
-			if(this[k]!==undefined){
-				if(/\_[\d]*?$/.test(k)){
-					return this.uniqueKey(k.replace(/[\d]*?$/,String(Number(/[\d]*?$/.exec(k)[0])+1)));
-				}else{
-					return  this.uniqueKey(k+"_1");
-				}
-			}
-			return k;
-		},
-		is:function(o,options){
-			if(typeof(o)!='object'){return;}
-			if(!(o instanceof this.type)){
-				o=new this.type(o);
+		/*
+		 * @parameter {Object} object
+		 * @return {Boolean} true if the object is equivalent to [this].
+		 */
+		is:function(object,options){
+			if(typeof(object)!='object'){return;}
+			if(!(object instanceof this.type)){
+				object=new this.type(object);
 			}
 			var settings=new ext.Object({
 				ignore:null,//list of attributes to ignore, defaults to none
@@ -135,15 +136,15 @@
 			if(settings.checklist && !(settings.checklist instanceof ext.Array)){
 				settings.checklist=new ext.Array(settings.checklist)
 			}
-			var keys=settings.checklist||o.keys;
+			var keys=settings.checklist||object.keys;
 			for(var i=0;i<keys.length;i++){
 				var k=keys[i];
 				if(
 					(!settings.ignore || settings.ignore.indexOf(k)<0) && (
-						!(o[k] instanceof Function) && (
-							(Boolean(o[k]) != Boolean(this[k])) || (
-								this[k]!=o[k] && 
-								!(this[k]['is'] && this[k].is(o[k]))
+						!(object[k] instanceof Function) && (
+							(Boolean(object[k]) != Boolean(this[k])) || (
+								this[k]!=object[k] && 
+								!(this[k]['is'] && this[k].is(object[k]))
 							)
 						)
 					)
@@ -152,6 +153,53 @@
 				}
 			}
 			return true;
+		},
+		/*
+		 * A list of the properties belonging to this object ( not it's prototype ).
+		 * @property
+		 */
+		get keys(){
+			var keys=new ext.Array();
+			for(k in this){
+				if(
+					this.hasOwnProperty(k)
+				){
+					keys.push(k);
+				}
+			}
+			return keys;
+		},
+		/*
+		 * Deletes specified keys.
+		 * @parameter {Array,String} keys A key or array of keys.
+		 */
+		remove:function(keys){
+			if(typeof(keys)=='string'){
+				keys=[keys];
+			}else if(typeof(keys)!='array'){
+				return;
+			}
+			for(var i=0;i<keys.length;i++){
+				if(this[keys[i]]){
+					delete this[keys[i]];
+				}
+			}
+		},
+		/*
+		 * @parameter {String} key
+		 * @return {String} If key is unique, returns key, otherwise appends or increments
+		 * an integer suffix and returns a unique key.
+		 */
+		uniqueKey:function(key){
+			if(typeof(key)!='string'){return;}
+			if(this[key]!==undefined){
+				if(/[\d]*$/.test(key)){
+					return this.uniqueKey(key.replace(/[\d]*$/,String(Number(/[\d]*$/.exec(key)[0])+1)));
+				}else{
+					return  this.uniqueKey(key+"1");
+				}
+			}
+			return key;
 		}
 	}
 	ext.extend({Object:ExtensibleObject});

@@ -17,7 +17,6 @@
 	}
 	ExtensibleLayer.prototype={
 		__proto__:ext.Object.prototype,
-		$:Layer,
 		type:ExtensibleLayer,
 		//built-in properties
 		get color(){return this.$.color;},

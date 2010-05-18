@@ -1,36 +1,28 @@
-﻿//STRING METHODS
-(function(ext){
-	String.prototype.trim=function(){
-	   return(this.replace(/^\s+|\s+$/g,""));
-	};
-	String.prototype.__defineGetter__('dir',function(){
-		return(this.replace(/\/[^\/]*?$/g,""));
-	});
-	String.prototype.stripExtension=function(){
-		return(this.replace(/\.[^\.]*?$/g,""));
-	};
+﻿(function(ext){
+	/*
+	 * Returns a file name from a  URI.
+	 * @addon
+	 */
 	String.prototype.__defineGetter__('basename',function(){
 		var a=this.split("/");
 		return a.pop();
 	});
-	String.prototype.__defineGetter__('relativeToDocument',function(){
-		return this.relativeTo(ext.doc.pathURI.dir);
-	});
-	String.prototype.relativeTo=function(uri){
-		var str=this;
-		if(!/(^file:\/\/)/.test(str)){
-			str=FLfile.platformPathToURI(str);
+	/*
+	 * Converts a string into a camelCased string.
+	 * @addon
+	 */
+	String.prototype.camelCase=function(capitalize){
+		var a=this.split(/[^A-Za-z\d_\$-]/g);
+		if(a && a.length){
+			a=new ext.Array(a);
+			a=a.remove('');
+			return a.ccJoin(capitalize);
 		}
-		if(!/(^file:\/\/)/.test(uri)){
-			uri=FLfile.platformPathToURI(uri);
-		}
-		var prefix='.';
-		while(str.indexOf(uri)<0 && uri.indexOf('/')>0){
-			prefix+='/..';
-			uri=uri.dir;
-		}
-		return prefix+str.replace(uri,'');
 	};
+	/*
+	 * Splits a camelCased string into an array.
+	 * @addon
+	 */
 	String.prototype.ccSplit=function(capitalize){//camelCasing >> [camel,casing]
 		var output=[""];
 		var split=this.trim().split(/([A-Z\z])/);
@@ -54,9 +46,51 @@
 		}
 		return output;
 	};
-	String.prototype.camelCase=function(capitalize){
-		var a=new ext.Array(this.split(/[^A-Za-z\d_\$-]/g));
-		a=a.remove('');
-		return a.ccJoin(capitalize);
-	}
+	/*
+	 * Returns the parent directory for a URI.
+	 * @addon
+	 */
+	String.prototype.__defineGetter__('dir',function(){
+		return(this.replace(/\/[^\/]*?$/g,""));
+	});
+	/*
+	 * Returns a URI relative to another URI.
+	 * @addon
+	 */
+	String.prototype.relativeTo=function(uri){
+		var str=this;
+		if(!/(^file:\/\/)/.test(str)){
+			str=FLfile.platformPathToURI(str);
+		}
+		if(!/(^file:\/\/)/.test(uri)){
+			uri=FLfile.platformPathToURI(uri);
+		}
+		var prefix='.';
+		while(str.indexOf(uri)<0 && uri.indexOf('/')>0){
+			prefix+='/..';
+			uri=uri.dir;
+		}
+		return prefix+str.replace(uri,'');
+	};
+	/*
+	 * Returns a document-relative  URI from an absolute URI.
+	 * @addon
+	 */
+	String.prototype.__defineGetter__('relativeToDocument',function(){
+		return this.relativeTo(ext.doc.pathURI.dir);
+	});
+	/*
+	 * Returns a URI or file name minus the extension.
+	 * @addon
+	 */
+	String.prototype.stripExtension=function(){
+		return(this.replace(/\.[^\.]*?$/g,""));
+	};
+	/*
+	 * Removes the whitespace at the beginning and end of a string.
+	 * @addon
+	 */
+	String.prototype.trim=function(){
+	    return this.replace(/^\s+|\s+$/g,"");
+	};
 })(extensible)

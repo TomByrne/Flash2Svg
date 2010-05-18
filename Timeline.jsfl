@@ -1,4 +1,13 @@
 (function(ext){
+	/*
+	 * extensible.Timeline pseudo-extends Timeline
+	 * @this {extensible.Timeline}
+	 * @extends extensible.Object
+	 * @extends Timeline
+	 * @see Timeline
+	 * @constructor
+	 * @param {Object} options
+	 */
 	function ExtensibleTimeline(timeline,options){
 		if(timeline && timeline instanceof Timeline){
 			this.$=timeline;
@@ -13,24 +22,51 @@
 	}
 	ExtensibleTimeline.prototype={
 		__proto__:ext.Object.prototype,
-		$:Timeline,
+		/*
+		 * @final
+		 */
 		type:ExtensibleTimeline,
-		//built in methods
+		/*
+		 * @see Timeline.addMotionGuide
+		 */
 		addMotionGuide:function(){
 			return this.$.addMotionGuide();
 		},
+		/*
+		 * @see Timeline.addNewLayer
+		 */
 		addNewLayer:function(){
 			return this.$.addNewLayer.apply(this.$,arguments);
 		},
+		/*
+		 * @see Timeline.clearFrames
+		 */
 		clearFrames:function(){
 			return this.$.clearFrames.apply(this.$,arguments);
 		},
+		/*
+		 * @see Timeline.clearKeyframes
+		 */
 		clearKeyframes:function(){
 			return this.$.clearKeyframes.apply(this.$,arguments);
 		},
+		/*
+		 * @see Timeline.convertToBlankKeyframes
+		 */
 		convertToBlankKeyframes:function(){
 			return this.$.convertToBlankKeyframes.apply(this.$,arguments);
 		},
+		/*
+		 * extensible.Timeline.convertToKeyframes() can accept the same arguments as  Timeline.convertToKeyframes(),
+		 * or may accept an array of argument list arrays, in which the indices correspond to the
+		 * layers indices. The index corresponding to a layer which is not to be modified should be 
+		 * null,undefined or empty (length==0).
+		 * convertToKeyframes also implements a workaround for Flash Professional CS5, wherein the
+		 * corresponding Timeline.convertToKeyframes() method does not work on Motion Objects.
+		 * @see Timeline.convertToKeyframes
+		 * @param {Number} startFrameIndex
+		 * @param {Number} endFrameIndex  ( optional )
+		 */
 		convertToKeyframes:function(startFrameIndex,endFrameIndex){ // accomodates multi-layer conversion
 			var args=Array.prototype.slice.call(arguments);
 			var ranges;
@@ -99,19 +135,38 @@
 				}
 			}
 		},
+		/*
+		 * @see Timeline#copyFrames
+		 * @see http://help.adobe.com/en_US/flash/cs/extend/WS5b3ccc516d4fbf351e63e3d118a9024f3f-782d.html
+		 */
 		copyFrames:function(){
 			return this.$.copyFrames.apply(this.$,arguments);
 		},
+		/*
+		 * @see Timeline#copyMotion
+		 * @link http://help.adobe.com/en_US/flash/cs/extend/WS5b3ccc516d4fbf351e63e3d118a9024f3f-7f1b.html
+		 */
 		copyMotion:function(){
 			return this.$.copyMotion();
 		},
+		/*
+		 * @see Timeline.copyMotionAsAS3
+		 */
 		copyMotionAsAS3:function(){
 			return this.$.copyMotionAsAS3();
 		},
+		/*
+		 * @see Timeline.createMotionTween
+		 */
 		createMotionTween:function(){
 			return this.$.createMotionTween.apply(this.$,arguments);
 		},
-		createMotionObject:function(){return this.$.createMotionObject()},
+		/*
+		 * @see Timeline.createMotionObject
+		 */
+		createMotionObject:function(){
+			return this.$.createMotionObject();
+		},
 		cutFrames:function(startFrameIndex,endFrameIndex){return this.$.cutFrames(startFrameIndex,endFrameIndex);},
 		deleteLayer:function(index){return this.$.deleteLayer(index);},
 		expandFolder:function(bExpand,bRecurseNestedParents,index){return this.$.expandFolder(bExpand,bRecurseNestedParents,index);},
@@ -188,13 +243,30 @@
 		},
 		set frameCount(s){this.$.frameCount=s;},
 		get layerCount(){return this.$.layerCount;},
-		get layers(){
+		set layerCount(){return;},
+		getLayers:function(options){
+			var settings=new ext.Object({
+				includeHiddenLayers:ext.includeHiddenLayers,
+				includeGuides:false
+			});
+			settings.extend(options);
 			var inputLayers=this.$.layers;
 			var layers=new ext.Array();
 			for(var i=0;i<inputLayers.length;i++){
-				layers.push(new ext.Layer(inputLayers[i],{timeline:this}));
+				if(
+					(inputLayers[i].visible || settings.includeHiddenLayers) && 
+					(inputLayers[i].layerType!='guide' || settings.includeGuides)
+				){
+					layers.push(new ext.Layer(inputLayers[i],{timeline:this}));
+				}
 			}
 			return layers;
+		},
+		get layers(){
+			return this.getLayers({
+				includeHiddenLayers:true,
+				includeGuides:true
+			});
 		},
 		get name(){return this.$.name;},
 		set name(s){this.$.name=s;},

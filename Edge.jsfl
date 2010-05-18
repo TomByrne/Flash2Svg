@@ -20,7 +20,6 @@
 	}
 	ExtensibleEdge.prototype={
 		__proto__:ext.Object.prototype,
-		$:Edge,
 		shape:null,
 		type:ExtensibleEdge,
 		getControl:function(i){

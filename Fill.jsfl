@@ -17,7 +17,7 @@
 		}else{
 			settings.extend(fill);
 		}
-		ext.Object.apply(this,[settings]);
+		ext.Object.apply(this,[settings,1]);
 		if(this.matrix && !(this.matrix instanceof ext.Matrix)){
 			this.matrix=new ext.Matrix(this.matrix);
 		}

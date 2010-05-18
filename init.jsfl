@@ -3,7 +3,9 @@
  
 (function(dom){
 	function Extensible(options){
+		BridgeTalk.apply(this,[]);
 		this._modules=[];
+		this.warnings=true;
 		this.log=undefined;
 		for(var o in options){
 			this[o]=options[o];
@@ -13,6 +15,7 @@
 		return this;
 	}
 	Extensible.prototype={
+		__proto__:BridgeTalk,
 		extend:function(obj){
 			for(var n in obj){
 				if(obj.hasOwnProperty(n)){
@@ -100,6 +103,9 @@
 		get modules(){
 			return this._modules;
 		},
+		ping:function(){
+			return true;
+		},
 		set modules(m){
 			this.load(m);
 		},
@@ -145,6 +151,11 @@
 				xml.files.appendChild(x);
 			}
 			FLfile.write(this.dir+"/"+settings.name+'.mxi',header+'\n'+xml.toXMLString());
+		},
+		warn:function(warning){
+			if(this.warnings){
+				fl.trace('Warning: '+warning);
+			}
 		}
 	};
 	dom.extensible=new Extensible();
@@ -182,7 +193,8 @@ extensible.load(
 		'Math',
 		'SVG',
 		'Log',
-		'ProgressBar'
+		'ProgressBar',
+		'Que'
 	],
 	true
 );

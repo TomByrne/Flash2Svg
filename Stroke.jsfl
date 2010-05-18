@@ -1,6 +1,10 @@
 (function(ext){
 	function ExtensibleStroke(stroke){
-		ext.Object.apply(this,[stroke]);
+		var settings=new ext.Object({
+			
+		});
+		settings.extend(stroke,1);
+		ext.Object.apply(this,[settings]);
 		if(this.shapeFill && !(this.shapeFill instanceof ext.Fill)){
 			this.shapeFill=new ext.Fill(this.shapeFill);
 		}else if(this.shapeFill){

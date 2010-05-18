@@ -1,13 +1,48 @@
 (function(ext){
-	var ExtensibleArray=function(array){
-		if(arguments.length==1 && array instanceof Array){
+	/*
+	 * extensible.Array
+	 * @this {extensible.Array}
+	 * @extends Array
+	 * @constructor
+	 * @parameter {Array} array
+	 */
+	var ExtensibleArray=function(array,recursive){
+		if(
+			(arguments.length==1 && array instanceof Array) || 
+			(arguments.length==2 && array instanceof Array && typeof(recursive)=='number' )
+		){
 			Array.prototype.splice.apply(
 				this,[0,0].concat(
 					Array.prototype.slice.call(array)
 				)
 			);
-			if(array instanceof this.type){
-				ext.Object.apply(this,[array]);
+			this.attributes=array.attributes;
+			if(recursive){
+				for(var i=0;i<this.length;i++){
+					if(!this[i].type){
+						switch(this[i].constructor.name){
+							case 'Array':
+								this[i]=new this.type(
+									this[i],
+									(
+										typeof(recursive)=='number'?
+										recursive-1:
+										recursive
+									)
+								);
+								break;
+							case 'Object':
+								this[i]=new ext.Object(
+									this[i],
+									(
+										typeof(recursive)=='number'?
+										recursive-1:
+										recursive
+									)
+								);
+						}
+					}
+				}
 			}
 		}else if(arguments.length>1){
 			Array.prototype.splice.apply(this,[0,0].concat(Array.prototype.slice.call(arguments)));	
@@ -19,10 +54,68 @@
 	ExtensibleArray.prototype={
 		__proto__:Array.prototype,
 		type:ExtensibleArray,
+		/*
+		 * @return {Array} a native javascript Array.
+		 */
 		get $(){
 			return Array.prototype.slice.call(this);
 		},
-		ccJoin:function(capitalize){//[camel,casing] >> camelCasing
+		/*
+		 * @parameter {Number} index A positive or negative integer.
+		 * @return The element at the specified index if positive, 
+		 * or the element at this.length-index if negative.
+		 */
+		at:function(index){
+			if(index<0){
+				return this[this.length+index];
+			}else{
+				return this[index];	
+			}
+		},
+		/*
+		 * @property {Object} An Object containing the non-enumerable properties of the Array object. 
+		 */
+		get attributes(){
+			var attributes={};
+			for(attr in this){
+				if(
+					this.hasOwnProperty(attr) &&
+					typeof(attr)=='string' &&
+					attr!='length' &&
+					!/^\d*\d$/.test(attr) 
+				){
+					try{
+						attributes[attr]=this[attr];
+					}catch(e){
+						ext.warn(
+							'extensible.Array.attibutes - 1 - could not retrieve value for '+
+							attr+'\n'+String(e)+'\n'+this.toSource()
+						);
+					}
+				}
+			}
+			return attributes;
+		},
+		set attributes(attributes){
+			if(!attributes){
+				return;
+			}
+			for(attr in attributes){
+				if(
+					attributes.hasOwnProperty(attr) &&
+					typeof(attr)=='string' &&
+					attr!='length' &&
+					!/^\d*\d$/.test(attr) 
+				){
+					this[attr]=attributes[attr];
+				}
+			}
+		},
+		/*
+		 * @parameter {Boolean} capitalize If true, the first letter will be capitalized.
+		 * @return {String} A joined string in camelCase format. 
+		 */
+		ccJoin:function(capitalize){ // [camel,casing] >> camelCasing
 			output="";
 			for(var i=0;i<this.length;i++){
 				var n=String(this[i]);
@@ -32,57 +125,31 @@
 			}
 			return output;
 		},
-		extend:function(array,noDuplicates){
-			for(var i=0;i<array.length;i++){
-				if(!noDuplicates || this.indexOf(array[i])<0){
-					this.push(array[i]);
+		/*
+		 * Clears all enumberable elements and (optionally) populates the Array with new elements.
+		 * @parameter {Array} newElements An array of elements to add after clearing the array.
+		 */
+		clear:function(newElements){
+			if(newElements){
+				newElements.unshift(0,this.length);
+				if(newElements instanceof this.type){
+					newElements=newElements.$;
 				}
-			}
-			return this;
-		},
-		prepend:function(array,noDuplicates){
-			for(var i=0;i<array.length;i++){
-				if(!noDuplicates || this.indexOf(array[i])<0){
-					this.unshift(array[i]);
-				}
-			}
-			return this;
-		},
-		clear:function(nlist){
-			if(nlist){
-				nlist.unshift(0,this.length);
-				if(nlist instanceof this.type){
-					nlist=nlist.$;
-				}
-				Array.prototype.splice.apply(this,nlist);
+				Array.prototype.splice.apply(this,newElements);
 			}else{
 				this.splice(0,this.length);
 			}
 			return this;
 		},
-		intersect:function(ilist){
-			if(!ilist || ilist.constructor.name!='Array'){return new this.type();}
-			if(ilist.length==0){return new this.type();}
-			ilist=new this.type(ilist);
-			var filtered=this.filter(function(element,index){
-				return(ilist.indexOf(element)>=0);
-			});
-			return filtered;
-		},
-		remove:function(rlist){
-			if(arguments.length==1 && arguments[0] instanceof Array){
-				rlist=arguments[0];
-			}else if(rlist){
-				rlist=Array.prototype.slice.call(arguments);
-			}else{
-				rlist=[undefined];
-			}
-			return this.filter(function(element,index,array){
-				return(rlist.indexOf(element)<0);
-			});
-		},
+		/*
+		 * @return A concatenated array of class [this.type].
+		 */
 		concat:function(){
-			var c=new this.type(this);
+			try{ // catch recursion
+				var c=new this.type(this);
+			}catch(e){
+				return;
+			}
 			for(var i=0;i<arguments.length;i++){
 				if(arguments[i].constructor.name=='Array'){
 					for(var n=0;n<arguments[i].length;n++){
@@ -92,17 +159,163 @@
 			}
 			return c;
 		},
+		/*
+		 * @parameter {Array} array Extends this with the elements of array.
+		 * @parameter {Boolean} noDuplicates Prevents the addition of redundant
+		 * elements. Does not remove existing redundancies.
+		 */
+		extend:function(array,noDuplicates){
+			for(var i=0;i<array.length;i++){
+				if(!noDuplicates || this.indexOf(array[i])<0){
+					this.push(array[i]);
+				}
+			}
+			return this;
+		},
+		/*
+		 * Works like the native javascript method Array.filter(), but returns an object of class [this.type].
+		 * @see Array.filter
+		 */
+		filter:function(){
+			var filtered=new this.type(this);
+			var a=Array.prototype.filter.apply(this,arguments);
+			filtered.clear(a);
+			return(filtered);
+		},
+		/*
+		 * @parameter {Boolean} recursive If true, reverses child Arrays.
+		 * @return A copy of [this], in reversed order.
+		 */
+		getReversed:function(recursive){
+			try{ // catch recursion
+				var r=new this.type(this);
+			}catch(e){
+				return;
+			}
+			r.reverse();
+			if(recursive){
+				for(var i=0;i<r.length;i++){
+					if(r[i] instanceof Array){
+						try{ // catch recursion
+							r[i]=(new this.type(r[i])).getReversed(recursive);
+						}catch(e){
+							return;
+						}
+					}
+				}
+			}
+			return r;
+		},
+		/*
+		 * Works like the native javascript method Array.indexOf(), but return an object of class [this.type].
+		 * @see Array.indexOf
+		 */
 		indexOf:function(element){
 			for(var i=0;i<this.length;i++){
-				if( 
-					this[i]==element ||
-					( this[i]['is'] && this[i].is(element))
-				){
-					return i;
+				try{
+					if(
+						(
+							this[i]==element && this[i]!==undefined && this[i]!==null
+						)||(
+							this[i]===element
+						)||( 
+							this[i]!==undefined && 
+							this[i]!==null && 
+							this[i]['is'] && 
+							this[i].is(element)
+						)
+					){
+						return i;
+					}
+				}catch(e){
+					ext.warn(
+						'extensible.Array.indexOf() - 1 - '+String(element)+'\n'+
+						String(this)+'\n'+String(e)
+					);	
 				}
 			}
 			return -1;
 		},
+		/*
+		 * @parameter {Array} array An array with which to compare [this].
+		 * @return An Array object of type this.type containing the elements
+		 * present in this and present in array, in the order they appear in [this].
+		 */
+		intersect:function(array){
+			if(!array instanceof Array){
+				return new this.type();
+			}
+			if(array.length==0){
+				return new this.type();
+			}
+			try{ // catch recursion
+				if(!(array instanceof this.type)){
+					array=new this.type(array);
+				}
+			}catch(e){
+				return;
+			}
+			var filtered=this.filter(function(element,index){
+				return(array.indexOf(element)>=0);
+			});
+			return filtered;
+		},
+		/*
+		 * @parameter {Array} array An Array object with which to compare [this].
+		 * @return {Boolean} Returns true if the elements of [this] match the elements of array.
+		 */
+		is:function(array,options){
+			if(this.length!=array.length){return false;}
+			for(var i=0;i<this.length;i++){
+				try{
+					if(this[i]!=array[i] && !(this[i]['is'] && this[i].is(array[i],options))){
+						return false;
+					}
+				}catch(e){
+					ext.warn(
+						'extensible.Array.is() - 1 - '+String(e)
+					);	
+				}
+			}
+			return true;
+		},
+		/*
+		 * @parameter
+		 */
+		prepend:function(array,noDuplicates){
+			for(var i=0;i<array.length;i++){
+				if(!noDuplicates || this.indexOf(array[i])<0){
+					this.unshift(array[i]);
+				}
+			}
+			return this;
+		},
+		/*
+		 * @parameter elements An element, or an array of elements, to remove from [this].
+		 * @return An Array object of class [this.type] with elements matching any in [array]
+		 * removed.
+		 */
+		remove:function(){
+			var args=Array.prototype.slice.call(arguments);
+			if(args.length==1 && args[0].constructor.name=='Array'){
+				rlist=arguments[0];
+			}else if(args.length>0){
+				rlist=Array.prototype.slice.call(args);
+			}else{
+				rlist=[undefined];
+			}
+			if(!(rlist instanceof this.type)){
+				rlist=new this.type(rlist);
+			}
+			var filtered=this.filter(function(element,index,array){
+				return rlist.indexOf(element)<0 ;
+			});
+			return filtered;
+		},
+		/*
+		 * Reverses the order of the enumerable elements in [this].
+		 * @parameter {Boolean} recursive If true, child Array elements are also reversed.
+		 */
 		reverse:function(recursive){
 			this.isReversed=this.isReversed?false:true;
 			Array.prototype.reverse.apply(this,arguments);
@@ -115,50 +328,23 @@
 			}
 			return this;
 		},
-		getReversed:function(recursive){
-			var r=new this.type(this);
-			r.reverse();
-			if(recursive){
-				for(var i=0;i<r.length;i++){
-					if(r[i] instanceof Array){
-						r[i]=(new this.type(r[i])).getReversed(recursive);
-					}
-				}
-			}
-			return r;
-		},
-		at:function(index){
-			if(index<0){
-				return this[this.length+index];
-			}else{
-				return this[index];	
-			}
-		},
+		/*
+		 * @parameter {Number} i A positive or negative integer.
+		 * @return An object of class [this.type] whith the element at index i removed.
+		 */
 		removeAt:function(i){
 			return this.filter(function(element,index,array){
 				return(index!=i);
 			});
 		},
+		/*
+		 * A copy of [this], in reversed order.
+		 */
 		get reversed(){
 			return this.getReversed();
 		},
 		set reversed(){
 			return;
-		},
-		filter:function(){
-			var filtered=new this.type(this);
-			var a=Array.prototype.filter.apply(this,arguments);
-			filtered.clear(a);
-			return(filtered);
-		},
-		is:function(a,options){
-			if(this.length!=a.length){return false;}
-			for(var i=0;i<this.length;i++){
-				if(this[i]!=a[i] && !(this[i]['is'] && this[i].is(a[i],options))){
-					return false;
-				}
-			}
-			return true;
 		}
 	}
 	ext.extend({Array:ExtensibleArray});

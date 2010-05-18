@@ -26,6 +26,14 @@
 		append:function(s){
 			FLfile.write(this.url,s,'append');
 		},
+		pauseTimer:function(id){
+			var t=this.timers[id];
+			if(t && t.startTime){
+				this.timers[id].elapsed=(new Date()).getTime()-t.startTime+t.elapsed;
+				this.timers[id].runs+=1;
+				delete this.timers[id].startTime;
+			}
+		},
 		startTimer:function(id){
 			var date=new Date();
 			if(id!==undefined && this.timers[id]){
@@ -38,28 +46,20 @@
 			this.timers[id]=t;
 			return id;
 		},
+		stop:function(){
+			var keys=this.timers.keys;
+			for(var k=0;k<keys.length;k++){
+				this.stopTimer(keys[k]);
+			}
+		},
 		stopTimer:function(id){
 			var t=this.timers[id];
 			if(t){
 				var time=t.elapsed;
 				var runs=t.runs;
 				if(t.startTime){time+=(new Date()).getTime()-t.startTime;}
-				this.append(id+'\t'+String(time)+'\t'+String((time/runs))+'\n');
+				this.append(id+'\t'+String(time)+'\t'+String((time/runs))+',');
 				delete(this.timers[id]);
-			}
-		},
-		pauseTimer:function(id){
-			var t=this.timers[id];
-			if(t && t.startTime){
-				this.timers[id].elapsed=(new Date()).getTime()-t.startTime+t.elapsed;
-				this.timers[id].runs+=1;
-				delete this.timers[id].startTime;
-			}
-		},
-		stop:function(){
-			var keys=this.timers.keys;
-			for(var k=0;k<keys.length;k++){
-				this.stopTimer(keys[k]);
 			}
 		}
 	}
