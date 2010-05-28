@@ -1,7 +1,9 @@
 ﻿package {
+	import adobe.utils.MMEndCommand;
 	import adobe.utils.MMExecute;
 	import adobe.utils.XMLUI;
 	
+	import fl.controls.ProgressBarMode;
 	import fl.events.ListEvent;
 	import fl.events.ScrollEvent;
 	
@@ -12,84 +14,167 @@
 	import flash.display.StageScaleMode;
 	import flash.events.Event;
 	import flash.events.MouseEvent;
+	import flash.events.ProgressEvent;
 	import flash.events.TimerEvent;
 	import flash.external.ExternalInterface;
-	import flash.utils.Timer;	
+	import flash.text.TextFieldAutoSize;
+	import flash.text.TextFormat;
+	import flash.text.TextFormatAlign;
+	import flash.utils.Timer;
+	import flash.utils.setTimeout;
+
 	public class SVGExportPanel extends MovieClip
 	{
-		var extensibleDir:String;
 		var initialized:Boolean=false;
+		var debugging:Boolean=true;
 		var init:Object={
 			width:360,
-			height:300
+			height:270
 		};
-		public function SVGExportPanel()
+		var timer:Timer=new Timer(1);
+		var isCanceled:Boolean=false;
+		var jsDir:String;
+		var exportInProgress=false;
+		var swfPanelName:String='SVG';
+		public function SVGExportPanel():void
 		{
 			super();
-			if(ExternalInterface.available){
-				stage.align=StageAlign.TOP_LEFT;
-				stage.scaleMode=StageScaleMode.NO_SCALE;
-				MMExecute('if(!this.extensible){fl.runScript(fl.configURI+"Javascript/Extensible/init.jsfl");}');
-				this.extensibleDir=MMExecute('extensible.dir.valueOf()');
-				this.pleaseWaitText.visible=false;
-				this.browseBttn.addEventListener(MouseEvent.CLICK,browseForFile);
-				this.saveDeletePresetBttn.addEventListener(MouseEvent.CLICK,saveOrDeletePresets);
-				this.presetOptionBox.addEventListener(
-					Event.CHANGE,
-					itemChange
-				);
-				this.presetOptionBox.addEventListener(
-					Event.CLOSE,
-					itemRollOut
-				);
-				this.presetOptionBox.addEventListener(
-					ListEvent.ITEM_ROLL_OUT,
-					itemRollOut
-				);
-				this.browseBttn.addEventListener(
-					MouseEvent.CLICK,
-					browseForFile
-				);
-				this.saveDeletePresetBttn.addEventListener(
-					MouseEvent.CLICK,
-					saveOrDeletePresets
-				);
-				this.okBttn.addEventListener(
-					MouseEvent.CLICK,
-					accept
-				);
-				this.cancelBttn.addEventListener(
-					MouseEvent.CLICK,
-					cancel
-				);
-				var timer:Timer = new Timer(10, 1);
-				timer.addEventListener("timer",loaded);
-				timer.start();
-				this.stage.addEventListener(Event.RESIZE,resize);
-			}
-		}
-		private function loaded(e:Event){
+			//Initialize Javascript
+			MMExecute('if(!this.extensible){fl.runScript(fl.configURI+"Javascript/Extensible/init.jsfl");}');
+			this.jsDir=MMExecute('extensible.dir.valueOf()');
+			// Display
+			stage.align=StageAlign.TOP_LEFT;
+			stage.scaleMode=StageScaleMode.NO_SCALE;
+			stage.addEventListener(Event.RESIZE,resize);
+			//Buttons
+			this.browseBttn.addEventListener(
+				MouseEvent.CLICK,
+				browseForFile
+			);
+			this.saveDeletePresetBttn.addEventListener(
+				MouseEvent.CLICK,
+				saveOrDeletePresets
+			);
+			this.presetOptionBox.addEventListener(
+				Event.CHANGE,
+				itemChange
+			);
+			this.presetOptionBox.addEventListener(
+				Event.CLOSE,
+				itemRollOut
+			);
+			this.presetOptionBox.addEventListener(
+				ListEvent.ITEM_ROLL_OUT,
+				itemRollOut
+			);
+			this.exportBttn.addEventListener(
+				MouseEvent.CLICK,
+				exportSVG
+			);
+			this.maskingTypeOptionBox.addEventListener(
+				Event.CHANGE,
+				setoptionsToCustom
+			);
+			this.curveDegreeOptionBox.addEventListener(
+				Event.CHANGE,
+				setoptionsToCustom
+			);
+			this.expandSymbolsCheckBox.addEventListener(
+				Event.CHANGE,
+				setoptionsToCustom
+			);
+			this.applyTransformationsCheckBox.addEventListener(
+				Event.CHANGE,
+				setoptionsToCustom
+			);
+			this.knockoutBackgroundColorCheckBox.addEventListener(
+				Event.CHANGE,
+				setoptionsToCustom
+			);
+			this.fillGapsCheckBox.addEventListener(
+				Event.CHANGE,
+				setoptionsToCustom
+			);
+			this.convertTextToOutlinesCheckBox.addEventListener(
+				Event.CHANGE,
+				setoptionsToCustom
+			);
+			this.decimalPointPrecisionNumericStepper.addEventListener(
+				Event.CHANGE,
+				setoptionsToCustom
+			);
+			//ProgressBar
+			this.progressbar.minimum=0;
+			this.timer.repeatCount=2999;
+			// Document change...
+			ExternalInterface.addCallback('documentChanged',documentChanged);
+			MMExecute([
+				'fl.addEventListener(',
+				'	"documentChanged",',
+				'	function(){',
+				'		extensible.swfPanel("'+this.swfPanelName+'").call("documentChanged");',
+				'	}',
+				');'
+			].join('\n'));
+			//Get original display positions
 			for(var i=0;i<this.numChildren;i++){
-				var child:DisplayObject=this.getChildAt(i);
-				this.init[child.name]={
-					bounds:child.getBounds(this),
-						scaleX:child.scaleX,
-						width:child.width,
-						x:child.x,
-						y:child.y
+			var child:DisplayObject=this.getChildAt(i);
+			this.init[child.name]={
+				bounds:child.getBounds(this),
+					scaleX:child.scaleX,
+					width:child.width,
+					x:child.x,
+					y:child.y
 				};
 			}
-			var exportPath:String=MMExecute('extensible.doc.getDataFromDocument("SVGExportTo")');
-			if(exportPath!='0'){
-				this.fileTextInput.text=exportPath;
-			}else if(['undefined','null'].indexOf(MMExecute('extensible.doc'))){
-				this.fileTextInput.text=MMExecute('FLfile.uriToPlatformPath(extensible.doc.pathURI.stripExtension())')+'.svg';
+			// For some reasons, this only works after a delay...
+			setTimeout(loaded,10);
+		}
+		public function documentChanged():Boolean
+		{
+			stage.focus=null;
+			this.initialized=false;
+			setTimeout(loaded,10);
+			return true;
+		}
+		private function setoptionsToCustom(e:Event):void
+		{
+			for(var i=0;i<this.presetOptionBox.length;i++){
+				if(this.presetOptionBox.text==this.presetOptionBox.getItemAt(i).label){
+					this.presetOptionBox.text='Custom';
+					break;
+				}
 			}
-			this.loadPreset(e);
+		}
+		private function browseForFile(e:MouseEvent){
+			var fileURI:String=MMExecute('fl.browseForFileURL("save","Export")');
+			var filePath:String=MMExecute('FLfile.uriToPlatformPath("'+fileURI+'")');
+			this.fileTextInput.text=filePath;
+		}
+		private function loaded(){
+			this.fillGapsCheckBox.visible=false; // this feature is not ready yet
+			this.knockoutBackgroundColorCheckBox.visible=false; // this feature is not ready yet
+			this.convertTextToOutlinesCheckBox.enabled=false; // text not yet supported, all is converted
+			if(MMExecute('extensible.doc')!=='null'){
+				if(MMExecute('extensible.doc.documentHasData("SVGExportPath")')=='true'){
+					this.fileTextInput.text=MMExecute('extensible.doc.getDataFromDocument("SVGExportPath")');
+				}else{
+					this.fileTextInput.text=MMExecute('FLfile.uriToPlatformPath(extensible.doc.pathURI.stripExtension())')+'.svg';
+				}
+			}	
+			this.loadPreset();
 		}
 		private function resize(e:Event):void
 		{
-			var stageScaleX=stage.stageWidth/this.init.width;
+			stage.focus=null;
+			var stageWidth=(
+				stage.stageWidth<this.init.width?
+				this.init.width:
+				stage.stageWidth
+			);
+			var stageScaleX=(
+				stageWidth/this.init.width
+			);
 			var names='';
 			for(var i=0;i<this.numChildren;i++){
 				var child=this.getChildAt(i);
@@ -98,8 +183,8 @@
 				if(
 					this.init[name].width>this.init.width*.5
 				){
-					child.width=stage.stageWidth-(this.init.width-this.init[name].width);
-				}else if(this.init[name].width>90){
+					child.width=stageWidth-(this.init.width-this.init[name].width);
+				}else if(this.init[name].width>105){
 					child.width=this.init[name].width*stageScaleX;
 				}else{
 					child.width=this.init[name].width;
@@ -111,7 +196,7 @@
 						this.init.width/2
 					){
 						child.x=(
-							stage.stageWidth-child.width-
+							stageWidth-child.width-
 							(
 								this.init.width-
 								(this.init[name].bounds.x+this.init[name].width)
@@ -121,38 +206,65 @@
 				}
 			}		
 		}
-		private function browseForFile(e:MouseEvent){
-			var fileURI:String=MMExecute('fl.browseForFileURL("save","Export SVG")');
-			var filePath:String=MMExecute('FLfile.uriToPlatformPath("'+fileURI+'")');
-			this.fileTextInput.text=filePath;
-		}
-		private function loadPreset(e:Event):void
+		private function loadPreset():void
 		{
-			var defaultSettings
+			var xml:XML;
 			if(!this.initialized){
-				
-				defaultSettings=MMExecute('FLfile.read("'+this.extensibleDir+'/Settings/SVG/.defaults")');
-				if(['False','false','0',false].indexOf(MMExecute('FLfile.exists("'+this.extensibleDir+'/Settings/SVG/'+defaultSettings+'.xml")'))){
-					defaultSettings='Illustrator';
+				var presets:Array=MMExecute('FLfile.listFolder("'+this.jsDir+'/Settings/SVG/","files")').split(',');
+				for(var n=0;n<presets.length;n++){
+					var str=presets[n].split('.').slice(0,-1).join('.');
+					var exists=false;
+					for(var i=0;i<this.presetOptionBox.length;i++){
+						if(str==this.presetOptionBox.getItemAt(i).label){
+							exists=true;
+							break;
+						}
+					}
+					if(!exists){
+						this.presetOptionBox.addItem({
+							label:str,
+							data:str
+						});
+					}
 				}
-				var presets:Array=MMExecute('FLfile.listFolder("'+this.extensibleDir+'/Settings/SVG/","files")').split(',');
-				for(i=0;i<presets.length;i++){
-					var str=presets[i].split('.').slice(0,-1).join('.');
-					this.presetOptionBox.addItem({
-						label:str,
-						data:str
-					});
+				if(
+					MMExecute('extensible.doc')!=='null' &&
+					MMExecute('extensible.doc.documentHasData("SVGExportOptions")')=='true'
+				){
+					xml=new XML(MMExecute('extensible.doc.getDataFromDocument("SVGExportOptions")'));
+				}else{
+					var defaultSetting=MMExecute('FLfile.read("'+this.jsDir+'/Settings/SVG/.defaults")');
+					if(MMExecute('FLfile.exists("'+this.jsDir+'/Settings/SVG/'+defaultSetting+'.xml")')!=='false'){
+						defaultSetting='Illustrator';
+					}else if(presets.length>0){
+						defaultSetting=presets[0].split('.').slice(0,-1).join('.');
+					}
+					xml=new XML(MMExecute('FLfile.read("'+this.jsDir+'/Settings/SVG/'+defaultSetting+'.xml")'));
 				}
 			}else{
-				defaultSettings=this.presetOptionBox.selectedItem.label;
+				if(MMExecute('FLfile.exists("'+this.jsDir+'/Settings/SVG/'+this.presetOptionBox.selectedItem.label+'.xml")')!=='false'){
+					xml=new XML(MMExecute('FLfile.read("'+this.jsDir+'/Settings/SVG/'+this.presetOptionBox.selectedItem.label+'.xml")'));
+				}				
 			};
-			var xmlString:String=MMExecute('FLfile.read("'+this.extensibleDir+'/Settings/SVG/'+defaultSettings+'.xml")');
-			var xml=new XML(xmlString);
+			if(!xml){
+				return;
+			}
+			this.setOptionsFromXML(xml);
+			if(!initialized){
+				this.setSaveDeleteStatus();	
+			}
+			this.initialized=true;
+		}
+		private function setOptionsFromXML(xml:XML):void
+		{
 			for(var i=0;i<this.presetOptionBox.length;i++){
-				if(defaultSettings==this.presetOptionBox.getItemAt(i).label){
+				if(xml['@title']==this.presetOptionBox.getItemAt(i).label){
 					this.presetOptionBox.selectedIndex=i;
 					break;
 				}
+			}
+			if(xml['@title']){
+				this.presetOptionBox.text=String(xml['@title']);				
 			}
 			for(i=0;i<this.maskingTypeOptionBox.length;i++){
 				if(String(xml.maskingType)==this.maskingTypeOptionBox.getItemAt(i).label){
@@ -168,13 +280,9 @@
 			}
 			this.expandSymbolsCheckBox.selected=Boolean(['False','false','0'].indexOf(String(xml.expandSymbols))<0);
 			this.applyTransformationsCheckBox.selected=Boolean(['False','false','0'].indexOf(String(xml.applyTransformations))<0);
-			this.decimalPointPrecisionTextInput.text=String(xml.decimalPointPrecision);
+			this.decimalPointPrecisionNumericStepper.value=Number(xml.decimalPointPrecision);
 			this.knockoutBackgroundColorCheckBox.selected=Boolean(['False','false','0'].indexOf(String(xml.knockoutBackgroundColor))<0);
 			this.fillGapsCheckBox.selected=Boolean(['False','false','0'].indexOf(String(xml.fillGaps))<0);
-			if(!initialized){
-				this.setSaveDeleteStatus();	
-			}
-			this.initialized=true;
 		}
 		private function setSaveDeleteStatus(){
 			var currentItem:String;
@@ -201,7 +309,7 @@
 		private function itemRollOut(e:Event){
 			this.saveDeletePresetBttn.label='Delete';
 			this.setSaveDeleteStatus();
-			this.loadPreset(e);
+			this.loadPreset();
 		}
 		private function itemChange(e:Event){
 			var unique=true;
@@ -224,7 +332,7 @@
 				this.presetOptionBox.text="";
 				this.presetOptionBox.selectedIndex=0;
 			}else{
-				MMExecute('FLfile.remove("'+this.extensibleDir+'/Settings/SVG/'+this.presetOptionBox.text+'.xml")');
+				MMExecute('FLfile.remove("'+this.jsDir+'/Settings/SVG/'+this.presetOptionBox.text+'.xml")');
 				for(var i=0;i<this.presetOptionBox.length;i++){
 					if(this.presetOptionBox.getItemAt(i).label==this.presetOptionBox.text){
 						this.presetOptionBox.removeItemAt(i);
@@ -232,7 +340,7 @@
 				}
 			}
 			this.presetOptionBox.selectedIndex=0;
-			this.loadPreset(e);
+			this.loadPreset();
 			this.setSaveDeleteStatus();
 		}
 		private function saveOrDeletePresets(e:Event):void
@@ -241,8 +349,21 @@
 				return this.deletePreset(e);
 			}
 			var settingsTitle=this.presetOptionBox.text;
-			this.presetOptionBox.addItem({label:settingsTitle});
-			var xml=new XML('<Settings title="'+settingsTitle+'"/>');
+			var xml=this.getOptionsXML();
+			this.presetOptionBox.addItem({label:String(xml['@title'])});
+			var fileURI=this.jsDir+'/Settings/SVG/'+String(xml['@title'])+'.xml';
+			var output=(
+				'unescape("'+escape(fileURI)+'"),'+
+				'unescape("'+escape(xml.toXMLString())+'")'
+			);
+			MMExecute('FLfile.write('+output+');');
+			this.saveDeletePresetBttn.label='Delete';
+			this.setSaveDeleteStatus();
+			this.presetOptionBox.selectedIndex=this.presetOptionBox.length-1;
+		}
+		private function getOptionsXML():XML
+		{
+			var xml=new XML('<Settings title="'+this.presetOptionBox.text+'"/>');
 			xml.appendChild(new XML(
 				'<maskingType>'+this.maskingTypeOptionBox.selectedItem.label+'</maskingType>'
 			));
@@ -256,7 +377,7 @@
 				'<applyTransformations>'+String(this.applyTransformationsCheckBox.selected)+'</applyTransformations>'
 			));
 			xml.appendChild(new XML(
-				'<decimalPointPrecision>'+String(this.decimalPointPrecisionTextInput.text)+'</decimalPointPrecision>'
+				'<decimalPointPrecision>'+String(this.decimalPointPrecisionNumericStepper.value)+'</decimalPointPrecision>'
 			));
 			xml.appendChild(new XML(
 				'<fillGaps>'+String(this.fillGapsCheckBox.selected)+'</fillGaps>'
@@ -264,49 +385,130 @@
 			xml.appendChild(new XML(
 				'<knockoutBackgroundColor>'+String(this.knockoutBackgroundColorCheckBox.selected)+'</knockoutBackgroundColor>'
 			));
-			var fileURI=this.extensibleDir+'/Settings/SVG/'+settingsTitle+'.xml';
-			var output=(
-				'unescape("'+escape(fileURI)+'"),'+
-				'unescape("'+escape(xml.toXMLString())+'")'
-			);
-			MMExecute('FLfile.write('+output+');');
-			this.saveDeletePresetBttn.label='Delete';
-			this.setSaveDeleteStatus();
-			this.presetOptionBox.selectedIndex=this.presetOptionBox.length-1;
+			xml.appendChild(new XML(
+				'<convertTextToOutlines>'+String(this.convertTextToOutlinesCheckBox.selected)+'</convertTextToOutlines>'
+			));
+			return xml;
 		}
-		private function accept(e:Event):void
+		private function exportSVG(e:Event):void
 		{
-			this.okBttn.enabled=false;
+			this.isCanceled=false;
+			//Switch exportBttn to 'Cancel'
+			this.exportInProgress=true;
+			this.exportBttn.label='Cancel';
+			this.exportBttn.removeEventListener(
+				MouseEvent.CLICK,
+				exportSVG
+			);
+			this.exportBttn.addEventListener(
+				MouseEvent.CLICK,
+				cancel
+			);
+			// Show indeterminate bar until progress starts...
+			this.progressbar.indeterminate=true;
+			this.progressbar.mode=ProgressBarMode.EVENT;
+			ExternalInterface.addCallback('setProgress',setProgress);
+			ExternalInterface.addCallback('endProgress',endProgress);
+			//Save options
+			MMExecute([
+				'extensible.doc.addDataToDocument(',
+				'	"SVGExportOptions",',
+				'	"string",',
+				'	unescape("'+escape(this.getOptionsXML().toXMLString())+'")',
+				')'
+			].join('\n'));
+			//Retrieve options...
 			var fileLoc=this.fileTextInput.text;
-			if(fileLoc.indexOf('.')==0){ //its a document relative path
-				fileLoc=fileLoc.replace(/^\./,MMExecute('extensible.doc.pathURI.dir'));
-			}
 			var uri=MMExecute('FLfile.platformPathToURI(unescape("'+escape(fileLoc)+'"))');
 			var cmd=[
-				'(function(ext){',
-				'	ext.doc.addDataToDocument("SVGExportURI","string","'+uri+'".relativeToDocument);',
-				'	var svg=new ext.SVG({',
+				'fl.runScript(fl.configURI+"Javascript/Extensible/init.jsfl");',
+				'extensible.que.push(',
+				'	new extensible.SVG({',
+				'		outputURI:"'+uri+'",',
+				'		swfPanelName:"'+this.swfPanelName+'",',
 				'		curveDegree:'+(this.curveDegreeOptionBox.selectedItem.label=='Quadratic'?'2':'3')+',',
 				'		maskingType:"'+this.maskingTypeOptionBox.selectedItem.label+'",',
 				'		expandSymbols:'+String(this.expandSymbolsCheckBox.selected)+',',
 				'		applyTransformations:'+String(this.applyTransformationsCheckBox.selected)+',',
-				'		decimalPointPrecision:'+String(this.decimalPointPrecisionTextInput.text)+',',
+				'		decimalPointPrecision:'+String(this.decimalPointPrecisionNumericStepper.value)+',',
 				'		fillGaps:'+String(this.fillGapsCheckBox.selected)+',',
 				'		knockoutBackgroundColor:'+String(this.knockoutBackgroundColorCheckBox.selected),
-				'	});',
-				'	FLfile.write("'+uri+'",String(svg));',
-				'	return true;',
-				'})(extensible)'
-			].join('');
-			cmd='extensible.que.push(unescape("'+escape(cmd)+'"));';
-			this.okBttn.enabled=true;
+				'	})',
+				')'
+			].join('\n');
 			MMExecute(cmd);
-			//XMLUI.accept();
 		}
 		private function cancel(e:Event):void
 		{
-			this.okBttn.enabled=true;
-			XMLUI.cancel();
+			this.isCanceled=true;
+			var killed;
+			try{
+				killed=MMExecute('extensible.que.kill()');
+			}catch(e){}
+			if(!killed=='true'){ // If kill command does not return "true"
+				this.endProgress();
+				progressbar.setProgress(0,100);
+			}
+			MMExecute('fl.trace("SVG Export Canceled")');
 		}
+		private function processQue(e:Event):void
+		{
+			if(this.isCanceled){return;}
+			if(this.timer.delay<100){this.timer.delay=100;}
+			// attempt to process the que
+			var success;
+			try{
+				success=MMExecute('extensible.que.process()');
+			}catch(e){}
+			if(success=='true'){ 
+				this.timer.stop();
+			}else{ // increase the delay with each failure
+				this.timer.delay+=20;
+			}
+		}
+		public function setProgress(completed:Number,max:Number):Boolean
+		{
+			this.progressbar.indeterminate=false;
+			this.progressbar.mode=ProgressBarMode.MANUAL;
+			this.progressbar.setProgress(completed,max);
+			// this is a total hack
+			this.timer=new Timer(0);
+			this.timer.addEventListener(
+				TimerEvent.TIMER,
+				processQue
+			);
+			this.timer.addEventListener(
+				TimerEvent.TIMER_COMPLETE,
+				function(e:Event){this.endProgress();}
+			);
+			timer.start();
+			return true;
+		}
+		public function endProgress():Boolean
+		{
+			this.progressbar.indeterminate=false;
+			this.progressbar.mode=ProgressBarMode.MANUAL;
+			// return exportBttn to original state
+			this.exportBttn.label='Export';
+			this.exportBttn.removeEventListener(
+				MouseEvent.CLICK,
+				cancel
+			);
+			this.exportBttn.addEventListener(
+				MouseEvent.CLICK,
+				exportSVG
+			);
+			ExternalInterface.addCallback('setProgress',null);
+			ExternalInterface.addCallback('endProgress',null);
+			if(this.timer){
+				this.timer.stop();
+			}
+			if(!this.isCanceled){
+				this.setProgress(100,100);
+				MMExecute('fl.trace("Export Successful: "+unescape("'+escape(this.fileTextInput.text)+'"))');
+			}
+			return true;
+		}
+		
 	}
 }

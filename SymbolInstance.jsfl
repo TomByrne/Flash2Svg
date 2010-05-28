@@ -65,11 +65,21 @@
 			return this.timeline.getNumCubicSegments(options);
 		},
 		getCurrentFrame:function(parentFrame){
-			parentFrame=parentFrame||0;
+			if(typeof(parentFrame)!='number'){
+				parentFrame=0;
+			}
 			var frame=0;
 			var timeline=this.timeline;
 			if(this.firstFrame!==undefined){
-				var playPosition=parentFrame-this.frame.startFrame+this.firstFrame;
+				var startFrame=0;
+				if(parentFrame==0 || this.frame.duration<2){ // ! important ( bugfix/workaround )
+					startFrame=parentFrame;
+				}else{
+					startFrame=this.frame.startFrame;
+				}
+				var playPosition=(
+					(parentFrame-startFrame)+this.firstFrame
+				);
 				if(this.loop=='single frame'){
 					frame=this.firstFrame;
 				}else if(this.loop=='play once'){

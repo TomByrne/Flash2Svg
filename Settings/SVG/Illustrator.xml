@@ -4,6 +4,7 @@
   <expandSymbols>true</expandSymbols>
   <applyTransformations>true</applyTransformations>
   <decimalPointPrecision>3</decimalPointPrecision>
-  <fillGaps>true</fillGaps>
+  <fillGaps>false</fillGaps>
   <knockoutBackgroundColor>false</knockoutBackgroundColor>
+  <convertTextToOutlines>true</convertTextToOutlines>
 </Settings>

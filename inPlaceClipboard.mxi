@@ -18,6 +18,7 @@
     <file source="Color.jsfl" destination="$flash/Javascript/Extensible"/>
     <file source="HalfEdge.jsfl" destination="$flash/Javascript/Extensible"/>
     <file source="Point.jsfl" destination="$flash/Javascript/Extensible"/>
+    <file source="Vertex.jsfl" destination="$flash/Javascript/Extensible"/>
     <file source="Edge.jsfl" destination="$flash/Javascript/Extensible"/>
     <file source="Fill.jsfl" destination="$flash/Javascript/Extensible"/>
     <file source="Stroke.jsfl" destination="$flash/Javascript/Extensible"/>
@@ -38,7 +39,10 @@
     <file source="Library.jsfl" destination="$flash/Javascript/Extensible"/>
     <file source="Item.jsfl" destination="$flash/Javascript/Extensible"/>
     <file source="Clipboard.jsfl" destination="$flash/Javascript/Extensible"/>
+    <file source="Math.jsfl" destination="$flash/Javascript/Extensible"/>
     <file source="SVG.jsfl" destination="$flash/Javascript/Extensible"/>
     <file source="Log.jsfl" destination="$flash/Javascript/Extensible"/>
+    <file source="ProgressBar.jsfl" destination="$flash/Javascript/Extensible"/>
+    <file source="Que.jsfl" destination="$flash/Javascript/Extensible"/>
   </files>
 </macromedia-extension>

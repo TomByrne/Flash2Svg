@@ -36,25 +36,25 @@
 		 * @see Timeline.addNewLayer
 		 */
 		addNewLayer:function(){
-			return this.$.addNewLayer.apply(this.$,arguments);
+			return this.$.addNewLayer.attempt(this.$,arguments);
 		},
 		/*
 		 * @see Timeline.clearFrames
 		 */
 		clearFrames:function(){
-			return this.$.clearFrames.apply(this.$,arguments);
+			return this.$.clearFrames.attempt(this.$,arguments);
 		},
 		/*
 		 * @see Timeline.clearKeyframes
 		 */
 		clearKeyframes:function(){
-			return this.$.clearKeyframes.apply(this.$,arguments);
+			return this.$.clearKeyframes.attempt(this.$,arguments);
 		},
 		/*
 		 * @see Timeline.convertToBlankKeyframes
 		 */
 		convertToBlankKeyframes:function(){
-			return this.$.convertToBlankKeyframes.apply(this.$,arguments);
+			return this.$.convertToBlankKeyframes.attempt(this.$,arguments);
 		},
 		/*
 		 * extensible.Timeline.convertToKeyframes() can accept the same arguments as  Timeline.convertToKeyframes(),
@@ -67,9 +67,11 @@
 		 * @param {Number} startFrameIndex
 		 * @param {Number} endFrameIndex  ( optional )
 		 */
-		convertToKeyframes:function(startFrameIndex,endFrameIndex){ // accomodates multi-layer conversion
+		convertToKeyframes:function(startFrameIndex,endFrameIndex){
 			var args=Array.prototype.slice.call(arguments);
 			var ranges;
+			var origSel=ext.sel;
+			ext.doc.selectNone();
 			if(!(args[0] instanceof Array)){
 				ranges=new ext.Array();
 				var selected=this.getSelectedFrames();
@@ -100,7 +102,7 @@
 							}
 						}
 						this.$.convertToKeyframes(ranges[i][0],ranges[i][1]);
-					}else{ // Flash CS5 has bugs in the convertToKeyframes command for motion objects, so we use a workaround.
+					}else{ // Flash CS5 workaround for motions objects
 						for(var n=ranges[i][0];n<ranges[i][1];n++){
 							if(frames[n].tweenType!='none' && frames[n].startFrame==n){
 								var start=frames[n].startFrame;
@@ -134,13 +136,15 @@
 					}
 				}
 			}
+			ext.sel=origSel;
+			return true;
 		},
 		/*
 		 * @see Timeline#copyFrames
 		 * @see http://help.adobe.com/en_US/flash/cs/extend/WS5b3ccc516d4fbf351e63e3d118a9024f3f-782d.html
 		 */
 		copyFrames:function(){
-			return this.$.copyFrames.apply(this.$,arguments);
+			return this.$.copyFrames.attempt(this.$,arguments);
 		},
 		/*
 		 * @see Timeline#copyMotion
@@ -159,7 +163,7 @@
 		 * @see Timeline.createMotionTween
 		 */
 		createMotionTween:function(){
-			return this.$.createMotionTween.apply(this.$,arguments);
+			return this.$.createMotionTween.attempt(this.$,arguments);
 		},
 		/*
 		 * @see Timeline.createMotionObject
@@ -167,58 +171,226 @@
 		createMotionObject:function(){
 			return this.$.createMotionObject();
 		},
-		cutFrames:function(startFrameIndex,endFrameIndex){return this.$.cutFrames(startFrameIndex,endFrameIndex);},
-		deleteLayer:function(index){return this.$.deleteLayer(index);},
-		expandFolder:function(bExpand,bRecurseNestedParents,index){return this.$.expandFolder(bExpand,bRecurseNestedParents,index);},
-		findLayerIndex:function(name){return this.$.findLayerIndex(name);},
-		getFrameProperty:function(property,startFrameIndex,endFrameIndex){return this.$.getFrameProperty(property,startFrameIndex,endFrameIndex);},
-		getGuidelines:function(){return this.$.getGuidelines();},
-		getLayerProperty:function(property){return this.$.getLayerProperty(property);},
-		getSelectedFrames:function(){return this.$.getSelectedFrames();},
-		getSelectedLayers:function(){return this.$.getSelectedLayers();},
-		insertBlankKeyframe:function(frameNumIndex){return this.$.insertBlankKeyframe(frameNumIndex);},
-		insertFrames:function(){
-			return this.$.insertFrames.apply(this.$,arguments);
+		cutFrames:function(startFrameIndex,endFrameIndex){
+			return this.$.cutFrames(startFrameIndex,endFrameIndex);
 		},
-		insertKeyframe:function(frameNumIndex){return this.$.insertKeyframe(frameNumIndex);},
+		deleteLayer:function(index){
+			return this.$.deleteLayer(index);
+		},
+		expandFolder:function(bExpand,bRecurseNestedParents,index){
+			return this.$.expandFolder(bExpand,bRecurseNestedParents,index);
+		},
+		findLayerIndex:function(name){
+			return this.$.findLayerIndex(name);
+		},
+		getFrameProperty:function(property,startFrameIndex,endFrameIndex){
+			return this.$.getFrameProperty(property,startFrameIndex,endFrameIndex);
+		},
+		getGuidelines:function(){
+			return this.$.getGuidelines();
+		},
+		getLayerProperty:function(property){
+			return this.$.getLayerProperty(property);
+		},
+		getSelectedFrames:function(){
+			return new ext.Array(this.$.getSelectedFrames());
+		},
+		getSelectedLayers:function(){
+			return new ext.Array(this.$.getSelectedLayers());
+		},
+		insertBlankKeyframe:function(frameNumIndex){
+			return this.$.insertBlankKeyframe(frameNumIndex);
+		},
+		insertFrames:function(){
+			return this.$.insertFrames.attempt(this.$,arguments);
+		},
+		insertKeyframe:function(frameNumIndex){
+			return this.$.insertKeyframe(frameNumIndex);
+		},
 		pasteFrames:function(){
-			return this.$.pasteFrames.apply(this.$,arguments);
+			return this.$.pasteFrames.attempt(this.$,arguments);
 		},
 		pasteMotion:function(){
 			return this.$.pasteMotion();
 		},
 		removeFrames:function(){
-			return this.$.removeFrames.apply(this.$,arguments);
+			return this.$.removeFrames.attempt(this.$,arguments);
 		},
 		removeMotionObject:function(){
 			return this.$.removeMotionObject();
 		},
 		reorderLayer:function(){
-			return this.$.reorderLayer.apply(this.$,arguments);
+			return this.$.reorderLayer.attempt(this.$,arguments);
 		},
 		reverseFrames:function(){
-			return this.$.reverseFrames.apply(this.$,arguments);
+			return this.$.reverseFrames.attempt(this.$,arguments);
 		},
-		selectAllFrames:function(){return this.$.selectAllFrames();},
-		setFrameProperty:function(property,value,startFrameIndex,endFrameIndex){return this.$.setFrameProperty(property,value,startFrameIndex,endFrameIndex);},
-		setGuidelines:function(xmlString){return this.$.setGuidelines(xmlString);},
-		setLayerProperty:function(property,value,layersToChange){return this.$.setLayerProperty(property,value,layersToChange);},
+		selectAllFrames:function(){
+			return this.$.selectAllFrames();
+		},
+		setFrameProperty:function(property,value,startFrameIndex,endFrameIndex){
+			return this.$.setFrameProperty(property,value,startFrameIndex,endFrameIndex);
+		},
+		setGuidelines:function(xmlString){
+			return this.$.setGuidelines.attempt(this,arguments);
+		},
+		setLayerProperty:function(property,value,layersToChange){
+			return this.$.setLayerProperty.attempt(this,arguments);
+		},
 		setSelectedFrames:function(){
-			return this.$.setSelectedFrames.apply(this.$,arguments);
+			var args=Array.prototype.slice.call(arguments);
+			var sLayers=this.getSelectedLayers();
+			var selectionList=new ext.Array([]);
+			var i;
+			var bReplaceCurrentSelection=true;
+			if(args[0] instanceof Array){
+				selectionList=args[0];
+				if(args[1]!==undefined){
+					bReplaceCurrentSelection=args[1];
+				}
+				for(var n=0;n<selectionList.length-2;n+=3){
+					if(selectionList[n+1]==selectionList[n+2]){
+						selectionList[n+2]+=1;
+					}
+				}
+			}else if(typeof(args[0])=='number'){
+				if(args[2]!==undefined){
+					bReplaceCurrentSelection=args[2];
+				}
+				var start=args[0];
+				var end=start+1;
+				if(typeof(args[1])=='number'){
+					if(args[1]==0){
+						return;
+					}else if(args[1]!=start){
+				 		end=args[1];
+					}
+				}
+				for(i=0;i<sLayers.length;i++){
+					selectionList.push(sLayers[i]);
+					selectionList.push(start);
+					if(end>-1){
+						selectionList.push(end);
+					}else{
+						selectionList.push(this.layers[sLayers[i]].frameCount);
+					}
+				}
+			}else{
+				return;	
+			}
+			var llocked=[];
+			for(i=0;i<this.layerCount;i++){
+				llocked[i]=this.layers[i].locked;
+				this.layers[i].locked=false;
+			}
+			var result,e;
+			var success,poo;
+			for(i=0;i<2999;i++){
+				success=false;
+				try{
+					result=this.$.setSelectedFrames(selectionList.$,bReplaceCurrentSelection);
+				}catch(e){}
+				var selected=this.$.getSelectedFrames();
+				if(selected.length==0){
+					continue;
+				}else if(bReplaceCurrentSelection){
+					selected=new ext.Array(selected);
+					if(selected.is(selectionList)){
+						success=true;
+						break;
+					}
+				}else{
+					success=false;
+					for(var n=0;n<selectionList.length-2;n+=3){
+						if(
+							this.layers[selectionList[n]].frameCount<selectionList[n+1]
+						){
+							success=true;
+							fl.trace(this.layers[selectionList[n]].frameCount);
+							continue;
+						}
+						success=false;
+						for(var ii=0;ii<selected.length-2;ii+=3){
+							if(
+								selected[ii]==selectionList[n] &&
+								selected[ii+1]==selectionList[n+1] &&
+								(
+									selected[ii+2]==selectionList[n+2] ||
+									(
+										this.layers[selectionList[n]].frameCount<selectionList[n+2] &&
+										selected[ii+2]==this.layers[selectionList[n]].frameCount
+									)
+								)
+							){
+								success=true;
+								break;
+							}
+						}
+						if(!success){
+							break;
+						}
+					}		
+					if(success){
+						break;	
+					}
+				}
+			}
+			for(i=0;i<this.layerCount;i++){
+				this.layers[i].locked=llocked[i];
+			}
+			return result;
 		},
-		setSelectedLayers:function(){
-			return this.$.setSelectedLayers.apply(this.$,arguments);
+		setSelectedLayers:function(index,bReplaceCurrentSelection){
+			if(
+				index==undefined ||
+				index>this.layerCount-1
+			){
+				return;	
+			}
+			var llocked=this.layers[index].locked;
+			this.layers[index].locked=false;
+			var result;
+			var success=true;
+			var e;
+			for(var i=0;this.getSelectedLayers().indexOf(index)<0 && i<100;i++){
+				try{
+					result=this.$.setSelectedLayers(index,bReplaceCurrentSelection);
+					success=true;
+				}catch(e){
+					success=false;
+				}
+			}
+			if(!success){
+				throw new Error('setSelectedLayers Error '+e);	
+			}
+			this.layers[index].locked=llocked;
+			return result;
 		},
-		showLayerMasking:function(layer){return this.$.showLayerMasking(layer);},
-		startPlayback:function(){return this.$.startPlayback();},
-		stopPlayback:function(){return this.$.stopPlayback();},
-		//built-in properties
-		get currentFrame(){return this.$.currentFrame;},
-		set currentFrame(s){this.$.currentFrame=s;},
-		get currentFrames(){return this.getFrames({position:this.currentFrame});},
+		showLayerMasking:function(){
+			return this.$.showLayerMasking.attempt(this,arguments);
+		},
+		startPlayback:function(){
+			return this.$.startPlayback();
+		},
+		stopPlayback:function(){
+			return this.$.stopPlayback();
+		},
+		get currentFrame(){
+			return this.$.currentFrame;
+		},
+		set currentFrame(s){
+			this.$.currentFrame=s;
+		},
+		get currentFrames(){
+			return this.getFrames({position:this.currentFrame});
+		},
 		set currentFrames(s){},		
-		get currentLayer(){return this.$.currentLayer;},
-		set currentLayer(s){this.$.currentLayer=s;},
+		get currentLayer(){
+			return this.$.currentLayer;
+		},
+		set currentLayer(s){
+			this.$.currentLayer=s;
+		},
 		get frameCount(options){
 			var settings=new ext.Object({
 				includeHiddenLayers:ext.includeHiddenLayers,
@@ -241,9 +413,15 @@
 			}
 			return frameCount;
 		},
-		set frameCount(s){this.$.frameCount=s;},
-		get layerCount(){return this.$.layerCount;},
-		set layerCount(){return;},
+		set frameCount(s){
+			this.$.frameCount=s;
+		},
+		get layerCount(){
+			return this.$.layerCount;
+		},
+		set layerCount(){
+			return;
+		},
 		getLayers:function(options){
 			var settings=new ext.Object({
 				includeHiddenLayers:ext.includeHiddenLayers,
@@ -268,10 +446,18 @@
 				includeGuides:true
 			});
 		},
-		get name(){return this.$.name;},
-		set name(s){this.$.name=s;},
-		get libraryItem(){return this.$.libraryItem;},
-		set libraryItem(s){this.$.libraryItem=s;},
+		get name(){
+			return this.$.name;
+		},
+		set name(s){
+			this.$.name=s;
+		},
+		get libraryItem(){
+			return this.$.libraryItem;
+		},
+		set libraryItem(s){
+			this.$.libraryItem=s;
+		},
 		//methods
 		getKeyframes:function(options){
 			var settings=new ext.Object({
@@ -388,40 +574,6 @@
 		},
 		get keyframes(){
 			return this.getKeyframes({selected:false});
-		},
-		getNumCubicSegments:function(options){
-			var settings=new ext.Object({
-				includeGuides:undefined,
-				includeHiddenLayers:ext.includeHiddenLayers,
-				frame:undefined
-			});
-			settings.extend(options);
-			if(ext.log){
-				var timer=ext.log.startTimer('Lookup cubic segment count.');
-			}
-			if(settings.frame && this.cache.numCubicSegments[settings.frame]){
-				return this.cache.numCubicSegments[settings.frame];
-			}
-			var elements=this.getElements(options).expandGroups();
-			var numCubicSegments=0;
-			for(var i=0;i<elements.length;i++){
-				if(elements[i] instanceof ext.SymbolInstance){
-					numCubicSegments+=elements[i].getNumCubicSegments({
-						includeGuides:settings.includeGuides,
-						includeHiddenLayers:settings.includeHiddenLayers,
-						frame:elements[i].getCurrentFrame(settings.frame)
-					})||0;
-				}else{
-					numCubicSegments+=elements[i].numCubicSegments||0;
-				}
-			}
-			if(settings.frame){
-				this.cache.numCubicSegments[settings.frame]=numCubicSegments;
-			}
-			if(ext.log){
-				ext.log.pauseTimer(timer);
-			}
-			return numCubicSegments;
 		}
 	}
 	ext.extend({Timeline:ExtensibleTimeline});

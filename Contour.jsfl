@@ -36,45 +36,40 @@
 			}else{
 				return this.getEdges();
 			}
+		},set edges(){},
+		get fill(){
+			return new ext.Fill(this.$.fill);
 		},
-		set edges(){
-			return;
+		set fill(s){
+			this.$.fill=s;
 		},
-		get fill(){return new ext.Fill(this.$.fill);},
-		set fill(s){this.$.fill=s;},
 		get interior(){return this.$.interior;},
-		set interior(){},
-		get orientation(){return this.$.orientation;},
-		set orientation(){},
+		get orientation(){
+			return this.$.orientation;
+		},set orientation(){},	
 		get edgeIDs(){
 			if(this.cache['edgeIDs']){return this.cache.edgeIDs;}
 			return this.getEdgeIDs();
-		},
-		set edgeIDs(s){
-			return;
-		},
+		},set edgeIDs(){},					
 		get oppositeFill(){
 			if(this.cache['oppositeFill']===undefined){
 				this.cache.oppositeFill=this.getOppositeFill();
 			}
 			return this.cache.oppositeFill;
 		},
-		set oppositeFill(s){
-			this.cache['oppositeFill']=s;
+		set oppositeFill(fill){
+			this.cache.oppositeFill=fill;
 		},
-		get oppositeContours(){
-			if(this.cache['oppositeContours']===undefined){
-				this.cache.oppositeContours=this.getOppositeContours();
+		get oppositeFills(){
+			if(this.cache['oppositeFill']===undefined){
+				this.cache.oppositeFill=this.getOppositeFill();
 			}
-			return this.cache.oppositeContours;
-		},
-		set oppositeContours(s){
-			this.cache.oppositeContours=s;
-		},
+			return this.cache.oppositeFill;
+		},set oppositeFills(){},
 		getEdgeIDs:function(){
 			return this.getEdges(true);
 		},
-		getEdges:function(bIDs){
+		getEdges:function(_getIDs){
 			var edges=new ext.Array();
 			var edgeIDs=new ext.Array();
 			var he=this.getHalfEdge();
@@ -94,35 +89,48 @@
 			edgeIDs.sort(function(a,b){return(a-b);});
 			this['cache']['edgeIDs']=edgeIDs;
 			this['cache']['edges']=edges;
-			return bIDs?edgeIDs:edges;
+			return _getIDs?edgeIDs:edges;
 		},
-		getOppositeFill:function(){
+		/**
+		 * Retrieve adjacent fill(s).
+		 * @return {extensible.Fill,extensible.Array} A fill or array of
+		 * fills adjacent to [this].
+		 */
+		getOppositeFill:function(all){
 			var edgeIDs=this.edgeIDs;
+			if(all){
+				this.cache.oppositeFills=new ext.Array();
+				var opposites=new ext.Array();
+			}
 			var contours=this.shape.contours;
 			for(var i=0;i<contours.length;i++){
-				if(contours[i].edgeIDs.is(edgeIDs)){
+				if(all && contours[i].edgeIDs.intersect(edgeIDs).length>0){
+					this.cache.oppositeFills.push(contours[i].fill);
+					opposites.push(contours[i].fill);
+				}else if(contours[i].edgeIDs.is(edgeIDs)){
 					this.cache.oppositeFill=contours[i].fill;
 					return contours[i].fill;
 				}
 			}
 		},
-		getOppositeContours:function(){
-			var edgeIDs=this.edgeIDs;
-			this.cache.oppositeContours=new ext.Array();
-			var contours=this.shape.contours;
-			for(var i=0;i<contours.length;i++){
-				if(contours[i].fill.is(this.fill) && !contours[i].edgeIDs.intersect(edgeIDs).length==0){
-					this.cache.oppositeContours.push(contours[i]);
-				}
-			}
-			return this.cache.oppositeContours;
-		},
+		/**
+		 * Retrieves a complete list of control points and/or cubic segment points, 
+		 * grouped in ordered arrays. When options.degree==3, cubic segment points 
+		 * are used where available. On rare occasions, cubic segment points are out 
+		 * of sync with a contour's quadratic control points used for display, but are 
+		 * still retrievable, and therefore are used in this output. This usually only
+		 * occurs when migrating from an earlier version of flash, so in the future we
+		 * may want to check the documents metadata ( RDF.Description.CreatorTool )
+		 * to determine if there is need to cross-check the cubic segment points.
+		 * @param {Object} options
+		 * @param {Number} options.curveDegree 2 (Quadratic) or 3 (Cubic). Default:2. 2 is faster, but not as sexy.
+		 * @param {Boolean} options.reversed If true, points are returned in reverse order.
+		 * @result {extensible.Array} An array of arrays, each child array containing an ordered point list.
+		 */
 		getControlPoints:function(options){
 			var settings=new ext.Object({
 				curveDegree:2, // quadratic ( 2 ) or cubic ( 3 )
-				reversed:false,
-				decimalPointPrecision:0,
-				matrix:undefined
+				reversed:false
 			});
 			settings.extend(options);
 			var controlPoints,edges;
@@ -141,7 +149,7 @@
 				var start=he.id;
 				var id;
 				if(ext.log){
-					var timerCPL=ext.log.startTimer('Contour point lookup.');
+					var timer=ext.log.startTimer('extensible.Contour.getControlPoints() >> Point Lookup');
 				}
 				while(id!=start){ // traverse the contour and acquire control point data.
 					var e=he.getEdge();
@@ -209,7 +217,6 @@
 							}
 						}
 					}
-					if(ext.progressbar){ext.progressbar.progress;}
 					if(cp.length>0 && (points.length==0 || !cp.is(points[points.length-1]))){				
 						cp.halfEdge=he;
 						cp.edgeID=e.id;
@@ -221,7 +228,7 @@
 					id=he.id;
 				}
 				if(ext.log){
-					ext.log.pauseTimer(timerCPL);
+					ext.log.pauseTimer(timer);
 				}
 				edgeIDs.sort(function(a,b){return(a-b);});
 				this.cache['edgeIDs']=edgeIDs;
@@ -231,18 +238,20 @@
 				var deg=points[points.length-1].length-1;
 				var edges=new ext.Array([]);
 				if(ext.log){
-						var timerPOC=ext.log.startTimer('Contour point order check.');
+					var timer2=ext.log.startTimer('extensible.Contour.getControlPoints() >> Order Check');
 				}
+				var removeNum=0;
 				for(var i=0;i<points.length;i++){ // Check to make sure that all points are correctly ordered and do not overlap.
-					var prev=i>0?i-1:points.length-1;
+					var prev=i>0?i-1-removeNum:points.length-1;
 					var next=i<points.length-1?i+1:0;
-					var prevdegree=deg;
+					var prevdegree=points[prev].length-1;
+					var nextdegree=points[next].length-1;
 					points[i].remove();
 					deg=points[i].length-1;
 					he=points[i].halfEdge;
 					e=points[i].edge;
 					var edgeID=points[i].edgeID;
-					if(
+					if( // an edge needs 2 points !
 						points[i].length<2 ||
 						(
 							points[i].length==2 &&
@@ -251,8 +260,7 @@
 					){
 						continue;
 					}
-					if(settings.curveDegree==3){
-						
+					if(settings.curveDegree==3){ // ... ! important
 						if(
 							!points[i][0].is(points[prev][prevdegree])
 						){
@@ -278,39 +286,121 @@
 							}
 						}
 					}
-					if(
-						(
-							(i==0) ||
-							(
-								!points[i].is(points[0]) &&
-								!points[i].is(points[0].reversed)
-							)
-						)
+					if( // ! important - without this little erratic lines can appear randomly ( albeit rarely ) at vertices
+						i<points.length
 					){
-						if( // get rid of anomalies
-							prevdegree<2&&
-							(points[prev][prevdegree].indexOfClosestTo(points[i])!=0)							
+						var isLine=(
+							deg<2 || (
+								deg<3 && (
+									points[i][deg].is( points[i][deg-1] ) ||
+									points[i][0].is( points[i][1] )
+								) 
+							) || (
+								deg==3 &&
+								points[i][deg].is( points[i][deg-1] ) &&
+								points[i][0].is( points[i][1] )
+							) || (
+								points[i][1].difference( points[i][0] ).normalized ==
+								points[i][deg].difference( points[i][deg-1] ).normalized
+							)
+						);
+						var nextIsLine=(
+							nextdegree<2 || (
+								nextdegree<3 && (
+									points[next][nextdegree].is( points[next][nextdegree-1] ) ||
+									points[next][0].is( points[next][1] )
+								) 
+							) || (
+								nextdegree==3 &&
+								points[next][nextdegree].is( points[next][nextdegree-1] ) &&
+								points[next][0].is( points[next][1] )
+							) || (
+								points[next][1].difference( points[next][0] ).normalized ==
+								points[next][nextdegree].difference( points[next][nextdegree-1] ).normalized
+							)
+						);
+						var prevIsLine=(
+							prevdegree<2 || (
+								prevdegree<3 && (
+									points[prev][prevdegree].is( points[prev][prevdegree-1] ) ||
+									points[prev][0].is( points[prev][1] )
+								) 
+							) || (
+								prevdegree==3 &&
+								points[prev][prevdegree].is( points[prev][prevdegree-1] ) &&
+								points[prev][0].is( points[prev][1] )
+							) || (
+								points[prev][1].difference( points[prev][0] ).normalized ==
+								points[prev][prevdegree].difference( points[prev][prevdegree-1] ).normalized
+							)
+						);
+						var folded=(
+							i>0 &&
+							points[i].is(points[prev].reversed) || 
+							(
+								isLine && 
+								prevIsLine && 
+								points[i][deg].is(points[prev][0]) &&
+								points[i][0].is(points[prev][prevdegree])
+							)
+						);
+						var overlapped=(
+							points[i].is(points[next]) || 
+							(
+								isLine && 
+								nextIsLine && 
+								points[i][deg].is(points[next][nextdegree]) &&
+								points[i][0].is(points[next][0])
+							)
+						);
+						var removeLast=false;
+						if( // ... ! important
+							folded || (
+								!overlapped &&
+								prevIsLine &&
+								isLine &&
+								points[prev][0].is(points[i][0])
+							)
 						){
-							controlPoints.pop();
-							edges.pop();
+							if(removeNum==0){
+								removeNum=1;
+							}
+							removeLast=true;
 						}
-						if( // double check before adding control points
-							deg>1||
-							points[i][0].indexOfClosestTo(points[prev])==prevdegree
+						if( // ... ! important
+							!folded && 
+							!overlapped
 						){
 							points[i].halfEdge=he;
-							//points[i].edge=e;
 							points[i].edgeID=edgeID;
 							controlPoints.push(points[i]);
 							edges.push(edgs[i]);
+							removeNum=0;
+						}else{
+							removeNum+=1;
 						}
+						if(removeLast){
+							if(i==0){
+								edgs.pop();
+								points.pop();
+							}else{
+								controlPoints.pop();
+								edges.pop();
+							}	
+						}						
 					}
+				}
+				if( // When < 3 edges are present, re-ordering can reverse the contour, so double check.
+					controlPoints.length<3 && controlPoints.length>0 &&
+					[-1,1][Number(Boolean(controlPoints[0].isReversed))]==this.orientation
+				){
+					controlPoints.reverse(true);	
 				}
 				this.cache[cacheID]=controlPoints;
 				this.cache.edges=edges;
 			}
 			if(ext.log){
-				ext.log.pauseTimer(timerPOC);
+				ext.log.pauseTimer(timer2);
 			}
 			if(settings.reversed!==false){
 				controlPoints.reverse(true);

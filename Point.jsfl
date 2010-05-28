@@ -1,4 +1,7 @@
 (function(ext){
+	/**
+	 *  
+	 */
 	function ExtensiblePoint(point,options){		
 		var settings=new ext.Object({
 			//halfEdge:undefined,
@@ -41,7 +44,7 @@
 		type:ExtensiblePoint,
 		is:function(p,options){
 			var settings=new ext.Object({
-				tolerance:0.1
+				tolerance:0.0
 			});
 			settings.extend(options);
 			if(p){
@@ -116,7 +119,10 @@
 				y:this.y/length
 			},this);
 		},
-		closestTo:function(points,bGetIndex){
+		/**
+		 * @param {Array} points
+		 */
+		closestTo:function(points,_bGetIndex){
 			if(!points || !points.length){
 				return;	
 			}
@@ -129,12 +135,15 @@
 					closestDistance=distance;
 				}
 			}
-			if(bGetIndex){
+			if(_bGetIndex){
 				return closest;
 			}else{
 				return points[closest];
 			}
 		},
+		/**
+		 * 
+		 */
 		indexOfClosestTo:function(points){
 			return this.closestTo(points,true);
 		},
@@ -145,6 +154,11 @@
 				x:Math.round(this.x*multiplier)/multiplier,
 				y:Math.round(this.y*multiplier)/multiplier
 			},this);
+		},
+		toSource:function(){
+			return(
+				'{ x:'+this.x+', y:'+this.y+' }'
+			);	
 		}
 	};
 	ext.extend({Point:ExtensiblePoint});

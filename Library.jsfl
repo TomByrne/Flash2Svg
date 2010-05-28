@@ -85,7 +85,8 @@
 				}else{
 					return this.uniqueName(name+"_1");
 				}
-			}	
+			}
+			return name;
 		}
 	};
 	ext.extend({Library:ExtensibleLibrary});

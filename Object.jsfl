@@ -1,5 +1,5 @@
 (function(ext){
-	/*
+	/**
 	 * @this {extensible.Object}
 	 * @extends Object
 	 * @constructor
@@ -48,7 +48,23 @@
 	}
 	ExtensibleObject.prototype={
 		__proto__:Object.prototype,
+		/**
+		 * Provides a reference to the class constructor.
+		 * @see extensible.Object
+		 * @property
+		 */
 		type:ExtensibleObject,
+		all:function(){
+			var result={};
+			for(var k in this){
+				if(
+					this.hasOwnProperty(k)
+				){
+					result[k]=this[k];
+				}
+			}
+			return result;
+		},
 		clear:function(keys){
 			keys=keys||this.keys;
 			for(var i=0;i<keys.length;i++){
@@ -59,7 +75,7 @@
 			var empty=new this.type();
 			context=context || this;
 			args=args||[];
-			for(k in this){
+			for(var k in this){
 				if(this.hasOwnProperty(k)){
 					var a=args;
 					a.splice(0,0,this[k],k);
@@ -200,6 +216,39 @@
 				}
 			}
 			return key;
+		},
+		/*
+		 * @see Object.toSource()
+		 * @addon
+		 */
+		toSource:function(maxRecursions){
+			maxRecursions=maxRecursions!==undefined?maxRecursions:3;
+			var args=Array.prototype.slice.call(arguments);
+			var tabs=args.length>1?args[1]:0;
+			var result=[];
+			var tabString='';
+			for(var i=0;i<tabs;i++){
+				tabString+='\t';	
+			}
+			var keys=this.keys;
+			for(var i=0;i<keys.length;i++){
+				if(this[keys[i]]!==undefined && this[keys[i]]!==null){
+					var str=String(keys[i])+':';
+					if(typeof this[keys[i]]=='number'){
+						str+=String(this[keys[i]]);
+					}else if(typeof this[keys[i]]=='string'){
+						str+='"'+String(this[keys[i]])+'"';
+					}else{
+						if(maxRecursions>0){
+							str+=this[keys[i]].toSource(maxRecursions-1,tabs+1);
+						}else{
+							str+=String(this[keys[i]]);
+						}
+					}
+					result.push(str);
+				}
+			}
+			return '{\n\t'+tabString+result.join(',\n\t'+tabString)+'\n'+tabString+'}';
 		}
 	}
 	ext.extend({Object:ExtensibleObject});

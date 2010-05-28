@@ -98,7 +98,11 @@
 			}
 		},
 		set members(s){return;},
-		get numCubicSegments(){if(this.$){return this.$.numCubicSegments;}},
+		get numCubicSegments(){
+			if(this.$){
+				return this.$.numCubicSegments;
+			}
+		},
 		set numCubicSegments(){},
 		get vertices(){if(this.$){return this.$.vertices;}},
 		set vertices(s){return;},

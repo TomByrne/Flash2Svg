@@ -13,7 +13,7 @@
 		});
 		settings.extend(options);
 		if(settings.url && !settings.append){
-			FLfile.write(settings.url,'Operation\tTotal Time\tAverage Time\n');
+			FLfile.write(settings.url,'Operation,Total Time,Average Time\n');
 		}
 		delete settings.append;
 		ext.Object.apply(this,[settings]);
@@ -58,7 +58,7 @@
 				var time=t.elapsed;
 				var runs=t.runs;
 				if(t.startTime){time+=(new Date()).getTime()-t.startTime;}
-				this.append(id+'\t'+String(time)+'\t'+String((time/runs))+',');
+				this.append(id+','+String(time)+','+String((time/runs))+'\n');
 				delete(this.timers[id]);
 			}
 		}

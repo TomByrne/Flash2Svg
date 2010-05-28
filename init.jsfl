@@ -39,7 +39,11 @@
 			return this;
 		},
 		get doc(){
-			return fl.getDocumentDOM();
+			try{
+				return fl.getDocumentDOM();
+			}catch(e){
+				return null;	
+			}
 		},
 		set doc(){},
 		get timeline(){
@@ -100,6 +104,13 @@
 		set flashVersion(){
 			return;
 		},
+		swfPanel:function(name){
+			for(var i=0;i<fl.swfPanels.length;i++){
+				if(fl.swfPanels[i].name==name){
+					return fl.swfPanels[i];
+				}
+			}
+		},
 		get modules(){
 			return this._modules;
 		},
@@ -153,8 +164,12 @@
 			FLfile.write(this.dir+"/"+settings.name+'.mxi',header+'\n'+xml.toXMLString());
 		},
 		warn:function(warning){
+			var message='Warning: '+warning;
 			if(this.warnings){
-				fl.trace('Warning: '+warning);
+				fl.trace(message);
+			}
+			if(this.log){
+				this.log.append(message);
 			}
 		}
 	};
@@ -191,10 +206,13 @@ extensible.load(
 		'Item',
 		'Clipboard',
 		'Math',
+		'Task',
 		'SVG',
 		'Log',
-		'ProgressBar',
-		'Que'
+		'Que',
+		'Timer',
+		'Error',
+		'Function'
 	],
 	true
 );

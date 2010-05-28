@@ -256,8 +256,8 @@
 				return;
 			}
 			var filtered=this.filter(function(element,index){
-				return(array.indexOf(element)>=0);
-			});
+				return(this.indexOf(element)>=0);
+			},array);
 			return filtered;
 		},
 		/*
@@ -283,10 +283,14 @@
 		 * @parameter
 		 */
 		prepend:function(array,noDuplicates){
-			for(var i=0;i<array.length;i++){
-				if(!noDuplicates || this.indexOf(array[i])<0){
-					this.unshift(array[i]);
+			if(noDuplicates){
+				for(var i=0;i<array.length;i++){
+					if(this.indexOf(array[i])<0){
+						this.unshift(array[i]);
+					}
 				}
+			}else{
+				Array.prototype.unshift.apply(this,array.$||array);
 			}
 			return this;
 		},
@@ -297,8 +301,8 @@
 		 */
 		remove:function(){
 			var args=Array.prototype.slice.call(arguments);
-			if(args.length==1 && args[0].constructor.name=='Array'){
-				rlist=arguments[0];
+			if(args.length==1 && args[0] instanceof Array){
+				rlist=args[0];
 			}else if(args.length>0){
 				rlist=Array.prototype.slice.call(args);
 			}else{
@@ -345,6 +349,41 @@
 		},
 		set reversed(){
 			return;
+		},
+		/*
+		 * @see Array.toSource()
+		 * @addon
+		 */
+		toSource:function(){
+			return this.$.toSource();
+			//return('["'+this.join('","')+'"]');
+		},
+		toSource:function(maxRecursions){
+			maxRecursions=maxRecursions!==undefined?maxRecursions:3;
+			var args=Array.prototype.slice.call(arguments);
+			var tabs=args.length>1?args[1]:0;
+			var result=[];
+			var tabString='';
+			for(var i=0;i<tabs;i++){
+				tabString+='\t';	
+			}
+			for(var i=0;i<this.length;i++){
+				if(this[i]!==undefined && this[i]!==null){
+					if(typeof this[i]=='number'){
+						var str=String(this[i]);
+					}else if(typeof this[i]=='string'){
+						var str='"'+String(this[i])+'"';
+					}else{
+						if(maxRecursions>0){
+							var str=this[i].toSource(maxRecursions-1,tabs+1);
+						}else{
+							var str=String(this[i]);
+						}
+					}
+					result.push(str);
+				}
+			}
+			return '[\n\t'+tabString+result.join(',\n\t'+tabString)+'\n'+tabString+']';
 		}
 	}
 	ext.extend({Array:ExtensibleArray});
