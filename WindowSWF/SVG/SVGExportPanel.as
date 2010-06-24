@@ -1,4 +1,5 @@
 ﻿package {
+	
 	import adobe.utils.MMEndCommand;
 	import adobe.utils.MMExecute;
 	import adobe.utils.XMLUI;
@@ -22,89 +23,117 @@
 	import flash.text.TextFormatAlign;
 	import flash.utils.Timer;
 	import flash.utils.setTimeout;
+	import flash.utils.getQualifiedClassName;
+	import flash.net.navigateToURL;
+	import flash.net.URLRequest;
 
 	public class SVGExportPanel extends MovieClip
 	{
 		var initialized:Boolean=false;
 		var debugging:Boolean=true;
 		var init:Object={
-			width:360,
-			height:270
+			width:240,
+			height:360
 		};
 		var timer:Timer=new Timer(1);
 		var isCanceled:Boolean=false;
 		var jsDir:String;
 		var exportInProgress=false;
 		var swfPanelName:String='SVG';
+		var dev:Boolean;
+		var helpURL:URLRequest=new URLRequest('http://dissentgraphics.com/tools/flash2svg');
 		public function SVGExportPanel():void
 		{
 			super();
 			//Initialize Javascript
-			MMExecute('if(!this.extensible){fl.runScript(fl.configURI+"Javascript/Extensible/init.jsfl");}');
+			this.dev=(
+				MMExecute([
+					'if(!this.extensible){',
+					'	fl.runScript(fl.configURI+"Javascript/Extensible/init.jsfl");',
+					'}',
+					'extensible.dev.valueOf()'
+				].join('\n'))=='true'
+			);
 			this.jsDir=MMExecute('extensible.dir.valueOf()');
 			// Display
 			stage.align=StageAlign.TOP_LEFT;
 			stage.scaleMode=StageScaleMode.NO_SCALE;
 			stage.addEventListener(Event.RESIZE,resize);
 			//Buttons
-			this.browseBttn.addEventListener(
+			this.controls.browseBttn.addEventListener(
 				MouseEvent.CLICK,
 				browseForFile
 			);
-			this.saveDeletePresetBttn.addEventListener(
+			this.controls.saveDeletePresetBttn.addEventListener(
 				MouseEvent.CLICK,
 				saveOrDeletePresets
 			);
-			this.presetOptionBox.addEventListener(
+			this.controls.presetComboBox.addEventListener(
 				Event.CHANGE,
 				itemChange
 			);
-			this.presetOptionBox.addEventListener(
+			this.controls.presetComboBox.addEventListener(
 				Event.CLOSE,
 				itemRollOut
 			);
-			this.presetOptionBox.addEventListener(
+			this.controls.presetComboBox.addEventListener(
 				ListEvent.ITEM_ROLL_OUT,
 				itemRollOut
 			);
-			this.exportBttn.addEventListener(
+			this.controls.exportBttn.addEventListener(
 				MouseEvent.CLICK,
 				exportSVG
 			);
-			this.maskingTypeOptionBox.addEventListener(
+			this.controls.maskingTypeComboBox.addEventListener(
 				Event.CHANGE,
-				setoptionsToCustom
+				setOptionsToCustom
 			);
-			this.curveDegreeOptionBox.addEventListener(
+			this.controls.sourceComboBox.addEventListener(
 				Event.CHANGE,
-				setoptionsToCustom
+				resize
 			);
-			this.expandSymbolsCheckBox.addEventListener(
+			this.controls.framesComboBox.addEventListener(
 				Event.CHANGE,
-				setoptionsToCustom
+				resize
 			);
-			this.applyTransformationsCheckBox.addEventListener(
+			this.controls.curveDegreeComboBox.addEventListener(
 				Event.CHANGE,
-				setoptionsToCustom
+				setOptionsToCustom
 			);
-			this.knockoutBackgroundColorCheckBox.addEventListener(
+			this.controls.expandSymbolsComboBox.addEventListener(
 				Event.CHANGE,
-				setoptionsToCustom
+				setOptionsToCustom
 			);
-			this.fillGapsCheckBox.addEventListener(
+			this.controls.applyTransformationsCheckBox.addEventListener(
 				Event.CHANGE,
-				setoptionsToCustom
+				setOptionsToCustom
 			);
-			this.convertTextToOutlinesCheckBox.addEventListener(
+			this.controls.knockoutBackgroundColorCheckBox.addEventListener(
 				Event.CHANGE,
-				setoptionsToCustom
+				setOptionsToCustom
 			);
-			this.decimalPointPrecisionNumericStepper.addEventListener(
+			this.controls.fillGapsCheckBox.addEventListener(
 				Event.CHANGE,
-				setoptionsToCustom
+				setOptionsToCustom
+			);
+			this.controls.convertTextToOutlinesCheckBox.addEventListener(
+				Event.CHANGE,
+				setOptionsToCustom
+			);
+			this.controls.helpBttn.addEventListener(
+				MouseEvent.CLICK,
+				getHelp
+			);
+			this.controls.decimalPointPrecisionNumericStepper.addEventListener(
+				Event.CHANGE,
+				setOptionsToCustom
+			);
+			this.scrollBar.addEventListener(
+				ScrollEvent.SCROLL,
+				scroll
 			);
 			//ProgressBar
-			this.progressbar.minimum=0;
+			this.controls.progressbar.minimum=0;
 			this.timer.repeatCount=2999;
 			// Document change...
 			ExternalInterface.addCallback('documentChanged',documentChanged);
@@ -117,10 +146,10 @@
 				');'
 			].join('\n'));
 			//Get original display positions
-			for(var i=0;i<this.numChildren;i++){
-			var child:DisplayObject=this.getChildAt(i);
-			this.init[child.name]={
-				bounds:child.getBounds(this),
+			for(var i=0;i<this.controls.numChildren;i++){
+				var child:DisplayObject=this.controls.getChildAt(i);
+				this.init[child.name]={
+					bounds:child.getBounds(this.controls),
 					scaleX:child.scaleX,
 					width:child.width,
 					x:child.x,
@@ -130,6 +159,10 @@
 			// For some reasons, this only works after a delay...
 			setTimeout(loaded,10);
 		}
+		public function getHelp(e:Event):void
+		{
+			navigateToURL(this.helpURL,"_blank");
+		}
 		public function documentChanged():Boolean
 		{
 			stage.focus=null;
@@ -137,74 +170,175 @@
 			setTimeout(loaded,10);
 			return true;
 		}
-		private function setoptionsToCustom(e:Event):void
+		
+		private function setOptionsToCustom(e:Event):void
 		{
-			for(var i=0;i<this.presetOptionBox.length;i++){
-				if(this.presetOptionBox.text==this.presetOptionBox.getItemAt(i).label){
-					this.presetOptionBox.text='Custom';
+			for(var i=0;i<this.controls.presetComboBox.length;i++){
+				if(this.controls.presetComboBox.text==this.controls.presetComboBox.getItemAt(i).label){
+					this.controls.presetComboBox.text='Custom';
 					break;
 				}
 			}
 		}
+		
 		private function browseForFile(e:MouseEvent){
 			var fileURI:String=MMExecute('fl.browseForFileURL("save","Export")');
-			var filePath:String=MMExecute('FLfile.uriToPlatformPath("'+fileURI+'")');
-			this.fileTextInput.text=filePath;
+			var filePath:String=MMExecute('FLfile.uriToPlatformPath("'+fileURI+'").relativeToDocument');
+			this.controls.fileTextInput.text=filePath;
 		}
+		
 		private function loaded(){
-			this.fillGapsCheckBox.visible=false; // this feature is not ready yet
-			this.knockoutBackgroundColorCheckBox.visible=false; // this feature is not ready yet
-			this.convertTextToOutlinesCheckBox.enabled=false; // text not yet supported, all is converted
+			this.scrollBarTextField.visible=false;
+			this.scrollBar.width=9;
+			this.controls.fillGapsCheckBox.visible=false; // this feature is not ready yet
+			this.controls.knockoutBackgroundColorCheckBox.visible=false; // this feature is not ready yet
+			this.controls.convertTextToOutlinesCheckBox.enabled=false; // text not yet supported, all is converted
 			if(MMExecute('extensible.doc')!=='null'){
 				if(MMExecute('extensible.doc.documentHasData("SVGExportPath")')=='true'){
-					this.fileTextInput.text=MMExecute('extensible.doc.getDataFromDocument("SVGExportPath")');
+					this.controls.fileTextInput.text=MMExecute('extensible.doc.getDataFromDocument("SVGExportPath")');
+				}else if(MMExecute('extensible.doc.pathURI')!=='undefined'){
+					this.controls.fileTextInput.text=MMExecute('FLfile.uriToPlatformPath(extensible.doc.pathURI.stripExtension())')+'.svg';
 				}else{
-					this.fileTextInput.text=MMExecute('FLfile.uriToPlatformPath(extensible.doc.pathURI.stripExtension())')+'.svg';
+					this.controls.fileTextInput.text=MMExecute('extensible.doc.name.stripExtension()')+'.svg';
 				}
-			}	
+			}
 			this.loadPreset();
+			setTimeout(this.resize,10,null);
 		}
+		
 		private function resize(e:Event):void
 		{
 			stage.focus=null;
+			var startWidth;
+			if(this.scrollBar.visible){
+				startWidth=this.init.width;
+			}else{
+				startWidth=this.init.width-14;
+			}
 			var stageWidth=(
-				stage.stageWidth<this.init.width?
-				this.init.width:
+				stage.stageWidth<startWidth?
+				startWidth:
 				stage.stageWidth
 			);
 			var stageScaleX=(
-				stageWidth/this.init.width
+				stageWidth/startWidth
 			);
+			var stageScaleY=(
+				stage.stageHeight/this.init.height
+			);
+			var verticalOffset:Number=0;
+			var bottom=0;
+			if(
+				this.controls.framesComboBox.selectedItem.label!='Current'
+			){
+				verticalOffset+=30;
+				this.controls.startFrameNumericStepper.visible=true;
+				this.controls.endFrameNumericStepper.visible=true;
+				this.controls.startFrameTextField.visible=true;
+				this.controls.endFrameTextField.visible=true;
+			}else{
+				this.controls.startFrameNumericStepper.visible=false;
+				this.controls.endFrameNumericStepper.visible=false;	
+				this.controls.startFrameTextField.visible=false;
+				this.controls.endFrameTextField.visible=false;			
+			}
+			if(
+				this.controls.sourceComboBox.selectedItem.label!='Current Timeline'
+			){
+				this.controls.clipToScalingGridRadioButton.visible=true;
+				this.controls.clipToBoundingBoxRadioButton.visible=true;
+				this.controls.clipToTextField.visible=true;
+				verticalOffset+=60;
+			}else{
+				this.controls.clipToScalingGridRadioButton.visible=false;
+				this.controls.clipToBoundingBoxRadioButton.visible=false;
+				this.controls.clipToTextField.visible=false;
+			}
 			var names='';
-			for(var i=0;i<this.numChildren;i++){
-				var child=this.getChildAt(i);
+			for(var i=0;i<this.controls.numChildren;i++){
+				var child=this.controls.getChildAt(i);
 				var name=child.name;
 				names+=name;
 				if(
-					this.init[name].width>this.init.width*.5
+					this.init[name].width>65
 				){
-					child.width=stageWidth-(this.init.width-this.init[name].width);
-				}else if(this.init[name].width>105){
-					child.width=this.init[name].width*stageScaleX;
+					child.width=stageWidth-(startWidth-this.init[name].width);
 				}else{
-					child.width=this.init[name].width;
-				}
-				if(this.init[name].width<this.init.width*.5){
 					var bounds=child.getBounds(this);
 					if(
 						this.init[name].bounds.x+(this.init[name].width/2)>
-						this.init.width/2
+						startWidth/2
 					){
 						child.x=(
 							stageWidth-child.width-
 							(
-								this.init.width-
+								startWidth-
 								(this.init[name].bounds.x+this.init[name].width)
 							)
 						);
 					}
 				}
-			}		
+				child.y=this.init[child.name].y;
+				if(
+					verticalOffset &&
+					this.init[child.name].y>this.controls.framesComboBox.y+10
+				){
+					child.y+=verticalOffset;
+				}
+				if(child.visible==true && child.y+child.height>bottom){
+					bottom=child.y+child.height+15;
+				}
+			}
+			this.controls.startFrameNumericStepper.y=this.init['startFrameNumericStepper'].y;
+			this.controls.endFrameNumericStepper.y=this.init['endFrameNumericStepper'].y;
+			this.controls.startFrameTextField.y=this.init['startFrameTextField'].y;
+			this.controls.endFrameTextField.y=this.init['endFrameTextField'].y;
+			this.controls.clipToScalingGridRadioButton.y=this.init['clipToScalingGridRadioButton'].y;
+			this.controls.clipToBoundingBoxRadioButton.y=this.init['clipToBoundingBoxRadioButton'].y;
+			this.controls.clipToTextField.y=this.init['clipToTextField'].y;
+			if(
+				this.controls.framesComboBox.selectedItem.label!='Current' &&
+				this.controls.sourceComboBox.selectedItem.label!='Current Timeline'
+			){
+				this.controls.clipToScalingGridRadioButton.y+=30;
+				this.controls.clipToBoundingBoxRadioButton.y+=30;
+				this.controls.clipToTextField.y+=30;
+			}
+			//Scroll Bar
+			this.scrollBar.update();
+			this.scrollBarTextField.width=stage.stageWidth;
+			this.scrollBarTextField.height=stage.stageHeight;
+			this.scrollBarTextField.x=0;
+			this.scrollBarTextField.y=0;
+			this.scrollBar.y=0;
+			this.scrollBar.x=stage.stageWidth-14;
+			this.scrollBar.setSize(10,stage.stageHeight);
+			var scrollTextArray=['\n'];
+			for(i=0;i<=bottom/12.666666;i++){
+				scrollTextArray.push('\n');
+			}
+			this.scrollBarTextField.text=scrollTextArray.join('');
+			this.scrollBar.update();
+			//
+			if(
+				stage.stageHeight>(i-2)*12.666666
+			){
+				if(this.scrollBar.visible){
+					this.scrollBar.scrollPosition=0;
+					this.scrollBar.visible=false;
+					this.resize(e);
+				}
+			}else{
+				if(!this.scrollBar.visible){
+					this.scrollBar.visible=true;
+					this.resize(e);
+				}
+			}
+			
+		}
+		private function scroll(e:Event):void
+		{
+			this.controls.y=-((this.scrollBar.scrollPosition-1)*12.666666);
 		}
 		private function loadPreset():void
 		{
@@ -214,14 +348,14 @@
 				for(var n=0;n<presets.length;n++){
 					var str=presets[n].split('.').slice(0,-1).join('.');
 					var exists=false;
-					for(var i=0;i<this.presetOptionBox.length;i++){
-						if(str==this.presetOptionBox.getItemAt(i).label){
+					for(var i=0;i<this.controls.presetComboBox.length;i++){
+						if(str==this.controls.presetComboBox.getItemAt(i).label){
 							exists=true;
 							break;
 						}
 					}
 					if(!exists){
-						this.presetOptionBox.addItem({
+						this.controls.presetComboBox.addItem({
 							label:str,
 							data:str
 						});
@@ -242,8 +376,8 @@
 					xml=new XML(MMExecute('FLfile.read("'+this.jsDir+'/Settings/SVG/'+defaultSetting+'.xml")'));
 				}
 			}else{
-				if(MMExecute('FLfile.exists("'+this.jsDir+'/Settings/SVG/'+this.presetOptionBox.selectedItem.label+'.xml")')!=='false'){
-					xml=new XML(MMExecute('FLfile.read("'+this.jsDir+'/Settings/SVG/'+this.presetOptionBox.selectedItem.label+'.xml")'));
+				if(MMExecute('FLfile.exists("'+this.jsDir+'/Settings/SVG/'+this.controls.presetComboBox.selectedItem.label+'.xml")')!=='false'){
+					xml=new XML(MMExecute('FLfile.read("'+this.jsDir+'/Settings/SVG/'+this.controls.presetComboBox.selectedItem.label+'.xml")'));
 				}				
 			};
 			if(!xml){
@@ -255,62 +389,79 @@
 			}
 			this.initialized=true;
 		}
+		
 		private function setOptionsFromXML(xml:XML):void
 		{
-			for(var i=0;i<this.presetOptionBox.length;i++){
-				if(xml['@title']==this.presetOptionBox.getItemAt(i).label){
-					this.presetOptionBox.selectedIndex=i;
+			for(var i=0;i<this.controls.presetComboBox.length;i++){
+				if(xml['@title']==this.controls.presetComboBox.getItemAt(i).label){
+					this.controls.presetComboBox.selectedIndex=i;
 					break;
 				}
 			}
 			if(xml['@title']){
-				this.presetOptionBox.text=String(xml['@title']);				
+				this.controls.presetComboBox.text=String(xml['@title']);				
 			}
-			for(i=0;i<this.maskingTypeOptionBox.length;i++){
-				if(String(xml.maskingType)==this.maskingTypeOptionBox.getItemAt(i).label){
-					this.maskingTypeOptionBox.selectedIndex=i;
-					break;
+			for(i=0;i<this.controls.numChildren;i++){
+				var child=this.controls.getChildAt(i);
+				var type=getQualifiedClassName(child).split('::').pop();
+				var option:String=child.name.replace(type,'');
+				var element=xml[option];
+				if(element.length()){
+					element=String(element[0]);
+					switch(type){
+						case 'ComboBox':
+							for(var n=0;n<child.length;n++){
+								if(element==child.getItemAt(n).label){
+									child.selectedIndex=n;
+									break;
+								}else if(Number(element)==n){
+									child.selectedIndex=n;
+								}
+							}
+							break;
+						case 'CheckBox':
+							child.selected=Boolean(['False','false','0'].indexOf(element)<0);
+							break;
+						case 'NumericStepper':
+							child.value=Number(element);
+							break;		
+						case 'TextInput':
+							child.text=element;
+							break;					
+					}
 				}
 			}
-			for(i=0;i<this.curveDegreeOptionBox.length;i++){
-				if(String(xml.curveDegree)==this.curveDegreeOptionBox.getItemAt(i).label){
-					this.curveDegreeOptionBox.selectedIndex=i;
-					break;
-				}
-			}
-			this.expandSymbolsCheckBox.selected=Boolean(['False','false','0'].indexOf(String(xml.expandSymbols))<0);
-			this.applyTransformationsCheckBox.selected=Boolean(['False','false','0'].indexOf(String(xml.applyTransformations))<0);
-			this.decimalPointPrecisionNumericStepper.value=Number(xml.decimalPointPrecision);
-			this.knockoutBackgroundColorCheckBox.selected=Boolean(['False','false','0'].indexOf(String(xml.knockoutBackgroundColor))<0);
-			this.fillGapsCheckBox.selected=Boolean(['False','false','0'].indexOf(String(xml.fillGaps))<0);
 		}
+		
 		private function setSaveDeleteStatus(){
 			var currentItem:String;
-			var currentIndex=this.presetOptionBox.selectedIndex;
+			var currentIndex=this.controls.presetComboBox.selectedIndex;
 			if(currentIndex<0){
-				this.presetOptionBox.selectedIndex=0;
+				this.controls.presetComboBox.selectedIndex=0;
 				currentIndex=0;
 				return;
 			}
-			currentItem=this.presetOptionBox.getItemAt(currentIndex).label;
+			currentItem=this.controls.presetComboBox.getItemAt(currentIndex).label;
 			if(
-				this.saveDeletePresetBttn.enabled &&
+				this.controls.saveDeletePresetBttn.enabled &&
 				(
 					'Illustrator'==currentItem||
 					'Inkscape'==currentItem||
 					'Web'==currentItem
 				)
 			){
-				this.saveDeletePresetBttn.enabled=false;
-			}else if(!saveDeletePresetBttn.enabled){
-				this.saveDeletePresetBttn.enabled=true;
+				this.controls.saveDeletePresetBttn.enabled=false;
+			}else if(!this.controls.saveDeletePresetBttn.enabled){
+				this.controls.saveDeletePresetBttn.enabled=true;
 			}
 		}
+		
 		private function itemRollOut(e:Event){
-			this.saveDeletePresetBttn.label='Delete';
+			this.controls.saveDeletePresetBttn.label='Delete';
 			this.setSaveDeleteStatus();
 			this.loadPreset();
 		}
+		
 		private function itemChange(e:Event){
 			var unique=true;
 			for(var i=0;i<e.target.length;i++){
@@ -320,93 +471,119 @@
 				}
 			}
 			if(unique){
-				this.saveDeletePresetBttn.label='Save';	
+				this.controls.saveDeletePresetBttn.label='Save';	
 			}else{
-				this.saveDeletePresetBttn.label='Delete';
+				this.controls.saveDeletePresetBttn.label='Delete';
 			}
-			this.saveDeletePresetBttn.enabled=true;
+			this.controls.saveDeletePresetBttn.enabled=true;
 		}
+		
 		private function deletePreset(e:Event):void
 		{
-			if(this.presetOptionBox.selectedIndex<0){
-				this.presetOptionBox.text="";
-				this.presetOptionBox.selectedIndex=0;
+			if(this.controls.presetComboBox.selectedIndex<0){
+				this.controls.presetComboBox.text="";
+				this.controls.presetComboBox.selectedIndex=0;
 			}else{
-				MMExecute('FLfile.remove("'+this.jsDir+'/Settings/SVG/'+this.presetOptionBox.text+'.xml")');
-				for(var i=0;i<this.presetOptionBox.length;i++){
-					if(this.presetOptionBox.getItemAt(i).label==this.presetOptionBox.text){
-						this.presetOptionBox.removeItemAt(i);
+				MMExecute('FLfile.remove("'+this.jsDir+'/Settings/SVG/'+this.controls.presetComboBox.text+'.xml")');
+				for(var i=0;i<this.controls.presetComboBox.length;i++){
+					if(this.controls.presetComboBox.getItemAt(i).label==this.controls.presetComboBox.text){
+						this.controls.presetComboBox.removeItemAt(i);
 					}
 				}
 			}
-			this.presetOptionBox.selectedIndex=0;
+			this.controls.presetComboBox.selectedIndex=0;
 			this.loadPreset();
 			this.setSaveDeleteStatus();
 		}
+		
 		private function saveOrDeletePresets(e:Event):void
 		{
 			if(e.target.label=='Delete'){
 				return this.deletePreset(e);
 			}
-			var settingsTitle=this.presetOptionBox.text;
-			var xml=this.getOptionsXML();
-			this.presetOptionBox.addItem({label:String(xml['@title'])});
+			var settingsTitle=this.controls.presetComboBox.text;
+			var xml=this.getOptionsXML(false);
+			this.controls.presetComboBox.addItem({label:String(xml['@title'])});
 			var fileURI=this.jsDir+'/Settings/SVG/'+String(xml['@title'])+'.xml';
 			var output=(
-				'unescape("'+escape(fileURI)+'"),'+
-				'unescape("'+escape(xml.toXMLString())+'")'
+				'decodeURIComponent("'+encodeURIComponent(fileURI)+'"),'+
+				'decodeURIComponent("'+encodeURIComponent(xml.toXMLString())+'")'
 			);
 			MMExecute('FLfile.write('+output+');');
-			this.saveDeletePresetBttn.label='Delete';
+			this.controls.saveDeletePresetBttn.label='Delete';
 			this.setSaveDeleteStatus();
-			this.presetOptionBox.selectedIndex=this.presetOptionBox.length-1;
+			this.controls.presetComboBox.selectedIndex=this.controls.presetComboBox.length-1;
 		}
-		private function getOptionsXML():XML
+		
+		private function getOptionsXML(includeFileSpecificSettings:Boolean):XML
 		{
-			var xml=new XML('<Settings title="'+this.presetOptionBox.text+'"/>');
-			xml.appendChild(new XML(
-				'<maskingType>'+this.maskingTypeOptionBox.selectedItem.label+'</maskingType>'
-			));
-			xml.appendChild(new XML(
-				'<curveDegree>'+this.curveDegreeOptionBox.selectedItem.label+'</curveDegree>'
-			));
-			xml.appendChild(new XML(
-				'<expandSymbols>'+String(this.expandSymbolsCheckBox.selected)+'</expandSymbols>'
-			));
-			xml.appendChild(new XML(
-				'<applyTransformations>'+String(this.applyTransformationsCheckBox.selected)+'</applyTransformations>'
-			));
-			xml.appendChild(new XML(
-				'<decimalPointPrecision>'+String(this.decimalPointPrecisionNumericStepper.value)+'</decimalPointPrecision>'
-			));
-			xml.appendChild(new XML(
-				'<fillGaps>'+String(this.fillGapsCheckBox.selected)+'</fillGaps>'
-			));
-			xml.appendChild(new XML(
-				'<knockoutBackgroundColor>'+String(this.knockoutBackgroundColorCheckBox.selected)+'</knockoutBackgroundColor>'
-			));
-			xml.appendChild(new XML(
-				'<convertTextToOutlines>'+String(this.convertTextToOutlinesCheckBox.selected)+'</convertTextToOutlines>'
-			));
+			var controlList=[
+				'maskingType','curveDegree','expandSymbols','applyTransformations','decimalPointPrecision',
+				'fillGaps','knockoutBackgroundColor','convertTextToOutlines'
+			];
+			if(includeFileSpecificSettings){
+				controlList.push(
+					'file','source','frames','startFrame','endFrame','clipToBoundingBox','clipToScalingGrid'
+				);
+			};
+			var xml=new XML('<Settings title="'+this.controls.presetComboBox.text+'"/>');
+			for(var i=0;i<this.controls.numChildren;i++){
+				var child=this.controls.getChildAt(i);
+				var type=getQualifiedClassName(child).split('::').pop();
+				var option:String=child.name.replace(type,'');
+				if(
+					controlList.indexOf(option)>-1 &&
+					child.visible
+				){
+					switch(type){
+						case 'ComboBox':
+							xml.appendChild(new XML(
+								'<'+option+'>'+child.selectedItem.label+'</'+option+'>'
+							));
+							break;
+						case 'CheckBox':
+							xml.appendChild(new XML(
+								'<'+option+'>'+String(child.selected)+'</'+option+'>'
+							));
+							break;
+						case 'RadioButton':
+							xml.appendChild(new XML(
+								'<'+option+'>'+String(child.selected)+'</'+option+'>'
+							));
+							break;
+						case 'NumericStepper':
+							xml.appendChild(new XML(
+								'<'+option+'>'+String(child.value)+'</'+option+'>'
+							));
+							break;
+						case 'TextInput':
+							xml.appendChild(new XML(
+								'<'+option+'>'+String(child.text)+'</'+option+'>'
+							));
+							break;					
+					}
+				}
+			}
 			return xml;
 		}
+		
 		private function exportSVG(e:Event):void
 		{
 			this.isCanceled=false;
 			//Switch exportBttn to 'Cancel'
 			this.exportInProgress=true;
-			this.exportBttn.label='Cancel';
-			this.exportBttn.removeEventListener(
+			this.controls.exportBttn.label='Cancel';
+			this.controls.exportBttn.removeEventListener(
 				MouseEvent.CLICK,
 				exportSVG
 			);
-			this.exportBttn.addEventListener(
+			this.controls.exportBttn.addEventListener(
 				MouseEvent.CLICK,
 				cancel
 			);
 			// Show indeterminate bar until progress starts...
-			this.progressbar.indeterminate=true;
-			this.progressbar.mode=ProgressBarMode.EVENT;
+			this.controls.progressbar.indeterminate=true;
+			this.controls.progressbar.mode=ProgressBarMode.EVENT;
 			ExternalInterface.addCallback('setProgress',setProgress);
 			ExternalInterface.addCallback('endProgress',endProgress);
 			//Save options
@@ -414,43 +591,78 @@
 				'extensible.doc.addDataToDocument(',
 				'	"SVGExportOptions",',
 				'	"string",',
-				'	unescape("'+escape(this.getOptionsXML().toXMLString())+'")',
+				'	decodeURIComponent("'+encodeURIComponent(this.getOptionsXML(true).toXMLString())+'")',
 				')'
 			].join('\n'));
 			//Retrieve options...
-			var fileLoc=this.fileTextInput.text;
-			var uri=MMExecute('FLfile.platformPathToURI(unescape("'+escape(fileLoc)+'"))');
-			var cmd=[
+			var fileLoc=this.controls.fileTextInput.text;
+			var uri=MMExecute('FLfile.platformPathToURI(decodeURIComponent("'+encodeURIComponent(fileLoc)+'"))');
+			/*var cmd=[
 				'fl.runScript(fl.configURI+"Javascript/Extensible/init.jsfl");',
 				'extensible.que.push(',
 				'	new extensible.SVG({',
-				'		outputURI:"'+uri+'",',
+				'		file:"'+uri+'",',
 				'		swfPanelName:"'+this.swfPanelName+'",',
-				'		curveDegree:'+(this.curveDegreeOptionBox.selectedItem.label=='Quadratic'?'2':'3')+',',
-				'		maskingType:"'+this.maskingTypeOptionBox.selectedItem.label+'",',
-				'		expandSymbols:'+String(this.expandSymbolsCheckBox.selected)+',',
-				'		applyTransformations:'+String(this.applyTransformationsCheckBox.selected)+',',
-				'		decimalPointPrecision:'+String(this.decimalPointPrecisionNumericStepper.value)+',',
-				'		fillGaps:'+String(this.fillGapsCheckBox.selected)+',',
-				'		knockoutBackgroundColor:'+String(this.knockoutBackgroundColorCheckBox.selected),
+				'		source:"'+this.controls.sourceComboBox.selectedItem.label+'",',
+				'		curveDegree:'+(this.controls.curveDegreeComboBox.selectedItem.label=='Quadratic'?'2':'3')+',',
+				'		maskingType:"'+this.controls.maskingTypeComboBox.selectedItem.label+'",',
+				'		expandSymbols:'+String(this.controls.expandSymbolsCheckBox.selected)+',',
+				'		applyTransformations:'+String(this.controls.applyTransformationsCheckBox.selected)+',',
+				'		decimalPointPrecision:'+String(this.controls.decimalPointPrecisionNumericStepper.value)+',',
+				'		fillGaps:'+String(this.controls.fillGapsCheckBox.selected)+',',
+				'		knockoutBackgroundColor:'+String(this.controls.knockoutBackgroundColorCheckBox.selected),
+				(
+					this.controls.startFrameNumericStepper.visible ?
+					'		startFrame:"'+String(this.controls.startFrameNumericStepper.value)+'",' :
+					''
+				),				
+				(
+					this.controls.endFrameNumericStepper.visible ?
+					'		endFrame:"'+String(this.controls.endFrameNumericStepper.value)+'",' :
+					''
+				),			
+				(
+					this.controls.clipToScalingGridRadioButton.visible ?
+					'		clipToScalingGrid:'+String(this.controls.clipToScalingGridRadioButton.selected)+',' :
+					''
+				),			
+				(
+					this.controls.clipToBoundingBoxRadioButton.visible ?
+					'		clipToBoundingBox:'+String(this.controls.clipToBoundingBoxRadioButton.selected)+',' :
+					''
+				),
 				'	})',
 				')'
+			].join('\n');*/
+			var xml=this.getOptionsXML(true);
+			xml['swfPanelName']='SVG';
+			if(this.dev){
+				MMExecute('fl.runScript(fl.configURI+"Javascript/Extensible/init.jsfl");');
+			}
+			var cmd=[
+				'extensible.que.push(',
+				'	new extensible.SVG(',
+						xml.toXMLString(),
+				'	)',
+				');'
 			].join('\n');
 			MMExecute(cmd);
 		}
+		
 		private function cancel(e:Event):void
 		{
 			this.isCanceled=true;
+			this.endProgress();
 			var killed;
 			try{
 				killed=MMExecute('extensible.que.kill()');
 			}catch(e){}
 			if(!killed=='true'){ // If kill command does not return "true"
-				this.endProgress();
-				progressbar.setProgress(0,100);
+				this.controls.progressbar.setProgress(0,100);
 			}
 			MMExecute('fl.trace("SVG Export Canceled")');
 		}
+		
 		private function processQue(e:Event):void
 		{
 			if(this.isCanceled){return;}
@@ -466,11 +678,12 @@
 				this.timer.delay+=20;
 			}
 		}
+		
 		public function setProgress(completed:Number,max:Number):Boolean
 		{
-			this.progressbar.indeterminate=false;
-			this.progressbar.mode=ProgressBarMode.MANUAL;
-			this.progressbar.setProgress(completed,max);
+			this.controls.progressbar.indeterminate=false;
+			this.controls.progressbar.mode=ProgressBarMode.MANUAL;
+			this.controls.progressbar.setProgress(completed,max);
 			// this is a total hack
 			this.timer=new Timer(0);
 			this.timer.addEventListener(
@@ -481,20 +694,21 @@
 				TimerEvent.TIMER_COMPLETE,
 				function(e:Event){this.endProgress();}
 			);
-			timer.start();
+			this.timer.start();
 			return true;
 		}
+		
 		public function endProgress():Boolean
 		{
-			this.progressbar.indeterminate=false;
-			this.progressbar.mode=ProgressBarMode.MANUAL;
+			this.controls.progressbar.indeterminate=false;
+			this.controls.progressbar.mode=ProgressBarMode.MANUAL;
 			// return exportBttn to original state
-			this.exportBttn.label='Export';
-			this.exportBttn.removeEventListener(
+			this.controls.exportBttn.label='Export';
+			this.controls.exportBttn.removeEventListener(
 				MouseEvent.CLICK,
 				cancel
 			);
-			this.exportBttn.addEventListener(
+			this.controls.exportBttn.addEventListener(
 				MouseEvent.CLICK,
 				exportSVG
 			);
@@ -505,7 +719,7 @@
 			}
 			if(!this.isCanceled){
 				this.setProgress(100,100);
-				MMExecute('fl.trace("Export Successful: "+unescape("'+escape(this.fileTextInput.text)+'"))');
+				MMExecute('fl.trace("Export Successful: "+decodeURIComponent("'+encodeURIComponent(this.controls.fileTextInput.text)+'"))');
 			}
 			return true;
 		}

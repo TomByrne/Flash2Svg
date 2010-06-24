@@ -1,7 +1,7 @@
 <Settings title="Illustrator">
   <maskingType>Clipping</maskingType>
   <curveDegree>Cubic</curveDegree>
-  <expandSymbols>true</expandSymbols>
+  <expandSymbols>All</expandSymbols>
   <applyTransformations>true</applyTransformations>
   <decimalPointPrecision>3</decimalPointPrecision>
   <fillGaps>false</fillGaps>

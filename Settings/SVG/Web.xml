@@ -1,7 +1,7 @@
 <Settings title="Web">
-  <maskingType>Alpha</maskingType>
-  <curveDegree>Quadratic</curveDegree>
-  <expandSymbols>true</expandSymbols>
+  <maskingType>Clipping</maskingType>
+  <curveDegree>Cubic</curveDegree>
+  <expandSymbols>Nested</expandSymbols>
   <applyTransformations>false</applyTransformations>
   <decimalPointPrecision>3</decimalPointPrecision>
   <fillGaps>false</fillGaps>

@@ -1,7 +1,7 @@
 <Settings title="Inkscape">
   <maskingType>Clipping</maskingType>
   <curveDegree>Cubic</curveDegree>
-  <expandSymbols>false</expandSymbols>
+  <expandSymbols>None</expandSymbols>
   <applyTransformations>false</applyTransformations>
   <decimalPointPrecision>3</decimalPointPrecision>
   <fillGaps>false</fillGaps>
