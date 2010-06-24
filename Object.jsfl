@@ -1,6 +1,6 @@
 (function(ext){
 	/**
-	 * @this {extensible.Object}
+	 * @this extensible.Object
 	 * @extends Object
 	 * @constructor
 	 * @parameter {Object} obj A native object.
@@ -85,6 +85,7 @@
 			return all;
 		},
 		extend:function(obj,recursive){
+			if(!obj){return;}
 			for(var n in obj){
 				if(
 					obj.hasOwnProperty(n) &&
@@ -113,7 +114,7 @@
 				}
 			}
 		},
-		/*
+		/**
 		 * @parameter element An element to search for.
 		 * @see Array.indexOf
 		 * @return {String} The key corresponding the the given element.
@@ -132,7 +133,7 @@
 				}
 			}
 		},
-		/*
+		/**
 		 * @parameter {Object} object
 		 * @return {Boolean} true if the object is equivalent to [this].
 		 */
@@ -170,7 +171,7 @@
 			}
 			return true;
 		},
-		/*
+		/**
 		 * A list of the properties belonging to this object ( not it's prototype ).
 		 * @property
 		 */
@@ -249,7 +250,8 @@
 				}
 			}
 			return '{\n\t'+tabString+result.join(',\n\t'+tabString)+'\n'+tabString+'}';
-		}
-	}
+		},
+		toString:this.toSource
+	};
 	ext.extend({Object:ExtensibleObject});
 })(extensible)

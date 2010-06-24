@@ -22,23 +22,18 @@
 				});
 				settings.extend(options);
 				var cachePoints;
-				var useCache=true;
-				if(useCache){
-					cachePoints=this.cache.cubicSegmentPoints[cubicSegmentIndex];
-					if(cachePoints && cachePoints.length){
-						return this.cache.cubicSegmentPoints[cubicSegmentIndex];
-					}
+				cachePoints=this.cache.cubicSegmentPoints[cubicSegmentIndex];
+				if(cachePoints && cachePoints.length){
+					return this.cache.cubicSegmentPoints[cubicSegmentIndex];
 				}
 				var csp=this.$.getCubicSegmentPoints(cubicSegmentIndex);
-				var points=new ext.Array();
+				var points=new ext.Curve();
 				for(var i=0;i<csp.length;i++){
 					points.push(
 						new ext.Point(csp[i],settings)
 					);
 				}
-				if(useCache){
-					this.cache.cubicSegmentPoints[cubicSegmentIndex]=new ext.Array(points);
-				}
+				this.cache.cubicSegmentPoints[cubicSegmentIndex]=new ext.Array(points);
 				if(ext.log){
 					ext.log.pauseTimer(timerCSPL);
 				}
@@ -72,40 +67,78 @@
 		set contours(c){this.cache.contours=c;},
 		get edges(){
 			if(this.$){
+				if(this.cache.edges){
+					return this.cache.edges;
+				}
 				var edges=new ext.Array();
 				var e=this.$.edges;
 				for(var i=0;i<e.length;i++){
 					edges.push(new ext.Edge(this.$.edges[i]));
 				}
+				this.cache.edges=edges;
 				return edges;
 			}
 		},
-		set edges(){return;},
-		get isDrawingObject(){if(this.$){return this.$.isDrawingObject;}},
-		set isDrawingObject(){return;},
-		get isGroup(){if(this.$){return this.$.isGroup;}},set isGroup(){},
-		get isOvalObject(){return this.$.isOvalObject;},
+		set edges(edges){
+			this.cache.edges=edges;
+		},
+		get isDrawingObject(){
+			if(this.$){
+				return this.$.isDrawingObject;
+			}
+		},
+		set isDrawingObject(){},
+		get isGroup(){
+			if(this.$){
+				return(this.$.isGroup);
+			}
+		},
+		set isGroup(){},
+		get isOvalObject(){
+			return this.$.isOvalObject;
+		},
 		set isOvalObject(){},
-		get isRectangleObject(){if(this.$){return this.$.isRectangleObject;}},
+		get isRectangleObject(){
+			if(this.$){
+				return this.$.isRectangleObject;
+			}
+		},
 		set isRectangleObject(){},
 		get members(){
 			if(this.$){
-				var members = new ext.Selection(this.$.members,this.options);
-				for(var i=0;i<members.length;i++){
-					members[i].parent=this;	
-				}
-				return members;
+				var members=new ext.Selection(
+					this.$.members,
+					( // ! - important ( bugfix )
+						this.hasOwnProperty('parent') ?
+						{ 
+							parent:new this.type(this)
+						}:{ 
+							parent:this
+						}
+					)
+				);
+				return members;				
 			}
 		},
-		set members(s){return;},
+		set members(s){},
 		get numCubicSegments(){
+			if(this.cache.numCubicSegments){
+				return this.cache.numCubicSegments;
+			}
 			if(this.$){
-				return this.$.numCubicSegments;
+				this.cache.numCubicSegments=this.$.numCubicSegments;
+				return this.cache.numCubicSegments;
 			}
 		},
-		set numCubicSegments(){},
-		get vertices(){if(this.$){return this.$.vertices;}},
-		set vertices(s){return;},
+		set numCubicSegments(numCubicSegments){
+			this.cache.numCubicSegments=numCubicSegments;
+		},
+		get vertices(){
+			if(this.$){
+				return this.$.vertices;
+			}
+		},
+		set vertices(){},
 		get objectSpaceBounds(){
 			return new ext.Object(this.$.objectSpaceBounds);
 		},

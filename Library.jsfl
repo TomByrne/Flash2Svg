@@ -42,8 +42,20 @@
 			return this.$.getItemType(namePath);
 		},
 		getSelectedItems:function(){
-			var items=new ext.Array(this.$.getSelectedItems());
-			return items;
+			var items=this.$.getSelectedItems();
+			for(var i=0;i<items.length;i+=1){
+				var item;
+				if(items[i] instanceof FolderItem){	
+					item=new ext.FolderItem(items[i]);
+				}else if(items[i] instanceof SymbolItem){
+					item=new ext.SymbolItem(items[i]);
+				}else{
+					item=new ext.LibraryItem(items[i]);
+				}
+				item.library=this;
+				items[i]=item;
+			}
+			return items;	
 		},
 		importEmbeddedSWF:function(linkageName,swfData,libName){
 			return this.$.importEmbeddedSWF(linkageName,swfData,libName);
@@ -52,9 +64,26 @@
 			return this.$.itemExists(namePath);
 		},
 		get items(){
-			return new ext.Array(this.$.items);	
+			var items=new ext.Array(this.$.items);
+			for(var i=0;i<items.length;i+=1){
+				var item=items[i];
+				if(item instanceof FolderItem){		
+					item=new ext.FolderItem(items[i]);
+				}else if(item instanceof SymbolItem){
+					item=new ext.SymbolItem(items[i]);
+				}else{
+					item=new ext.LibraryItem(items[i]);
+				}
+				item.library=this;
+				items[i]=item;
+			}
+			return items;
 		},
-		moveToFolder:function(){
+		set items(){},
+		moveToFolder:function(folderPath,itemToMove,bReplace){
+			if(itemToMove){
+				itemToMove.name=folderPath+'/'+itemToMove.name.basename;
+			}
 			return this.$.moveToFolder.apply(this,arguments);
 		},
 		newFolder:function(folderPath){

@@ -7,10 +7,18 @@
 		__proto__:ext.Element.prototype,
 		type:ExtensibleInstance,
 		//built in functions
-		get instanceType(){return this.$.instanceType;},
-		set instanceType(s){this.$.instanceType=s;},
-		get libraryItem(){return this.$.libraryItem;},
-		set libraryItem(s){this.$.libraryItem=s;}
+		get instanceType(){
+			return this.$.instanceType;
+		},
+		set instanceType(s){
+			this.$.instanceType=s;
+		},
+		get libraryItem(){
+			return this.$.libraryItem;
+		},
+		set libraryItem(s){
+			this.$.libraryItem=s;
+		}
 	}
 	ext.extend({Instance:ExtensibleInstance});
 })(extensible);

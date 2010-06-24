@@ -6,6 +6,7 @@
 		BridgeTalk.apply(this,[]);
 		this._modules=[];
 		this.warnings=true;
+		this.dev=true;
 		this.log=undefined;
 		for(var o in options){
 			this[o]=options[o];
@@ -105,11 +106,15 @@
 			return;
 		},
 		swfPanel:function(name){
+			if(!name){
+				return null;	
+			}
 			for(var i=0;i<fl.swfPanels.length;i++){
 				if(fl.swfPanels[i].name==name){
 					return fl.swfPanels[i];
 				}
 			}
+			return null;
 		},
 		get modules(){
 			return this._modules;
@@ -184,6 +189,7 @@ extensible.load(
 		'Color',
 		'HalfEdge',
 		'Point',
+		'Curve',
 		'Vertex',
 		'Edge',
 		'Fill',
@@ -202,8 +208,10 @@ extensible.load(
 		'Layer',
 		'Timeline',
 		'Selection',
+		'LibraryItem',
+		'FolderItem',
+		'SymbolItem',
 		'Library',
-		'Item',
 		'Clipboard',
 		'Math',
 		'Task',
@@ -211,7 +219,6 @@ extensible.load(
 		'Log',
 		'Que',
 		'Timer',
-		'Error',
 		'Function'
 	],
 	true

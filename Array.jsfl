@@ -265,10 +265,18 @@
 		 * @return {Boolean} Returns true if the elements of [this] match the elements of array.
 		 */
 		is:function(array,options){
-			if(this.length!=array.length){return false;}
+			if(this.length!=array.length){
+				return false;
+			}
+			if(ext.log){
+				var timer=ext.log.startTimer('extensible.Array.is');
+			}
 			for(var i=0;i<this.length;i++){
 				try{
 					if(this[i]!=array[i] && !(this[i]['is'] && this[i].is(array[i],options))){
+						if(ext.log){
+							ext.log.pauseTimer(timer);
+						}
 						return false;
 					}
 				}catch(e){
@@ -276,6 +284,9 @@
 						'extensible.Array.is() - 1 - '+String(e)
 					);	
 				}
+			}
+			if(ext.log){
+				ext.log.pauseTimer(timer);	
 			}
 			return true;
 		},
@@ -291,6 +302,14 @@
 				}
 			}else{
 				Array.prototype.unshift.apply(this,array.$||array);
+			}
+			return this;
+		},
+		removeDuplicates:function(){
+			for(var i=0;i<this.length;i++){
+				if(this.slice(0,i).indexOf(this[i])>-1){
+					this.splice(i,1);	
+				}
 			}
 			return this;
 		},
@@ -354,10 +373,6 @@
 		 * @see Array.toSource()
 		 * @addon
 		 */
-		toSource:function(){
-			return this.$.toSource();
-			//return('["'+this.join('","')+'"]');
-		},
 		toSource:function(maxRecursions){
 			maxRecursions=maxRecursions!==undefined?maxRecursions:3;
 			var args=Array.prototype.slice.call(arguments);

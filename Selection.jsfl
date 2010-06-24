@@ -172,7 +172,60 @@
 				}
 			}
 			return c;
-		}
+		},
+		get boundingBox(){
+			var boundingBox=new ext.Object();
+			for(var i=0;i<this.length;i++){
+				if(
+					!boundingBox.hasOwnProperty('left') ||
+					this[i].left<boundingBox.left
+				){
+					boundingBox.left=this[i].left;
+				}
+				if(
+					!boundingBox.hasOwnProperty('top') ||
+					this[i].top<boundingBox.top
+				){
+					boundingBox.top=this[i].top;
+				}
+				if(
+					!boundingBox.hasOwnProperty('right') ||
+					this[i].right>boundingBox.right
+				){
+					boundingBox.right=this[i].right;
+				}
+				if(
+					!boundingBox.hasOwnProperty('bottom') ||
+					this[i].bottom>boundingBox.bottom
+				){
+					boundingBox.bottom=this[i].bottom;
+				}
+			}
+			if(!boundingBox.hasOwnProperty('left')){
+				boundingBox.left=0;
+			}
+			if(!boundingBox.hasOwnProperty('top')){
+				boundingBox.top=0;
+			}
+			if(!boundingBox.hasOwnProperty('right')){
+				boundingBox.right=0;
+			}
+			if(!boundingBox.hasOwnProperty('bottom')){
+				boundingBox.bottom=0;
+			}
+			return boundingBox;
+		},
+		set boundingBox(){},
+		get width(){
+			var boundingBox=this.boundingBox;
+			return boundingBox.right-boundingBox.left;
+		},
+		set width(){},
+		get height(){
+			var boundingBox=this.boundingBox;
+			return boundingBox.bottom-boundingBox.top;
+		},
+		set height(){}
 	}
 	ext.extend({
 		Selection:Selection

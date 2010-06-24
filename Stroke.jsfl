@@ -7,8 +7,6 @@
 		ext.Object.apply(this,[settings]);
 		if(this.shapeFill && !(this.shapeFill instanceof ext.Fill)){
 			this.shapeFill=new ext.Fill(this.shapeFill);
-		}else if(this.shapeFill){
-			this.shapeFill=this.shapeFill;
 		}
 		return this;
 	}

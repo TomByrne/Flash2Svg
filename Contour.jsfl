@@ -13,10 +13,12 @@
 		}else if(options.shape instanceof Shape){
 			this.shape=new ext.Shape(options.shape);
 		}
-		this.cache=new ext.Object({
-			controlPoints:new ext.Array(),
-			cubicSegmentPoints:new ext.Array()
-		});
+		if(!this.cache){
+			this.cache=new ext.Object({
+				controlPoints:new ext.Array(),
+				cubicSegmentPoints:new ext.Array()
+			});
+		}
 		return this;
 	}
 	ExtensibleContour.prototype={
@@ -48,11 +50,13 @@
 			return this.$.orientation;
 		},set orientation(){},	
 		get edgeIDs(){
-			if(this.cache['edgeIDs']){return this.cache.edgeIDs;}
+			if(this.cache['edgeIDs']){
+				return this.cache.edgeIDs;
+			}
 			return this.getEdgeIDs();
 		},set edgeIDs(){},					
 		get oppositeFill(){
-			if(this.cache['oppositeFill']===undefined){
+			if(this.cache['oppositeFill']==undefined){
 				this.cache.oppositeFill=this.getOppositeFill();
 			}
 			return this.cache.oppositeFill;
@@ -69,7 +73,10 @@
 		getEdgeIDs:function(){
 			return this.getEdges(true);
 		},
-		getEdges:function(_getIDs){
+		getEdges:function(getIDs){
+			if(ext.log){
+				var timer=ext.log.startTimer('extensible.Contour.getEdges()');	
+			}
 			var edges=new ext.Array();
 			var edgeIDs=new ext.Array();
 			var he=this.getHalfEdge();
@@ -79,7 +86,7 @@
 			var id;
 			while(id!=start){
 				var e=he.getEdge();
-				if(edges.indexOf(e.id)<0){
+				if(edgeIDs.indexOf(e.id)<0){
 					edges.push(e);
 					edgeIDs.push(e.id);
 				}
@@ -87,9 +94,12 @@
 				id=he.id;
 			}
 			edgeIDs.sort(function(a,b){return(a-b);});
-			this['cache']['edgeIDs']=edgeIDs;
-			this['cache']['edges']=edges;
-			return _getIDs?edgeIDs:edges;
+			this.cache['edgeIDs']=edgeIDs;
+			this.cache['edges']=edges;
+			if(ext.log){
+				ext.log.pauseTimer(timer);	
+			}
+			return getIDs?edgeIDs:edges;
 		},
 		/**
 		 * Retrieve adjacent fill(s).
@@ -104,9 +114,11 @@
 			}
 			var contours=this.shape.contours;
 			for(var i=0;i<contours.length;i++){
-				if(all && contours[i].edgeIDs.intersect(edgeIDs).length>0){
-					this.cache.oppositeFills.push(contours[i].fill);
-					opposites.push(contours[i].fill);
+				if(all){
+					if(contours[i].edgeIDs.intersect(edgeIDs).length>0){
+						this.cache.oppositeFills.push(contours[i].fill);
+						opposites.push(contours[i].fill);
+					}
 				}else if(contours[i].edgeIDs.is(edgeIDs)){
 					this.cache.oppositeFill=contours[i].fill;
 					return contours[i].fill;
@@ -142,10 +154,8 @@
 			}else{
 				var points=new ext.Array();
 				var strokes=new ext.Array();
-				var edgs=new ext.Array();
 				var edgeIDs=new ext.Array();
 				var he=this.getHalfEdge();
-				var used=[];
 				var start=he.id;
 				var id;
 				if(ext.log){
@@ -160,17 +170,18 @@
 						id=he.id;
 						continue;
 					}
-					var cp=new ext.Array();
-					if(settings.curveDegree==3){
-						if(e.isLine){
-							var c0=e.getControl(0);
-							if(c0){
-								var c2=e.getControl(2);
-								if(c2){
-									cp.extend([c0,c2]);
-								}
+					var cp;
+					if(e.isLine){
+						cp=new ext.Curve([e.getControl(0),e.getControl(2)]);
+						/*var c0=e.getControl(0);
+						if(c0){
+							var c2=e.getControl(2);
+							if(c2){
+								cp=new ext.Curve([c0,c2]);
 							}
-						}else{
+						}*/
+					}else{//if(cp.length<2)
+						if(settings.curveDegree==3){
 							if(e.cubicSegmentIndex){
 								cp=this.shape.getCubicSegmentPoints(
 									e.cubicSegmentIndex,
@@ -179,7 +190,8 @@
 									}
 								);
 							}else{
-								var c0=e.getControl(0);
+								cp=new ext.Curve([e.getControl(0),e.getControl(1),e.getControl(2)]);
+								/*var c0=e.getControl(0);
 								if(c0){
 									var c1=e.getControl(1);
 									if(c1){
@@ -189,9 +201,7 @@
 										}
 									}
 								}
-								if(cp.length){
-									cp=new ext.Array([c0,c1,c2]);
-								}else{
+								if(!cp.length)
 									var ohe=he.getOppositeHalfEdge();
 									if(ohe){
 										var ov=ohe.getVertex();
@@ -202,27 +212,25 @@
 											}
 										}
 									}
-								}
+								}*/
 							}
-						}
-					}else{
-						var c0=e.getControl(0);
-						if(c0){
-							var c1=e.getControl(1);
-							if(c1){
-								var c2=e.getControl(2);
-								if(c2){
-									cp=new ext.Array([c0,c1,c2]);
+						}else{
+							cp=new ext.Curve([e.getControl(0),e.getControl(1),e.getControl(2)]);
+							/*var c0=e.getControl(0);
+							if(c0){
+								var c1=e.getControl(1);
+								if(c1){
+									var c2=e.getControl(2);
+									if(c2){
+										cp=new ext.Array([c0,c1,c2]);
+									}
 								}
-							}
+							}*/
 						}
 					}
 					if(cp.length>0 && (points.length==0 || !cp.is(points[points.length-1]))){				
-						cp.halfEdge=he;
-						cp.edgeID=e.id;
-						//cp.edge=e;
+						cp.edge=e;
 						points.push(cp);
-						edgs.push(e);
 					}
 					he=he.getNext();
 					id=he.id;
@@ -241,6 +249,7 @@
 					var timer2=ext.log.startTimer('extensible.Contour.getControlPoints() >> Order Check');
 				}
 				var removeNum=0;
+				var isLine,nextIsLine,prevIsLine;
 				for(var i=0;i<points.length;i++){ // Check to make sure that all points are correctly ordered and do not overlap.
 					var prev=i>0?i-1-removeNum:points.length-1;
 					var next=i<points.length-1?i+1:0;
@@ -248,9 +257,6 @@
 					var nextdegree=points[next].length-1;
 					points[i].remove();
 					deg=points[i].length-1;
-					he=points[i].halfEdge;
-					e=points[i].edge;
-					var edgeID=points[i].edgeID;
 					if( // an edge needs 2 points !
 						points[i].length<2 ||
 						(
@@ -260,80 +266,34 @@
 					){
 						continue;
 					}
-					if(settings.curveDegree==3){ // ... ! important
+					if( // ! important 
+						!points[i][0].is(points[prev][prevdegree])
+					){
 						if(
-							!points[i][0].is(points[prev][prevdegree])
+							points[i][deg].is(points[prev][0]) 
 						){
-							if(
-								points[i][deg].is(points[prev][0]) 
-							){
-								points[prev].reverse();
-								points[i].reverse();
-							}else if(
-								points[i][0].is(points[prev][0])
-							){
-								points[prev].reverse();
-							}else if(
-								points[i][deg].is(points[prev][prevdegree])
-							){
-								points[i].reverse();
-							}
-							if(points[prev][prevdegree].indexOfClosestTo(points[i])==deg){
-								points[i].reverse();
-							}
-							if(points[i][0].indexOfClosestTo(points[prev])==0){
-								points[prev].reverse();
-							}
+							points[prev].reverse();
+							points[i].reverse();
+						}else if(
+							points[i][0].is(points[prev][0])
+						){
+							points[prev].reverse();
+						}else if(
+							points[i][deg].is(points[prev][prevdegree])
+						){
+							points[i].reverse();
+						}
+						if(points[prev][prevdegree].indexOfClosestTo(points[i])==deg){
+							points[i].reverse();
+						}
+						if(points[i][0].indexOfClosestTo(points[prev])==0){
+							points[prev].reverse();
 						}
 					}
-					if( // ! important - without this little erratic lines can appear randomly ( albeit rarely ) at vertices
-						i<points.length
-					){
-						var isLine=(
-							deg<2 || (
-								deg<3 && (
-									points[i][deg].is( points[i][deg-1] ) ||
-									points[i][0].is( points[i][1] )
-								) 
-							) || (
-								deg==3 &&
-								points[i][deg].is( points[i][deg-1] ) &&
-								points[i][0].is( points[i][1] )
-							) || (
-								points[i][1].difference( points[i][0] ).normalized ==
-								points[i][deg].difference( points[i][deg-1] ).normalized
-							)
-						);
-						var nextIsLine=(
-							nextdegree<2 || (
-								nextdegree<3 && (
-									points[next][nextdegree].is( points[next][nextdegree-1] ) ||
-									points[next][0].is( points[next][1] )
-								) 
-							) || (
-								nextdegree==3 &&
-								points[next][nextdegree].is( points[next][nextdegree-1] ) &&
-								points[next][0].is( points[next][1] )
-							) || (
-								points[next][1].difference( points[next][0] ).normalized ==
-								points[next][nextdegree].difference( points[next][nextdegree-1] ).normalized
-							)
-						);
-						var prevIsLine=(
-							prevdegree<2 || (
-								prevdegree<3 && (
-									points[prev][prevdegree].is( points[prev][prevdegree-1] ) ||
-									points[prev][0].is( points[prev][1] )
-								) 
-							) || (
-								prevdegree==3 &&
-								points[prev][prevdegree].is( points[prev][prevdegree-1] ) &&
-								points[prev][0].is( points[prev][1] )
-							) || (
-								points[prev][1].difference( points[prev][0] ).normalized ==
-								points[prev][prevdegree].difference( points[prev][prevdegree-1] ).normalized
-							)
-						);
+					if(i<points.length){
+						prevIsLine=(i>0 && !removeNum)?isLine:points[prev].isLine;			
+						isLine=i>0?nextIsLine:points[i].isLine;
+						nextIsLine=points[next].isLine;
 						var folded=(
 							i>0 &&
 							points[i].is(points[prev].reversed) || 
@@ -371,17 +331,14 @@
 							!folded && 
 							!overlapped
 						){
-							points[i].halfEdge=he;
-							points[i].edgeID=edgeID;
 							controlPoints.push(points[i]);
-							edges.push(edgs[i]);
+							edges.push(points[i].edge);
 							removeNum=0;
 						}else{
 							removeNum+=1;
 						}
 						if(removeLast){
 							if(i==0){
-								edgs.pop();
 								points.pop();
 							}else{
 								controlPoints.pop();

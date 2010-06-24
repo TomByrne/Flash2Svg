@@ -48,6 +48,7 @@
 				this.isProcessing=false;
 				this.currentTask=null;
 			}
+			return true;
 		},
 		/**
 		 * @parameter {Function} callback
@@ -201,6 +202,6 @@
 		ping:function(){
 			return true;	
 		}
-	}
+	};
 	ext.que=new Que();
 })(extensible);

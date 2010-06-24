@@ -9,7 +9,16 @@
 			var floaters=[];
 			this.sourceMatrix=ext.viewMatrix;
 			for(var i=0;i<sel.length;i++){
-				if(i>0 && sel[i].type==ext.Shape && !(sel[i].isGroup || sel[i].isDrawingObject)){
+				if(
+					i>0 && 
+					sel[i].type==ext.Shape &&
+					!(
+						sel[i].isGroup ||
+						sel[i].isDrawingObject ||
+						sel[i].isOvalObject ||
+						sel[i].isRectangleObject
+					)
+				){
 					ext.sel=[sel[i]];
 					ext.doc.union();
 					ext.doc.arrange('back');

@@ -41,10 +41,17 @@
 			return;
 		}, 
 		is:function(f){
+			if(ext.log){
+				var timer=ext.log.startTimer('extensible.Fill.is()');	
+			}
 			if(this.style!=f.style){
+				if(ext.log){ext.log.pauseTimer(timer);}
 				return false;
 			}else if(this.style=='bitmap'){
-				if(this.bitmapPath!=f.bitmapPath){return false;}
+				if(this.bitmapPath!=f.bitmapPath){
+					if(ext.log){ext.log.pauseTimer(timer);}
+					return false;
+				}
 			}else if(this.style=='linearGradient' || this.style=='radialGradient'){
 				if(
 					!this.colorArray.is(f.colorArray) ||
@@ -52,10 +59,14 @@
 					(this.style=='radialGradient' && this.focalPoint!=f.focalPoint) ||
 					this.linearRGB!=f.linearRGB
 				){
+					if(ext.log){ext.log.pauseTimer(timer);}
 					return false;
 				}
 			}else if(this.style=='solid'){
-				if(this.color!=f.color){return false;}
+				if(this.color!=f.color){
+					if(ext.log){ext.log.pauseTimer(timer);}
+					return false;
+				}
 			}
 			if(
 				(
@@ -65,8 +76,10 @@
 				) && 
 				!this.matrix.is(f.matrix)
 			){
+				if(ext.log){ext.log.pauseTimer(timer);}
 				return false;
 			}
+			if(ext.log){ext.log.pauseTimer(timer);}
 			return true;
 		}
 	}

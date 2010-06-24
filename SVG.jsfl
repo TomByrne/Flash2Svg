@@ -2,16 +2,11 @@
 	/**
 	 * Creates an SVG formatted image.
 	 * @this {extensible.SVG}
-	 * @constructor 
+	 * @constructor
 	 * @extends Object
-	 * @classDescription Creates an SVG formatted image.
-	 * @namespace extensible
-	 * @type {extensible.SVG}
-	 * @return {extensible.SVG}
-	 * @extends {extensible.Task}
+	 * @extends extensible.Task
 	 * @parameter {Object} options
-	 * @parameter {String} options.outputURI File output URI.
-	 * @parameter {String} options.fillGaps If true, adjacent opaque fills will overlap to prevent anti-aliasing artifacts.
+	 * @parameter {String} options.file File output URI.
 	 * @parameter {Number} options.decimalPointPrecision Decimals are rounded to this many places.
 	 * @parameter {Boolean} options.expandSymbols If true, symbols are converted to graphic elements for compatibility w/ Illustrator & Webkit browsers.
 	 * @parameter {Boolean} applyTransformations If true, matrices are concatenated and applied to child elements for broader compatibility.
@@ -20,25 +15,32 @@
 	 * @parameter {Boolean} knockoutBackgroundColor If true, shapes that match the background color will serve as a knockout group.
 	 * @parameter {Boolean} convertTextToOutlines If true, text is converted to outlines.
 	 * @parameter {String} swfPanelName The name of the swfPanel UI.
+	 * @parameter {Boolean} exportSelectedLibraryItems If true, selected library items are exported rather than the stage view.
 	 */
 	function SVG(options){
+		this.DEFAULT_GRADIENT_LENGTH=819.2; // Pre-transformation length of ALL linear gradients in flash.
+		this.DEFAULT_GRADIENT_RADIUS=810.7; // Pre-transformation radius of ALL radial gradients in flash.
+		this.MAX_INLINE_CALL_COUNT=2999; // Max recursions
+		this.IDENTITY_MATRIX='matrix(1 0 0 1 0 0)';
+		this.DOCUMENT_DATA='SVGExportOptions';
+		this.MODULO_STAND_IN='.__';
 		var settings=new ext.Object({
-			outputURI:undefined,
-			fillGaps:true,
+			file:undefined,
 			decimalPointPrecision:3,
-			expandSymbols:true,
+			expandSymbols:'None', // 'Nested', 'All', 'None'
 			applyTransformations:true,
 			curveDegree:3,
 			maskingType:'Clipping',
-			timeline:ext.timeline,
-			frame:ext.frame,
+			frames:new ext.Array(),
+			startFrame:undefined,
+			endFrame:undefined,
+			timelines:new ext.Array([]),
 			backgroundColor:ext.doc.backgroundColor,
 			knockoutBackgroundColor:false,
 			includeHiddenLayers:ext.includeHiddenLayers,
 			convertTextToOutlines:true,
-			includeGuides:false, 
+			includeGuides:false,
 			selection:null,
-			matrix:ext.viewMatrix,
 			swfPanelName:null,
 			id:String(ext.doc.name.stripExtension().camelCase()),
 			x:0,y:0,
@@ -48,19 +50,50 @@
 			version:'1.1',
 			baseProfile:'basic',
 			log:ext.doc.pathURI.stripExtension()+'.log.csv', // debugging log
-			settingsFile:undefined
+			source:'Current Timeline',// 'Current Timeline', 'Selected Library Items'
+			clipToScalingGrid:false, // only relevant when source=='Selected Library Items'
+			clipToBoundingBox:false // only relevant when source=='Selected Library Items'
 		});
-		settings.extend(options);
-		ext.Task.apply(this,[settings]);
+		if(
+			options instanceof XML ||
+			typeof(options)=='string'
+		){
+			ext.Task.apply(this,[settings]);
+			this.settingsXML=this.loadSettings(options);
+		}else{
+			settings.extend(options);
+			ext.Task.apply(this,[settings]);
+		}
+		if(
+			!options && 
+			ext.doc.documentHasData(this.DOCUMENT_DATA)
+		){
+			this.settingsXML=this.loadSettings(
+				ext.doc.getDataFromDocument(this.DOCUMENT_DATA)
+			);
+		}
+		if(
+			this.file &&
+			!/^file\:/.test(this.file)
+		){
+			this.file=FLfile.platformPathToURI(this.file);
+		}
+		if(this.frames=='Current'){
+			this.frames=new ext.Array([]);
+			if(this.source=='Current Timeline'){
+				this.startFrame=ext.frame;
+				this.endFrame=ext.frame+1;
+			}else{
+				this.startFrame=0;
+				this.endFrame=1;
+			}
+		}
 		if(typeof(this.curveDegree)=='string'){
 			this.curveDegree=['','','Quadratic','Cubic'].indexOf(this.curveDegree);
 		}
 		this.swfPanel=ext.swfPanel(this.swfPanelName); // the swfPanel
-		this.DEFAULT_GRADIENT_LENGTH=819.2; // Pre-transformation length of ALL linear gradients in flash.
-		this.DEFAULT_GRADIENT_RADIUS=810.7; // Pre-transformation radius of ALL radial gradients in flash.
-		this.MAX_INLINE_CALL_COUNT=2999; // Max recursions
-		this.IDENTITY_MATRIX='matrix(1 0 0 1 0 0)';
-		this._symbols=new ext.Array([]);
+		this._timer=undefined;
+		this._symbols={};
 		this._contourCPs=new ext.Object({}); // Holds edge point arrays used in filling gaps.
 		this._tempFolder=ext.lib.uniqueName('temp'); // Library folder holding temporary symbols.
 		this._ids=new ext.Object({}); // Used by uniqueID() for cross-checking IDs.
@@ -68,12 +101,77 @@
 		this._progress=0;
 		this._minProgressIncrement=1; // Is later set to this._progressMax/this.MAX_INLINE_CALL_COUNT in order to prevent recursion
 		this._origSelection=new ext.Selection([]);
-		this._linearProcessing=true; //If true, a timeline is processed one level deep in it's entirety before progressing to descendants. 
+		this._linearProcessing=true;//Boolean(this.swfPanel);//If true, a timeline is processed one level deep in it's entirety before progressing to descendants.
+		
+		if(this.startFrame!==undefined){
+			if(
+				this.endFrame==undefined ||
+				this.endFrame<=this.startFrame
+			){
+				this.endFrame=this.startFrame+1;
+			}
+			this.frames=new ext.Array();
+			for(
+				var i=this.startFrame;
+				i<this.endFrame;
+				i++
+			){
+				this.frames.push(i);
+			}
+		}
+		var timeline;
+		if(this.source=='Current Timeline'){
+			timeline={
+				timeline:ext.timeline,
+				matrix:ext.viewMatrix,
+				frames:new ext.Array([]),
+				width:ext.doc.width,
+				height:ext.doc.height
+			};
+			if(this.frames.length){
+				timeline.frames.extend(this.frames);
+			}else{
+				timeline.frames.push(ext.frame);	
+			}
+			this.timelines.push(timeline);
+		}else if(this.source=='Selected Library Items'){
+			this.timelines.clear();
+			var selectedItems=ext.lib.getSelectedItems();
+			var width,height;
+			for(var i=0;i<selectedItems.length;i++){
+				if(selectedItems[i] instanceof ext.SymbolItem){
+					timeline=selectedItems[i].timeline;
+					if(timeline){selectedItems[i]
+						var timeline={
+							timeline:timeline,
+							matrix:new ext.Matrix(),
+							frames:this.frames,
+							libraryItem:selectedItems[i]
+						};
+						if(
+							this.clipToScalingGrid &&
+							selectedItems[i].scalingGrid
+						){
+							var rect=selectedItems[i].scalingGridRect;
+							timeline.width=rect.right-rect.left;
+							timeline.height=rect.bottom-rect.top;
+							timeline.matrix.x=-rect.left;
+							timeline.matrix.y=-rect.top;
+						}else{
+							timeline.width=ext.doc.width;
+							timeline.height=ext.doc.height;
+						}
+						this.timelines.push(timeline);
+					}
+				}
+			}
+		}
 		return this;
 	}
 	SVG.prototype={
 		__proto__:ext.Task,
 		/**
+		 * @property
 		 * @see extensible.Object
 		 */
 		type:SVG,
@@ -81,14 +179,13 @@
 		 * Applies transformation matrices recursively given an SVG graphic element.
 		 * @parameter {XML} xml An SVG graphic element or an SVG document. 
 		 */
-		applyMatrices:function(xml){
+		applyMatrices:function(xml,defs){
 			xml=xml!==undefined?xml:this.xml;
-			bApplyVertices=true;
-			var transform=xml['@transform'];
-			var matrix;
-			var mxs;
-			if(transform){
-				transform=String(transform);
+			defs=defs||xml.defs;	
+			var bApplyVertices=true;
+			var transform,matrix,mxs;
+			if(xml.hasOwnProperty('@transform')){
+				transform=String(xml['@transform']);
 				var mxa=transform.match(/matrix\(.*?\)/g);
 				if(mxa && mxa.length){
 					matrix=new ext.Matrix(mxa[0]);
@@ -100,9 +197,9 @@
 					xml['@transform']=transform;
 				}
 			}
-			for each(var child in xml.*){
-				var childName=String(child.name());
-				if(matrix){	
+			for each(var child in (xml.defs.symbol.*+xml.*)){
+				var childName=String(child.localName());
+				if(matrix){
 					var tr=child['@transform'];
 					var nmx;
 					var nmxString;
@@ -124,7 +221,7 @@
 						nmx=matrix;
 						nmxString=mxa[0];
 						child['@transform']=nmxString;
-					}					
+					}			
 					if(bApplyVertices){
 						var gradientAttr=['stroke','fill'];
 						for(var i=0;i<gradientAttr.length;i++){
@@ -138,8 +235,12 @@
 								}
 							}
 							if(gradientID!==undefined){
-								var gradient=this.xml.defs.*.(@id==gradientID);
-								if(gradient && gradient.name()=='radialGradient'){
+								var gradient=defs.*.(@id==gradientID);
+								if(
+									gradient && 
+									gradient.length() && 
+									gradient.localName()=='radialGradient'
+								){
 									var gtr=gradient['@gradientTransform'];
 									if(gtr){
 										gtr=String(gtr);
@@ -238,21 +339,18 @@
 							child['@stroke-width']=Math.roundTo(Number(child['@stroke-width'])*((nmx.scaleX+nmx.scaleY)/2),this.decimalPointPrecision);
 						}
 					}
-
 				}
 				if(childName=='g'){
-					this.applyMatrices(child);	
+					this.applyMatrices(child,defs);	
 				}
 			}
+			return xml;
 		},
 		/**
 		 * Begins processing. 
 		 * @see extensible.Task
 		 */
 		begin:function(){
-			if(this.settingsFile && !this.swfPanelName){
-				this.loadSettings(); // load settings from an xml file
-			}
 			fl.showIdleMessage(false);
 			if(this.que && this.que.isPaused){
 				this.que.resumeCmd='begin';
@@ -260,9 +358,20 @@
 			}
 			if(this.log && typeof(this.log)=='string'){
 				ext.startLog({url:this.log});
+				this._timer=ext.log.startTimer('extensible.SVG()');
+				var timer=ext.log.startTimer('extensible.SVG.begin()');
 			}
+			var i,n;
 			if(this.swfPanel){
-				this._progressMax=this._getProgressIncrements(this.timeline,this.frame,true);
+				for(i=0;i<this.timelines.length;i++){
+					for(n=0;n<this.timelines[i].frames.length;n++){
+						this._progressMax+=this._getProgressIncrements(
+							this.timelines[i].timeline,
+							this.timelines[i].frames[n],
+							true
+						);
+					}
+				}
 				this._minProgressIncrement=this._progressMax/this.MAX_INLINE_CALL_COUNT;
 			}
 			this._origSelection=ext.sel;
@@ -281,20 +390,33 @@
 			this.xml['@enable-background']='new '+vb;
 			this.xml['@xml:space']='preserve';
 			this.xml.appendChild(new XML('<defs/>'));
-			var x=this._getTimeline(
-				this.timeline,
-				{
-					matrix:this.matrix,
-					frame:this.frame,
-					selection:this.selection
+			for(i=0;i<this.timelines.length;i++){
+				for(n=0;n<this.timelines[i].frames.length;n++){
+					var x=this._getTimeline(
+						this.timelines[i].timeline,
+						{
+							matrix:this.timelines[i].matrix,
+							frame:this.timelines[i].frames[n],
+							selection:this.selection,
+							libraryItem:this.timelines[i].libraryItem,
+							isRoot:true
+						}
+					);
+					if(
+						this.timelines[i].matrix.is(new ext.Matrix()) &&
+						this.timelines.length==1 &&
+						this.timelines[i].frames.length==1
+					){ // skip unnecessary identity matrix
+						for each(var e in x.*){
+							this.xml.appendChild(e);
+						}
+					}else{
+						this.xml.appendChild(x);
+					}
 				}
-			);
-			if(this.matrix.is(new ext.Matrix())){ // skip unnecessary identity matrix
-				for each(var e in x.*){
-					this.xml.appendChild(e);
-				}
-			}else{
-				this.xml.appendChild(x);
+			}
+			if(ext.log){
+				ext.log.pauseTimer(timer);	
 			}
 			this.process();
 		},
@@ -303,50 +425,175 @@
 		 * @see extensible.Task
 		 */
 		end:function(){
-			if(this.expandSymbols || this.baseProfile=='tiny'){ // expand symbol instances
-				this.expandUse(this.xml);
-				if(this.applyTransformations){
-					this.applyMatrices(this.xml);
+			var success=true;
+			var fileExists=FLfile.exists(this.file);
+			/*
+			 * If the target is a file and needs to be a folder, delete it first,
+			 * and vice-versa.
+			 */
+			if(
+				this.file && 
+				fileExists && (
+					(
+						(
+							this.timelines.length > 1 ||
+							this.frames.length > 1
+						) && (
+							FLfile.getAttributes(
+								this.file
+							).indexOf("D")<0
+						)
+					)||(
+						(
+							this.timelines.length==1 &&
+							this.frames.length==1
+						) && (
+							FLfile.getAttributes(
+								this.file
+							).indexOf("D")>-1
+						)
+					)
+				)
+			){
+				FLfile.remove(this.file);
+				fileExists=false;
+			}
+			var documents;
+			if(
+				this.timelines.length==1 &&
+				this.frames.length==1
+			){
+				documents=new ext.Array([this.xml]);
+			}else{
+				documents=this._splitXML(this.xml);
+				if(this.file && !fileExists){
+					success=FLfile.createFolder(this.file);
+				}
+				if(!success){
+					throw new Error('Problem creating folder.');
 				}
 			}
-			this.xml['@xmlns']="http://www.w3.org/2000/svg";
-			if(ext.lib.itemExists(this._tempFolder)){ // cleanup temporary items
-				ext.lib.deleteItem(this._tempFolder);	
+			var writeSuccess=true;
+			for(var i=0;i<documents.length;i++){
+				if(this.expandSymbols && this.expandSymbols!='None'){ // expand symbol instances
+					if(this.expandSymbols=='Nested'){
+						this.expandUse(documents[i].defs.symbol);
+						this.deleteUnusedReferences(documents[i]);
+					}else{
+						this.expandUse(documents[i]);
+						this.deleteUnusedReferences(documents[i]);
+						//delete documents[i].defs.symbol;
+					}
+				}
+				if(this.applyTransformations){
+					this.applyMatrices(documents[i]);
+				}
+				documents[i]['@xmlns']="http://www.w3.org/2000/svg";
+				if(this.file){
+					var outputString=(
+						this.docString+
+						documents[i].toXMLString().replace(
+							/(<use.*?)xlink-href="#/g,
+							'$1xlink:href="#'
+						)
+					);
+					if(this.timelines.length==1){
+						success=FLfile.write(this.file,outputString);
+					}else{
+						fl.trace('go');
+						var rPath=decodeURIComponent(
+							String(
+								documents[i].@id
+							).replace(
+								this.MODULO_STAND_IN,
+								'%',
+								'g'
+							)
+						);
+						var rPathArray=rPath.split('/');
+						for(var n=0;n<rPathArray.length;n++){
+							rPathArray[n]=rPathArray[n].safeFileName();
+						}
+						rPath=rPathArray.join('/');
+						if(rPathArray.length>1){
+							var rDir=rPath.dir;
+							if(!FLfile.exists(rDir)){
+								FLfile.createFolder(this.file+'/'+rDir);
+							}
+							
+						}
+						var outputPath=(
+							this.file+'/'+
+							rPath.replace(
+								/\s/g,'-'
+							)+'.svg'
+						);
+						fl.trace(outputPath);
+						success=FLfile.write(
+							outputPath,
+							outputString
+						);
+					}
+					if(!success){
+						ext.warn('Problem writing '+outputPath||this.file);
+						//writeSuccess=false;
+					}
+				}
 			}
 			fl.showIdleMessage(true);
-			if(this.log){ext.stopLog();}
-			ext.sel=this._origSelection;
-			var writeSuccess;
-			if(this.outputURI){ 
-				writeSuccess=FLfile.write(this.outputURI,String(this));
+			if(this.log){
+				ext.stopLog();
 			}
-			var epSuccess;
+			/*
+			 * cleanup temporary items
+			 */
+			if(ext.lib.itemExists(this._tempFolder)){
+				ext.lib.deleteItem(this._tempFolder);	
+			}
+			ext.sel=this._origSelection;
+			var epSuccess=true;
 			if(this.swfPanel){
 				epSuccess=this.swfPanel.call('endProgress');	
 			}
-			if(!epSuccess && this.que){
-				return(this.que.next() && writeSuccess);	
-			}else{
-				return(writeSuccess && epSuccess);
-			}
+			
+			return( writeSuccess && epSuccess && this.que.next() );
 		},
 		/**
-		 * Expands symbol instances ( use tags ). 
+		 * Expands symbol instances ( use tags ).
 		 * @parameter {XML} xml An svg document or graphic element.
+		 * @parameter {Boolean} recursive
+		 * @parameter {XML} defs
 		 */
-		expandUse:function(xml){
-			for each(var useNode in xml..use){
+		expandUse:function( xml,recursive,defs ){
+			defs=defs||xml.defs||this.xml.defs;
+			if(recursive==undefined){
+				recursive=true;
+			}
+			var rootIsUse=(
+				xml.localName()=='use'
+			);
+			for each(
+				var useNode in (
+					recursive ? (
+						rootIsUse ? xml : xml..use
+					):(
+						rootIsUse ? xml : xml.use
+					)
+				)
+			){
 				if( useNode.name()!='use' || !useNode['@xlink-href'] ){
 					continue;
 				}
 				var id=String(useNode['@xlink-href']).slice(1);
-				var symbol=this.xml.defs.symbol.(@id==id)[0];
-				this.expandUse(symbol);
+				var symbol=defs.symbol.(@id==id)[0];
+				if(recursive){
+					this.expandUse(symbol,recursive,defs);
+				}
 				useNode.setName('g');
 				for each(var child in symbol.*){
-					useNode.appendChild(child);
+					useNode.appendChild(child.copy());
 				}
-				useNode['@id']=this._uniqueID(String(symbol['@id']));
+				useNode['@id']=this._uniqueID(String(symbol['@id'])+'_1');
 				delete useNode['@xlink-href'];
 				delete useNode['@width'];
 				delete useNode['@height'];
@@ -355,32 +602,110 @@
 				if(useNode['@transform']==this.IDENTITY_MATRIX){
 					delete useNode['@transform'];
 				}
-				delete this.xml.defs.symbol.(@id==id)[0];
+				for each(var node in useNode..*){
+					if(node.@id){
+						node.@id=this._uniqueID(String(node.@id));
+					}
+					if(this.applyTransformations){
+						for each(var attr in node.@*){
+							if(attr.name()!='id'){
+								var ida=String(attr).match(/(?:url\(#)(.*?)(?:\))/);
+								if(ida && ida.length>1){
+									var origDef=defs.*.(@id==ida[1]);
+									if(origDef && origDef.length()){
+										var newDef=origDef[0].copy();
+										var newID=this._uniqueID(ida[1]);
+										newDef.@id=newID;
+										node['@'+attr.name()]='url(#'+newID+')';
+										defs.appendChild(newDef);
+									}
+								}
+							}
+						}
+					}
+				}
 			}
+			if( rootIsUse && recursive ){
+				this.expandUse( xml,recursive,defs );
+			}
+		},
+		/**
+		 * Deletes unreferenced defs.
+		 * @parameter {XML} xml
+		 */
+		deleteUnusedReferences:function(xml,defs){
+			xml=xml||this.xml;
+			defs=defs||xml.defs;
+			if(!xml.defs || xml.defs.length()==0){
+				return xml;	
+			}
+			var refs=this._listReferences(xml,defs);
+			var references=defs.*.copy();
+			delete defs.*;
+			for each(var def in references){
+				if(refs.indexOf(String(def.@id))>=0){
+					defs.appendChild(def);
+				}
+			}
+			return xml;
+		},
+		/**
+		 * Retrieves a list of references used.
+		 * @parameter {XML} xml
+		 */
+		_listReferences:function(xml,defs){
+			defs=defs||xml.defs;
+			var refs=new ext.Array();
+			if(!defs){return refs;}
+			for each(var x in xml.*){
+				for each(var a in x.@*){
+					var reference=(
+						String(a).match(/(?:url\(#)(.*?)(?:\))/)||
+						String(a).trim().match(/(?:^#)(.*$)/)
+					);
+					if(
+						reference && 
+						reference.length>1
+					){
+						var ref=defs.(@id==reference[1]);
+						if(ref){
+							refs.push(reference[1]);
+							refs.extend(
+								this._listReferences(ref,defs)
+							);
+						}
+					}
+				}
+			}
+			return refs;
 		},
 		/**
 		 * Loads an xml settings file.
 		 * @parameter {String} uri The location of the settings file.
 		 */
-		loadSettings:function(uri){
-			uri=uri||this.settingsFile;
-			if(uri && FLfile.exists(uri)){
-				var xml=new XML(FLfile.read(uri));
-				for each(var x in xml.*){
-					var key=String(x.name());
-					if(typeof(this[key])=='boolean'){
-						this[key]=(
-							String(x.valueOf())!=='false' &&
-							String(x.valueOf())!=='False' &&
-							String(x.valueOf())!=='0'
-						);
-					}else if(typeof(this[key])=='number'){
-						this[key]=Number(x.valueOf());
-					}else{
-						this[key]=String(x.valueOf());
-					}
+		loadSettings:function(xml){
+			if(typeof(xml)=='string'){
+				xml=new XML(xml);
+			}
+			for each(var x in xml.*){
+				var key=String(x.name());
+				if(
+					['true','false','True','False'].indexOf(String(x))>-1
+				){
+					this[key]=(
+						String(x)!=='false' &&
+						String(x)!=='False' &&
+						String(x)!=='0'
+					);
+				}else if(
+					String(x).replace(/[^\d\.\-\W]/g,'')==String(x)
+				){
+					this[key]=Number(x);
+				}else{
+					this[key]=String(x);
 				}
 			}
+			return xml;
 		},
 		/**
 		 * Inherited from extensible.Task, this method processes data incrementally, providing the
@@ -416,7 +741,8 @@
 								elementXML.toXMLString()
 							)
 						);
-					}					
+					}	
+					if(!this.swfPanel){ break; }				
 				}
 				if(this.swfPanel){
 					var success=Boolean(
@@ -475,7 +801,6 @@
 					}
 				}
 			}
-			
 			if(ext.log){
 				var timer=ext.log.startTimer('extensible.SVG.getProgressIncrements()');
 			}
@@ -519,6 +844,9 @@
 		 * @private
 		 */
 		_getElement:function(element,options){
+			if(ext.log){
+				var timer=ext.log.startTimer('extensible.SVG._getElement()');	
+			}
 			var settings=new ext.Object({});
 			settings.extend(options);
 			var result;
@@ -551,33 +879,42 @@
 					result=this._getText(element,settings);
 				}
 			}
-			
+			if(ext.log){
+				ext.log.pauseTimer(timer);	
+			}
 			return result;
 		},
 		/**
 		 * Retrieves the SVG data corresponding to a timeline.
 		 * @parameter {extensible.timeline) timeline
 		 * @parameter {Object} options
-		 * @parameter {Number} [options.frame] The frame to process.
-		 * @parameter {extensible.Selection} [options.selection] 
-		 * @parameter {Number} [id]
-		 * @parameter {Matrix} [matrix]
-		 * @parameter {Item} [libraryItem] The library item 
-		 * @parameter {String} [color] A hexadecimal color value.
+		 * @parameter {Number} [options.frame] The frame number.
+		 * @parameter {Number} [options.id] The id to use for the element.
+		 * @parameter {Matrix} [options.matrix]
+		 * @parameter {Item} [options.libraryItem] The library item 
+		 * @parameter {String} [options.color] A hexadecimal color value.
+		 * @private
 		 */
 		_getTimeline:function(timeline,options){
+			if(ext.log){
+				var timer=ext.log.startTimer('extensible.SVG._getTimeline()');	
+			}
 			var settings=new ext.Object({
 				frame:0,
 				selection:undefined,
 				id:undefined,
 				matrix:new ext.Matrix(),
 				libraryItem:undefined,
-				color:undefined
+				color:undefined,
+				isRoot:false
 			});
 			settings.extend(options);
-			if(typeof(settings.color)=='string'){ // tint color
+			if(typeof(settings.color)=='string'){
 				settings.color=new ext.Color(settings.color);
 			}
+			/*
+			 * Check to see if the timeline has tweens that we need to resolve.
+			 */
 			var hasTweens=false;
 			var frames,tempName;
 			if(settings.libraryItem){ // it's a symbol
@@ -601,8 +938,12 @@
 					}
 				}
 			}
+			/*
+			 * Create temporary timelines where tweens exist & convert to
+			 * keyframes.
+			 */
 			var originalScene,timelines;
-			if(hasTweens){ // create temporary timelines for converting frames to keyframes
+			if(hasTweens){
 				if(settings.libraryItem==undefined){
 					originalScene=timeline.name;
 					ext.doc.duplicateScene();
@@ -655,7 +996,10 @@
 				var success=false;
 				success=timeline.convertToKeyframes(ranges);
 			}
-			if(!settings.selection){ // retrieve elements in the current frames
+			/*
+			 * Retrieve elements in the current frames.
+			 */
+			if(!settings.selection){
 				var options={
 					includeHiddenLayers:this.includeHiddenLayers,
 					includeGuides:this.includeGuides
@@ -667,23 +1011,36 @@
 				}
 				settings.selection=timeline.getElements(options);
 			}
-			var selection=settings.selection.byFrame({stacked:true});// group elements by layer
-			var xml;
-			var instanceXML;
-			var boundingBox;
+			/*
+			 * Group elements by layer.
+			 */
+			var selection=settings.selection.byFrame({stacked:true});
+			var xml,boundingBox,instanceXML,id;
 			var transformString=this._getMatrix(settings.matrix);
-			if(settings.libraryItem){  // create symbol definition if not already available
-				var id=settings.libraryItem.name.replace('/','_').camelCase();
+			/*
+			 * If the timeline is a symbol ( has a libraryItem ), 
+			 * we either create a symbol definition or use the existings one.
+			 */
+			if(settings.libraryItem){
+				var symbolIDString=settings.libraryItem.name;
 				if(settings.frame!=0){
-					id+='_'+String(settings.frame);
+					symbolIDString+='/'+String(settings.frame);
 				}
 				if(settings.color){
-					id+='_'+settings.color.idString;
+					symbolIDString+='/'+settings.color.idString;
 				}
-				id=this._uniqueID(id);
-				var instanceID=this._uniqueID(id);				
+				var isNew,instanceID;
+				if(this._symbols[symbolIDString]){
+					isNew=false;
+					id=this._symbols[symbolIDString];
+				}else{
+					isNew=true;
+					id=this._uniqueID(symbolIDString);
+					this._symbols[symbolIDString]=id;
+				}				
+				var instanceID=this._uniqueID(id);		
 				xml=new XML('<use xlink-href="#'+id+'" id="'+instanceID+'" />');
-				if(this._symbols.indexOf(id)<0){
+				if(isNew){
 					instanceXML=xml;
 					instanceXML['@width']=0;
 					instanceXML['@height']=0;
@@ -691,10 +1048,9 @@
 					instanceXML['@y']=0;
 					instanceXML['@transform']=transformString;
 					instanceXML['@overflow']="visible";
-					this._symbols.push(id);
 					xml=new XML('<symbol/>');
 					xml['@id']=id;
-					boundingBox=new ext.Object({left:0,top:0,right:0,bottom:0});
+					boundingBox=new ext.Object();//top:0,left:0,right:0,bottom:0});
 				}else{
 					var vb=String(this.xml.defs.symbol.(@id==id)[0]['@viewBox']).split(' ');
 					xml['@width']=vb[2];
@@ -712,7 +1068,12 @@
 					xml['@transform']=transformString;
 				}
 			}
-			var timelineID=id;
+			/*
+			 * Loop through the visible frames by layer &
+			 * either take note of the elements for linear
+			 * processing ( enables use of a progress bar ), 
+			 * or process them immediately ( for debugging purposes ).
+			 */
 			var masked=new ext.Array();
 			for(var i=0;i<selection.length;i++){
 				if(selection[i] && selection[i].length>0){
@@ -725,12 +1086,17 @@
 					var colorX=settings.color;
 					var id=layer.name.camelCase();
 					id=this._uniqueID(id);
+					/*
+					 * If the masking type is "Alpha" or "Clipping"
+					 * we need to manipulate the color of the mask to ensure
+					 * the proper behavior
+					 */
 					if(layer.layerType=='mask'){
 						layerXML=new XML('<mask id="'+id+'" />');
 						if(this.maskingType=='Alpha'){
-							colorX=new ext.Color('#FFFFFF00');  // isolate the alpha channel by tinting the element white 
+							colorX=new ext.Color('#FFFFFF00');  
 						}else if(this.maskingType=='Clipping'){
-							colorX=new ext.Color('#FFFFFFFF'); // make the mask opaque
+							colorX=new ext.Color('#FFFFFFFF');
 						}
 					}else if(layer.layerType=='masked'){
 						layerXML=new XML('<g id="'+id+'" />');
@@ -739,16 +1105,39 @@
 					}
 					var layerID=id;
 					for(var n=0;n<selection[i].length;n++){
-						if(boundingBox){ // get the timeline's bounding box
-							if(selection[i][n].left<boundingBox.left){boundingBox.left=selection[i][n].left;}
-							if(selection[i][n].top<boundingBox.top){boundingBox.top=selection[i][n].top;}
-							if(selection[i][n].right>boundingBox.right){boundingBox.right=selection[i][n].right;}
-							if(selection[i][n].bottom>boundingBox.bottom){boundingBox.bottom=selection[i][n].bottom;}
+						/*
+						 * Keep track of the bounding box...
+						 */
+						if(boundingBox && layer.layerType!='masked'){
+							if(
+								!boundingBox.hasOwnProperty('left') ||
+								selection[i][n].left<boundingBox.left
+							){
+								boundingBox.left=selection[i][n].left;
+							}
+							if(
+								!boundingBox.hasOwnProperty('top') ||
+								selection[i][n].top<boundingBox.top
+							){
+								boundingBox.top=selection[i][n].top;
+							}
+							if(
+								!boundingBox.hasOwnProperty('right') ||
+								selection[i][n].right>boundingBox.right
+							){
+								boundingBox.right=selection[i][n].right;
+							}
+							if(
+								!boundingBox.hasOwnProperty('bottom') ||
+								selection[i][n].bottom>boundingBox.bottom
+							){
+								boundingBox.bottom=selection[i][n].bottom;
+							}
 						}
 						var elementID=this._uniqueID('element');
 						var element=new XML('<g id="'+elementID+'"></g>');
-						if(this.swfPanel || this._linearProcessing){
-							this.qData.push([ // store arguments for later processing
+						if(this._linearProcessing){
+							this.qData.push([
 								elementID,
 								selection[i][n],
 								{
@@ -758,7 +1147,7 @@
 							]);
 						}else{
 							var element=this._getElement(
-								selection[i][n],{ // get the XML for the element
+								selection[i][n],{ // 
 									colorTransform:colorX,
 									frame:settings.frame
 								}
@@ -768,11 +1157,15 @@
 							layerXML.appendChild(element);
 						}
 					}
-					if(layer.layerType=='masked'){  // masked layers are grouped together
+					/*
+					 * Masked layers are grouped together and inserted after
+					 * the mask.
+					 */
+					if(layer.layerType=='masked'){  // 
 						masked.push(layerXML);
 					}else if(layerXML){
 						xml.appendChild(layerXML);
-						if(layer.layerType=='mask'){ // masked layers must come after the mask
+						if(layer.layerType=='mask'){
 							var mg=new XML('<g mask="url(#'+id+')"/>');
 							for(var m=0;m<masked.length;m++){
 								mg.appendChild(masked[m]);
@@ -785,7 +1178,10 @@
 					if(layer.locked!=lLocked){layer.locked=lLocked;}
 				}
 			}
-			if(originalScene!==undefined){ // this is a temporary scene, delete it and return to the original
+			/*
+			 *  If this is a temporary scene, delete it and return to the original.
+			 */
+			if(originalScene!==undefined){
 				var timelines=ext.timelines;
 				ext.doc.deleteScene();
 				for(i=0;i<ext.timelines.length;i++){
@@ -797,6 +1193,26 @@
 			}
 			var result;
 			if(instanceXML){ // set the viewBox
+				if(
+					settings.isRoot && 
+					this.clipToScalingGrid &&
+					settings.libraryItem
+				){
+					boundingBox=settings.libraryItem.scalingGridRect;
+				}else{
+					if(!boundingBox.hasOwnProperty('left')){
+						boundingBox.left=0;
+					}
+					if(!boundingBox.hasOwnProperty('top')){
+						boundingBox.top=0;
+					}
+					if(!boundingBox.hasOwnProperty('right')){
+						boundingBox.right=0;
+					}
+					if(!boundingBox.hasOwnProperty('bottom')){
+						boundingBox.bottom=0;
+					}
+				}				
 				instanceXML['@width']=String(boundingBox.right-boundingBox.left);
 				instanceXML['@height']=String(boundingBox.bottom-boundingBox.top);
 				instanceXML['@x']=String(boundingBox.left);
@@ -812,6 +1228,9 @@
 			}else{
 				result=xml;
 			}
+			if(ext.log){
+				ext.log.pauseTimer(timer);	
+			}
 			return result;
 		},
 		/**
@@ -821,6 +1240,9 @@
 		 * @private
 		 */
 		_getSymbolInstance:function(instance,options){
+			if(ext.log){
+				var timer=ext.log.startTimer('extensible.SVG._getSymbolInstance()');	
+			}
 			var settings=new ext.Object({
 				frame:0,
 				matrix:new ext.Matrix(),
@@ -832,14 +1254,17 @@
 			var timeline=instance.timeline;
 			settings.frame=instance.getCurrentFrame(settings.frame);
 			var xml=this._getTimeline(instance.timeline,settings);
-			//var filters=this._getFilters(instance,options);
+			//xml['@filter']=this._getFilter(instance,options);
+			if(ext.log){
+				ext.log.pauseTimer(timer);	
+			}
 			return xml;
 		},
-		_getFilters:function(element,options){
+		_getFilter:function(element,options){
 			var settings=new ext.Object({
 				frame:0
 			});
-			settings.extend(options);				
+			settings.extend(options);		
 		},
 		_getBitmapInstance:function(bitmapInstance,options){
 			var id=this._uniqueID('bitmap');
@@ -852,27 +1277,37 @@
 		 * @parameter {Matrix} options.matrix
 		 * @parameter {extensible.Color} options.colorTransform
 		 * @parameter {Number} frame
-		 * @parameter {Boolean} fillGaps
 		 * @private
+		 * 
 		 */
 		_getShape:function(shape,options){
+			/*if(ext.log){
+				var timer=ext.log.startTimer('');	
+			}
+			if(ext.log){
+				ext.log.pauseTimer(timer);	
+			}*/
+			if(ext.log){
+				var timer=ext.log.startTimer('extensible.SVG._getShape() >> 1');	
+			}
 			var settings=new ext.Object({
 				matrix:new ext.Matrix(),
 				colorTransform:null,
-				frame:null,
-				fillGaps:this.fillGaps
+				frame:null
 			});
 			settings.extend(options);
 			var matrix=shape.matrix;
 			var descendantMatrix=new ext.Matrix();
 			var pathMatrix=null;
 			var layerLocked=shape.layer.locked;
-			if(shape.isDrawingObject){
-				matrix=matrix.concat(settings.matrix);
-			}else if(shape.isOvalObject || shape.isRectangleObject){ // ! important
+			if(shape.isRectangleObject || shape.isOvalObject){ // ! important
 				shape.setTransformationPoint({x:0.0,y:0.0});
-				matrix.tx=shape.left;
-				matrix.ty=shape.top;
+				var origin=new ext.Point({
+					x:(shape.objectSpaceBounds.left-shape.objectSpaceBounds.right)/2,
+					y:(shape.objectSpaceBounds.top-shape.objectSpaceBounds.bottom)/2
+				}).transform(matrix);
+				matrix.tx=origin.x;
+				matrix.ty=origin.y;
 				matrix=matrix.concat(settings.matrix);
 				if(shape.objectSpaceBounds.left!=0 || shape.objectSpaceBounds.top!=0){
 					pathMatrix=new ext.Matrix({
@@ -880,6 +1315,8 @@
 						ty:-shape.objectSpaceBounds.top}
 					);
 				}
+			}else if(shape.isDrawingObject){
+				matrix=matrix.concat(settings.matrix);
 			}else if(shape.isGroup){
 				descendantMatrix=matrix.invert();
 				pathMatrix=new ext.Matrix({
@@ -892,35 +1329,30 @@
 				matrix.tx=shape.left;
 				matrix.ty=shape.top;
 				matrix=matrix.concat(settings.matrix);
-				if(shape.objectSpaceBounds.left!=0 || shape.objectSpaceBounds.top!=0){
+				if(
+					shape.objectSpaceBounds &&
+					(
+						shape.objectSpaceBounds.left!=0 ||
+						shape.objectSpaceBounds.top!=0
+					)
+				){
 					pathMatrix=new ext.Matrix({tx:shape.objectSpaceBounds.left,ty:shape.objectSpaceBounds.top});
 					pathMatrix=pathMatrix.invert();
 				}
 			}
 			var contours=shape.contours;
+			if(!(contours && contours.length) && !shape.isGroup){
+				return;	
+			}
 			var svgArray=new ext.Array();
 			var filled=new ext.Array();
 			var tobeCut=null;
-			var fillGaps=false;
-			if(settings.fillGaps){ // check for the possibility of gaps
-				var filledCount=0;
-				for(var i=0;i<contours.length;i++){
-					if(contours[i].fill.style!='noFill'){
-						filledCount+=1;
-						if(filledCount>1){
-							fillGaps=true;
-							break;
-						}
-					}
-				}
-			}
 			var ii;
 			var validContours=new ext.Array([]);
 			for(i=0;i<contours.length;i++){
 				var s=this._getContour(contours[i],{
 					colorTransform:settings.colorTransform,
-					matrix:pathMatrix,
-					fillGaps:fillGaps
+					matrix:pathMatrix
 				});
 				if(s){
 					validContours.push(contours[i]);
@@ -933,7 +1365,6 @@
 										var cutID=String(svgArray[filled[n]].path[0]['@id']);
 										s=this._getContour(contours[i],{
 											colorTransform:settings.colorTransform,
-											fillGaps:fillGaps,
 											reversed:cutID
 										});
 										if(s){
@@ -1013,349 +1444,43 @@
 					}
 				}
 			}
-			if(shape.isGroup && !shape.isDrawingObject){
+			if(
+				shape.isGroup && 
+				!shape.isDrawingObject && 
+				!shape.isRectangleObject &&
+				!shape.isOvalObject
+			){
 				var g=shape.members;
 				for(i=0;i<g.length;i++){
-					var e=this._getElement(g[i],{
-						colorTransform:settings.colorTransform,
-						matrix:descendantMatrix,
-						frame:settings.frame
-					})
+					var e=this._getElement(
+						g[i],
+						{
+							colorTransform:settings.colorTransform,
+							matrix:descendantMatrix,
+							frame:settings.frame
+						}
+					);
 					if(e){svg.appendChild(e);}
 				}
 			}
-			/**
-			 * WIP: Not yet implemented, possibly more problematic than
-			 * beneficial. 
-			 */
-			if(fillGaps){
-				var keys=this._contourCPs.keys;
-				for(var t=0;t<1;t++){					
-					for(i=0;i<keys.length;i++){
-						var k=keys[i];
-						for(var n=i-1;n>=0;n--){//for(var n=0;n<i;n++){
-							var id=keys[n];
-							if( // only fill gaps when the foremost shape is opaque
-								this._contourCPs[id].fill.style!='noFill' &&
-								this._contourCPs[k].fill.style!='noFill' &&
-								this._contourCPs[k].fill.isOpaque
-							){
-								/**
-								 * Check to see if the outer region of the anterior shape
-								 * fills a hole in the posterior.
-								 */
-								var plug=-1;
-								var plugReversed=false;
-								var reversed=this._contourCPs[k][0].getReversed(true);
-								for(ii=1;ii<this._contourCPs[id].length;ii++){
-									if(
-										this._contourCPs[k][0].remove(this._contourCPs[id][ii]).length==0
-									){
-										plug=ii;
-										break;
-									}else if(
-										reversed.remove(this._contourCPs[id][ii]).length==0
-									){
-										plugReversed=true;
-										plug=ii;
-										break;
-									}else if(
-										this._contourCPs[k][0].filter(
-											function(element,index){
-												for(var i=0;i<this.length;i++){
-													if(
-														this[i].edgeID==element.edgeID
-													){
-														return false;	
-													}
-												}
-												return true;
-											},
-											this._contourCPs[id][ii]
-										).length==0
-									){
-										plug=ii;
-										break;
-									}
-								}
-								var intersected=null;
-								var newCPs=new ext.Array(this._contourCPs[id]);					
-								if(plug>0){
-									newCPs.splice(plug,1);
-								}else if(t==0 && !newCPs.fill.is(this._contourCPs[k].fill)){
-									intersected=this._intersectCPs(newCPs[0],this._contourCPs[k][0]);
-									if(intersected && intersected.length){
-										newCPs.shift();
-										newCPs.prepend(intersected.areas);
-									}
-								}
-								var newHoleCPs=new ext.Array();
-								for(ii=1;ii<this._contourCPs[k].length;ii++){
-									newHoleCPs.push(this._contourCPs[k][ii]);
-								}
-								if(
-									(plug && plugReversed && !intersected) ||
-									(plug && !plugReversed && intersected)
-								){
-									for(ii=0;ii<newHoleCPs.length;ii++){
-										newHoleCPs[ii].reverse(true);
-									}
-								}
-								if(intersected||plug>-1){
-									for(ii=0;ii<newHoleCPs.length;ii++){
-										newCPs.push(newHoleCPs[ii]);
-									}
-									var c=this._getCurve(newCPs[0],true);
-									var curve=[];
-									if(c){curve.push(c);};
-									for(ii=1;ii<newCPs.length;ii++){
-										c=this._getCurve(newCPs[ii],true);
-										if(c){
-											c=/^[^Zz]*[Zz]?/.exec(c.trim())[0];
-											curve.push(c);
-										}
-									}
-									c=this._getCurve(intersected.edges[0],true);
-									var curve2=[];
-									if(c){curve2.push(c);};
-									for(ii=1;ii<intersected.edges.length;ii++){
-										c=this._getCurve(intersected.edges[ii],true);
-										if(c){
-											c=/^[^Zz]*[Zz]?/.exec(c.trim())[0];
-											curve2.push(c);
-										}
-									}
-									var x=svg..path.(@id==id);
-									var gap=new XML('<g id="'+this._uniqueID('gap')+'" />');
-									if(x.length()){
-										var mask=new XML(
-											'<mask/>'
-										);
-										maskPath['@id']=this._uniqueID('mask');
-										var maskPath=new XML(
-											'<path fill="#000000"/>'
-										);
-										maskPath['@id']=this._uniqueID('path');
-										maskPath['@d']=curve.join(' ');
-										mask.appendChild(maskPath);
-										gap.appendChild(mask);
-										var edgePath=new XML(
-											'<path vector-effect="non-scaling-stroke" stroke-width="1"/>'
-										);
-										edgePath['@id']=this._uniqueID('path');
-										edgePath['@d']=curve2.join(' ');
-										edgePath['@stroke']=x[0]['@fill'];
-										edgePath['@mask']=mask['@id'];
-										gap.appendChild(edgePath);
-										x[0].parent().insertChildBefore(x[0],gap);			
-									}
-								}
-							}
-						}
-					}
-				}
-				this._contourCPs.clear();
+			if(ext.log){
+				ext.log.pauseTimer(timer);	
 			}
 			return svg;		
 		},
-		/**
-		 * Detects intersecting edges and creates overlapping regions to fill gaps.
-		 */
-		_intersectCPs:function(cp1,cp2){
-			var result={
-				areas:null,
-				edges:null
-			};
-			var tolerance=.01;
-			var origLength=cp1.length;
-			var intersected;
-			for(var i=0;i<2;i++){
-				intersected=cp1.filter(function(element,index){
-					for(var i=0;i<this.length;i++){
-						if(
-							(
-								this[i].is(element)
-							)||( 
-								this[i].edgeID==element.edgeID
-							)||( 
-								this[i].is(element)
-							)
-						){
-							return true;
-						}
-					}
-					return false;
-				},cp2);
-				if(intersected.length){
-					cp2=cp2.remove(intersected);
-					cp1=cp1.remove(intersected);
-					break;	
-				}else{
-					cp2.reverse(true);
-				}
-				if(i==1){
-					cp2=cp2.remove(intersected);
-					cp1=cp1.remove(intersected);
-					cp2.reverse(true);	
-				}
-			}
-			var cps=[
-				cp1.concat(cp2),
-				intersected
-			];
-			if(
-				intersected.length
-			){
-				for(var t=0;t<2;t++){
-					var controlPoints=cps[t];
-					var orderedCPs=new ext.Array([new ext.Array([controlPoints.shift()])]);
-					orderedCPs[orderedCPs.length-1].attributes=cp1.attributes;
-					while(controlPoints.length>0){
-						var origLength=controlPoints.length;
-						var unused=new ext.Array();
-						unused.attributes=cp1.attributes;
-						for(var i=0;i<controlPoints.length;i++){
-							if(
-								orderedCPs.at(-1).at(-1).at(-1).is(
-									controlPoints[i][0]
-								)
-							){
-								orderedCPs[orderedCPs.length-1].push(
-									controlPoints[i]
-								);
-							}else if(
-								orderedCPs.at(-1).at(-1).at(-1).is(
-									controlPoints[i].at(-1)
-								)
-							){
-								orderedCPs[orderedCPs.length-1].push(
-									controlPoints[i].reversed
-								);
-							}else if(
-								orderedCPs.at(-1)[0][0].is(
-									controlPoints[i].at(-1)
-								)
-							){
-								orderedCPs[orderedCPs.length-1].unshift(
-									controlPoints[i]
-								);
-							}else if(
-								orderedCPs.at(-1)[0][0].is(
-									controlPoints[i][0]
-								)
-							){
-								orderedCPs[orderedCPs.length-1].unshift(
-									controlPoints[i].reversed
-								);
-							}else{
-								unused.push(controlPoints[i]);
-							}
-						}
-						controlPoints=unused;
-						if(
-							controlPoints.length>0 &&
-							origLength==controlPoints.length		
-						){
-							orderedCPs.push(new ext.Array([controlPoints.shift()]));
-							orderedCPs[orderedCPs.length-1].attributes=cp1.attributes;
-						}
-					}
-					var controlPoints=new ext.Array([orderedCPs.shift()]);
-					while(orderedCPs.length>0){
-						if(controlPoints.at(-1).at(-1).at(-1).is(controlPoints.at(-1)[0][0])){
-							controlPoints.push(orderedCPs.shift());
-						}else{
-							var closestDistance=controlPoints.at(-1).at(-1).at(-1).distanceTo(
-								controlPoints.at(-1)[0][0]
-							);
-							var closest=-1;
-							var closestEndA=-1;
-							var closestEndB=-1;
-							for(var i=0;i<orderedCPs.length;i++){
-								var distance=orderedCPs[i][0][0].distanceTo(
-									controlPoints.at(-1).at(-1).at(-1)
-								);
-								if(distance<closestDistance){
-									closestDistance=distance;
-									closest=i;
-									closestEndA=1;
-									closestEndB=0;
-								}
-								distance=orderedCPs[i][0][0].distanceTo(
-									controlPoints.at(-1)[0][0]
-								);
-								if(distance<closestDistance){
-									closestDistance=distance;
-									closest=i;
-									closestEndA=0;
-									closestEndB=0;
-								}
-								distance=orderedCPs[i].at(-1).at(-1).distanceTo(
-									controlPoints.at(-1).at(-1).at(-1)
-								);
-								if(distance<closestDistance){
-									closestDistance=distance;
-									closest=i;
-									closestEndA=1;
-									closestEndB=1;
-								}
-								distance=orderedCPs[i].at(-1).at(-1).distanceTo(
-									controlPoints.at(-1)[0][0]
-								);
-								if(distance<closestDistance){
-									closestDistance=distance;
-									closest=i;
-									closestEndA=0;
-									closestEndB=1;
-								}
-								
-							}
-							if(closest==-1 || tolerance>closest){
-								controlPoints.push(orderedCPs.shift());
-							}else{
-								var matched=orderedCPs[closest];
-								if(closestEndA==closestEndB){
-									matched.reverse(true);
-								}
-								if(closestEndA==1){
-									controlPoints[controlPoints.length-1].extend(matched);
-								}else{
-									controlPoints[controlPoints.length-1].prepend(matched);
-								}
-								orderedCPs.splice(closest,1);
-							}						
-						}
-					}
-					if(t==0){
-						orderedCPs.clear();
-						for(i=0;i<controlPoints.length;i++){
-							if(controlPoints[i].at(-1).at(-1).is(controlPoints[i][0][0])){
-								orderedCPs.push(controlPoints[i]);
-							}
-						}
-						controlPoints=orderedCPs;
-						result.areas=controlPoints;
-					}else{
-						result.edges=controlPoints;
-					}
-				}
-				return result;
-			}else{
-				return;	
-			}
-		},
 		_getContour:function(contour,options){
+			if(ext.log){
+				var timer=ext.log.startTimer('extensible.SVG._getContour()');	
+			}
 			var settings=new ext.Object({
 				matrix:null,
 				reversed:false,
-				colorTransform:null,
-				fillGaps:false
+				colorTransform:null
 			});
 			settings.extend(options);
 			var controlPoints=contour.getControlPoints({
 				curveDegree:this.curveDegree,
-				reversed:settings.reversed,
-				fillGaps:settings.fillGaps
+				reversed:settings.reversed
 			});
 			if(!controlPoints || controlPoints.length==0){
 				return;
@@ -1379,7 +1504,6 @@
 					if(fill.name()=='solidColor'){
 						fillString=String(fill['@solid-color']);
 						opacityString=String(fill['@solid-opacity']);
-						//this._ids.pop();
 					}else{
 						//fills.push(fill);
 						this.xml.defs.appendChild(fill)
@@ -1390,14 +1514,6 @@
 				cdata=this._getCurve(controlPoints,true);
 				id=this._uniqueID('path');
 				idString='id="'+id+'" ';
-				if(settings.fillGaps){
-					if(settings.reversed!==false){
-						this._contourCPs[settings.reversed].push(controlPoints);
-					}else if(contour.fill.style!='noFill'){
-						this._contourCPs[id]=new ext.Array([controlPoints]);
-						this._contourCPs[id].fill=contour.fill;
-					}
-				}
 				paths.push('<path  '+idString+xform+'fill="'+fillString+'" fill-opacity="'+opacityString+'" d="'+cdata+'"/>\n');
 			}
 			var hasStroke=false;
@@ -1493,17 +1609,21 @@
 			for(var i=0;i<paths.length;i++){
 				xml.appendChild(new XML(paths[i]));
 			}
+			if(ext.log){
+				ext.log.pauseTimer(timer);	
+			}
 			return(xml);
 		},
+		/**
+		 * Build a curve string from an array of arrays of points.
+		 * @param {Array} controlPoints
+		 * @private {Boolean} close
+		 */
 		_getCurve:function(controlPoints,close){
+			if(ext.log){
+				var timer=ext.log.startTimer('extensible.SVG._getCurve()');	
+			}
 			close=close!==undefined?close:true;
-			//while(!controlPoints[0] || !controlPoints[0][0] && controlPoints.length){
-			//	if(controlPoints[0] && controlPoints[0].length){
-			//		controlPoints[0].shift();
-			//	}else{
-			//		controlPoints.shift();
-			//	}
-			//}
 			if(controlPoints.length==0){
 				return;	
 			}
@@ -1544,9 +1664,20 @@
 					curveString.push(" ");
 				}
 			}
+			if(ext.log){
+				ext.log.pauseTimer(timer);	
+			}
 			return curveString.join('');
 		},
+		/**
+		 * Returns a paint server for the specified fill.
+		 * @param {extensible.Fill} fillObj
+		 * @private {Object} options
+		 */
 		_getFill:function(fillObj,options){
+			if(ext.log){
+				var timer=ext.log.startTimer('extensible.SVG._getFill()');	
+			}
 			var settings=new ext.Object({
 				shape:undefined,
 				gradientUnits:'userSpaceOnUse' // objectBoundingBox, userSpaceOnUse
@@ -1655,32 +1786,86 @@
 					break;
 			}
 			xml['@id']=id;
+			if(ext.log){
+				ext.log.pauseTimer(timer);	
+			}
 			return xml;
 		},
+		/**
+		 * Returns stroke attribute string.
+		 * If the stroke has a shapeFill, a paint server for the specified fill
+		 * is inserted under this.xml.defs.
+		 * @param {extensible.Fill} fillObj
+		 * @param {Object} options Options object, passed on to _getFill() if 
+		 * a shapeFill is present.
+		 * @return {String} Returns stroke attributes.
+		 * @private
+		 */
 		_getStroke:function(stroke,options){
-			var color=new ext.Color(stroke.color);
-			var svg='';
-			//if(stroke.fill && stroke.fill!='noFill'){
-				
-			//}else{
-				svg+='stroke="'+color.hex+'" ';
-				svg+='stroke-opacity="'+String(color.opacity)+'" ';
-			//}
-			svg+='stroke-width="'+stroke.thickness+'" ';
-			svg+='stroke-linecap="'+(stroke.capType=='none'?'round':stroke.capType)+'" ';
-			svg+='stroke-linejoin="'+stroke.joinType+'" ';
-			if(stroke.joinType=='miter'){svg+='stroke-miterlimit="'+stroke.miterLimit+'" ';}
-			
-			if(stroke.scaleType=='none'){
-				svg+='vector-effect="non-scaling-stroke" ';
+			if(ext.log){
+				var timer=ext.log.startTimer('extensible.SVG._getStroke()');	
 			}
-			return svg;
+			var svg=[];
+			var fillString,opacityString;
+			if(stroke.shapeFill && stroke.shapeFill!='noFill'){
+				var fill=this._getFill(
+					stroke.shapeFill,
+					options
+				);
+				if(fill){
+					if(fill.name()=='solidColor'){
+						fillString=String(fill['@solid-color']);
+						opacityString=String(fill['@solid-opacity']);
+					}else{
+						this.xml.defs.appendChild(fill)
+						fillString='url(#'+String(fill['@id'])+')';
+					}
+				}
+			}else{
+				var color=new ext.Color(stroke.color);
+				fillString=color.hex;
+				if(color.opacity<1){
+					opacityString=String(color.opacity);
+				}
+			}
+			svg.push('stroke="'+fillString+'" ');
+			if(opacityString){
+				svg.push('stroke-opacity="'+opacityString+'"');
+			}
+			svg.push(
+				'stroke-width="'+stroke.thickness+'"',
+				'stroke-linecap="'+(stroke.capType=='none'?'round':stroke.capType)+'"',
+				'stroke-linejoin="'+stroke.joinType+'"'
+			);
+			if(stroke.joinType=='miter'){
+				svg.push('stroke-miterlimit="'+stroke.miterLimit+'"');
+			}
+			if(stroke.scaleType=='none'){
+				svg.push('vector-effect="non-scaling-stroke"');
+			}
+			if(ext.log){
+				ext.log.pauseTimer(timer);	
+			}
+			return svg.join(' ')+' ';
 		},
-		_getText:function(element,options){
+		_getText:function(element,options){			
+			if(ext.log){
+				var timer=ext.log.startTimer('extensible.SVG._getText()');	
+			}
 			var settings=new ext.Object({});
 			settings.extend(options);
+			var xml;
 			if(this.convertTextToOutlines){
 				var timeline=element.timeline;
+				if(element instanceof ext.Text){
+					if(
+						!element.$.length
+					){
+						return;	
+					}
+					var	textWidth=element.$.textWidth;
+					var	textHeight=element.$.textHeight;
+				}
 				var frame=settings.frame||element.frame;
 				var layer=element.layer;
 				var index=element.frame.elements.expandGroups().indexOf(element);
@@ -1710,7 +1895,7 @@
 					ext.doc.selectNone();
 				}
 				searchElements=currentTimeline.layers[tempLayerIndex].frames[0].elements;
-				for(i=0;i<searchElements.length;i++){
+				for(var i=0;i<searchElements.length;i++){
 					if(
 						searchElements[i].hasPersistentData(id) &&
 						searchElements[i].getPersistentData(id)==pd
@@ -1721,20 +1906,55 @@
 						ext.doc.deleteSelection();
 					}
 				}
-				tempElement.matrix=new ext.Matrix();
+				var tempMatrix=new ext.Matrix();
+				tempElement.matrix=tempMatrix;
+				if(element instanceof ext.Text){
+					tempElement.$.textType='static';
+					tempElement.$.textHeight=textHeight;
+					tempElement.$.textWidth=textWidth;
+				}else{
+					tempMatrix.a=(
+						new ext.Point({
+							x:tempElement.matrix.a,
+							y:tempElement.matrix.b
+						})
+					).length;
+					tempMatrix.d=(
+						new ext.Point({
+							x:tempElement.matrix.c,
+							y:tempElement.matrix.d
+						})
+					).length;	
+				}
 				ext.sel=[tempElement];
-				while(ext.sel.length==0){
+				for(var i=0;i<parentGroups.length && ext.sel.length==0;i++){
 					ext.doc.exitEditMode();
 					ext.sel=[tempElement];
 				}
-				ext.doc.breakApart();
-				ext.doc.breakApart();
-				options.matrix=matrix.concat(options.matrix);
+				for(
+					i=0;
+					i<10 &&
+					ext.sel.length>0 &&
+					(
+						ext.sel[0] instanceof ext.Text ||
+						ext.sel[0] instanceof ext.TLFText
+					);
+					i++
+				){
+					try{
+						ext.doc.breakApart();
+					}catch(e){}
+				}
+				options.matrix=matrix.concat(tempMatrix.invert()).concat(options.matrix);
 				var xml=this._getShape(currentTimeline.layers[tempLayerIndex].elements[0],options);
 				currentTimeline.deleteLayer(tempLayerIndex);
 				element.removePersistentData(id);
+				if(ext.log){
+					ext.log.pauseTimer(timer);	
+				}
 				return xml;
-			}	
+			}
+			return xml;
 		},
 		_getMatrix:function(matrix){
 			if(!(matrix instanceof ext.Matrix)){
@@ -1742,18 +1962,74 @@
 			}
 			return('matrix('+matrix.a+' '+matrix.b+' '+matrix.c+' '+matrix.d+' '+matrix.tx+' '+matrix.ty+')');
 		},
+		/**
+		 * Splits the xml into multiple documents. For use when exporting multiple root timelines.
+		 * @private
+		 */
+		_splitXML:function(inputXML){
+			if(ext.log){
+				var timer=ext.log.startTimer('extensible.SVG._splitXML()');	
+			}
+			var documents=new ext.Array();
+			var emptyXML=inputXML.copy();
+			delete emptyXML.use;
+			delete emptyXML.g;
+			for each(var e in inputXML.use+inputXML.g){
+				var xml=emptyXML.copy();
+				element=e.copy();
+				if(element.localName()=='use'){
+					var id=String(element['@xlink-href']).slice(1);
+					var symbol=xml.defs.symbol.(@id==id)[0];
+					xml.@viewBox=symbol.@viewBox;
+					var dimensions=(String(xml.@viewBox)).match(/[\d\-\.]*[\d\-\.]/g);
+					var attrs=['x','y','width','height'];
+					for(
+						var i=0;
+						(
+							i<dimensions.length &&
+							i<attrs.length
+						);
+						i++
+					){
+						xml['@'+attrs[i]]=dimensions[i];
+					}
+					xml['@enable-background']='new '+String(symbol.@viewBox);
+					this.expandUse(element,false,this.xml.defs);
+					xml.@id=id;
+				}
+				xml.appendChild(element);
+				//this.deleteUnusedReferences(xml);
+				documents.push(xml);
+			}
+			if(ext.log){
+				ext.log.pauseTimer(timer);	
+			}
+			return documents;
+		},
 		_uniqueID:function(id,xml){
-			id=id.trim().camelCase();
-			if(!id || !id.length){
+			if(ext.log){
+				var timer=ext.log.startTimer('extensible.SVG._uniqueID()');	
+			}
+			var invalid=id.match(/[^A-Za-z\d\-\.\:]/g);
+			if(invalid && invalid.length){
+				for(var i=0;i<invalid.length;i++){
+					id=id.replace(
+						invalid[i],
+						encodeURIComponent(invalid[i]).replace('%',this.MODULO_STAND_IN,'g')
+					);
+				}
+			}		
+			if(!id ||!id.length){
 				id='g';
-			}else if(/^[^A-Za-z\d]/.test(id)){
-				id='g'+id;
 			}
 			var parts=/(.*[^\d])([\d][\d]*$)?/.exec(id);
 			var base=parts[1];
 			var increment=0;
 			if(parts.length>2){
 				increment=Number(parts[2]);
+			}
+			if(ext.log){
+				ext.log.pauseTimer(timer);	
 			}
 			if(this._ids[base]!==undefined){
 				this._ids[base]+=1;
@@ -1766,6 +2042,6 @@
 		toString:function(){
 			return this.docString+this.xml.toXMLString().replace(/(<use.*?)xlink-href="#/g,'$1xlink:href="#');
 		}
-	}
+	};
 	ext.extend({SVG:SVG});
 })(extensible);
