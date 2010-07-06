@@ -42,6 +42,7 @@
 		var swfPanelName:String='SVG';
 		var dev:Boolean;
 		var helpURL:URLRequest=new URLRequest('http://dissentgraphics.com/tools/flash2svg');
+		public static const cGetASObjectData:String = "28";
 		public function SVGExportPanel():void
 		{
 			super();
@@ -586,6 +587,7 @@
 			this.controls.progressbar.mode=ProgressBarMode.EVENT;
 			ExternalInterface.addCallback('setProgress',setProgress);
 			ExternalInterface.addCallback('endProgress',endProgress);
+			//ExternalInterface.addCallback('getASElementInfo',getASElementInfo);
 			//Save options
 			MMExecute([
 				'extensible.doc.addDataToDocument(',
@@ -597,43 +599,6 @@
 			//Retrieve options...
 			var fileLoc=this.controls.fileTextInput.text;
 			var uri=MMExecute('FLfile.platformPathToURI(decodeURIComponent("'+encodeURIComponent(fileLoc)+'"))');
-			/*var cmd=[
-				'fl.runScript(fl.configURI+"Javascript/Extensible/init.jsfl");',
-				'extensible.que.push(',
-				'	new extensible.SVG({',
-				'		file:"'+uri+'",',
-				'		swfPanelName:"'+this.swfPanelName+'",',
-				'		source:"'+this.controls.sourceComboBox.selectedItem.label+'",',
-				'		curveDegree:'+(this.controls.curveDegreeComboBox.selectedItem.label=='Quadratic'?'2':'3')+',',
-				'		maskingType:"'+this.controls.maskingTypeComboBox.selectedItem.label+'",',
-				'		expandSymbols:'+String(this.controls.expandSymbolsCheckBox.selected)+',',
-				'		applyTransformations:'+String(this.controls.applyTransformationsCheckBox.selected)+',',
-				'		decimalPointPrecision:'+String(this.controls.decimalPointPrecisionNumericStepper.value)+',',
-				'		fillGaps:'+String(this.controls.fillGapsCheckBox.selected)+',',
-				'		knockoutBackgroundColor:'+String(this.controls.knockoutBackgroundColorCheckBox.selected),
-				(
-					this.controls.startFrameNumericStepper.visible ?
-					'		startFrame:"'+String(this.controls.startFrameNumericStepper.value)+'",' :
-					''
-				),				
-				(
-					this.controls.endFrameNumericStepper.visible ?
-					'		endFrame:"'+String(this.controls.endFrameNumericStepper.value)+'",' :
-					''
-				),			
-				(
-					this.controls.clipToScalingGridRadioButton.visible ?
-					'		clipToScalingGrid:'+String(this.controls.clipToScalingGridRadioButton.selected)+',' :
-					''
-				),			
-				(
-					this.controls.clipToBoundingBoxRadioButton.visible ?
-					'		clipToBoundingBox:'+String(this.controls.clipToBoundingBoxRadioButton.selected)+',' :
-					''
-				),
-				'	})',
-				')'
-			].join('\n');*/
 			var xml=this.getOptionsXML(true);
 			xml['swfPanelName']='SVG';
 			if(this.dev){
@@ -648,7 +613,10 @@
 			].join('\n');
 			MMExecute(cmd);
 		}
-		
+		/*public function getASElementInfo(element:String):String
+		{
+			return  ExternalInterface.call(this.cGetASObjectData,element);
+		}*/
 		private function cancel(e:Event):void
 		{
 			this.isCanceled=true;

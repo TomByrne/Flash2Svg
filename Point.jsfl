@@ -12,7 +12,7 @@
 		ext.Object.apply(this,[settings]);
 		point=point!==undefined?point:{};
 		if(typeof(point)=='string'){
-			point=point.match(/[\d\.\-]*[\d\.]/g);
+			point=point.match(/[\d\.\-]*\d/g);
 		}
 		if(point instanceof Array){
 			this.x=point[0]!==undefined?Number(point[0]):0.0;

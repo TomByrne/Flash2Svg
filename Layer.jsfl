@@ -37,8 +37,7 @@
 		get frames(){
 			if(this.cache.frames){
 				return this.cache.frames;
-			}
-			else{
+			}else{
 				return this.getFrames();
 			}
 		},

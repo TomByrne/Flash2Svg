@@ -54,18 +54,21 @@
 						'colorBluePercent',
 						'colorAlphaPercent'
 					];
+					
 					for(var n=0;n<4;n++){
 						this.amount[n]=args[0][rgba[n]];
 					}
 					for(var n=0;n<4;n++){
 						this.percent[n]=args[0][rgbaX[n]];
 					}
+					
 				}
 			}
 		}else{
 			for(var i=0;i<args.length;i++){
 				this.amount[i]=Number(args[i]);
-			}	
+			}
+			this.percent=new ext.Array([100,100,100,100]);
 		}
 		return this;
 	};
@@ -74,10 +77,10 @@
 		type:Color,
 		get output(){
 			return [
-				this.amount[0]*(this.percent[0]/100),
-				this.amount[1]*(this.percent[1]/100),
-				this.amount[2]*(this.percent[2]/100),
-				this.amount[3]*(this.percent[3]/100)
+				Math.max(Math.min(this.amount[0]*(this.percent[0]/100),255),0),
+				Math.max(Math.min(this.amount[1]*(this.percent[1]/100),255),0),
+				Math.max(Math.min(this.amount[2]*(this.percent[2]/100),255),0),
+				Math.max(Math.min(this.amount[3]*(this.percent[3]/100),255),0)
 			];
 		},
 		set output(){},
@@ -109,20 +112,21 @@
 		},
 		getHex:function(alpha){
 			alpha=alpha||false;
-			var c=this.amount;
+			var c=this.output;
 			for(var i=0;i<c.length;i++){
-				if(c[i]>255){c[i]=255;}
-				if(c[i]<0){c[i]=0;}
+				c[i]=Math.min(c[i],255);
+				c[i]=Math.max(c[i],0);
 			}
 			var hexDigit=['0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'];
-			var hstring="#";
+			var hex=["#"];
 			for(var i=0;i<c.length-(alpha?0:1);i++){
-				hstring+=(
-					hexDigit[Math.floor((c[i])/16.0)]+
-					hexDigit[Math.round(c[i]-16.0*Math.floor(c[i]/16.0))]
-				);
+				var indexA=Math.floor((c[i])/16.0);
+				var indexB=Math.floor(c[i]-(16.0*indexA));
+				hex.push(hexDigit[indexA]);
+				hex.push(hexDigit[indexB]);
+				
 			}
-			return hstring;
+			return hex.join('');
 		},
 		set red(value){
 			this.amount[0]=value;
@@ -183,17 +187,39 @@
 			this.amount[3]=value*255.0;
 			this.percent[3]=100;
 		},
-		transform:function(c){
-			var c=new this.type(c);
-			var color=new this.type(this);
-			color.amount[0]=color.amount[0]*(c.percent[0]/100.0)+c.amount[0];
-			color.amount[1]=color.amount[1]*(c.percent[1]/100.0)+c.amount[1];
-			color.amount[2]=color.amount[2]*(c.percent[2]/100.0)+c.amount[2];
-			color.amount[3]=color.amount[3]*(c.percent[3]/100.0)+c.amount[3];
-			for(var i=0;i<color.amount.length;i++){
-				if(color.amount[i]>255){color.amount[i]=255;}
-				if(color.amount[i]<-255){color.amount[i]=-255;}
+		transform:function(color){
+			fl.trace('\npercent: '+color.percent);
+			fl.trace('amount: '+color.amount);
+			fl.trace('output: '+color.output);
+			color=new this.type(color);
+			if(this.percent[0]){
+				color.amount[0]+=this.amount[0]/(this.percent[0]/100);
+				color.percent[0]*=this.percent[0]/100;
+			}else{
+				color.amount[0]=this.amount[0];
 			}
+			if(this.percent[1]){
+				color.amount[1]+=this.amount[1]/(this.percent[1]/100);
+				color.percent[1]*=this.percent[1]/100;
+			}else{
+				color.amount[1]=this.amount[1];
+			}
+			if(this.percent[2]){
+				color.amount[2]+=this.amount[2]/(this.percent[2]/100);
+				color.percent[2]*=this.percent[2]/100;
+			}else{
+				color.amount[2]=this.amount[2];
+			}
+			if(this.percent[3]){
+				color.amount[3]+=this.amount[3]/(this.percent[3]/100);
+				color.percent[3]*=this.percent[3]/100;
+			}else{
+				color.amount[3]=this.amount[3];
+			}
+			/*for(var i=0;i<4;i++){
+				color.amount[i]=Math.min(color.amount[i],255);
+				color.amount[i]=Math.max(color.amount[i],0);
+			}*/
 			return color;
 		},
 		get idString(){

@@ -31,8 +31,13 @@
 					if(force || this._modules.indexOf[mods[i]]<0){
 						var file=this.dir+"/"+mods[i]+".jsfl";
 						if(file!=fl.scriptURI && FLfile.exists(file)){
-							fl.runScript(file);
-							this.modules.push(mods[i]);
+							try{
+								fl.runScript(file);
+								this.modules.push(mods[i]);
+							}catch(e){
+								this.warn("Problem loading "+mods[i]);
+								break;
+							}
 						}
 					}
 				}

@@ -9,6 +9,9 @@
 		}
 		ext.Object.apply(this,[options]);
 		this.cache=new ext.Object({});
+		if(frame.startFrame){
+			this.cache.startFrame=frame.startFrame;
+		}
 		if(options && options.layer){
 			if(options.layer instanceof Layer){
 				this.cache.layer=new ext.Layer(options.layer,{timeline:options.timeline});
@@ -168,6 +171,8 @@
 		get startFrame(){
 			if(this.$ && this.$.hasOwnProperty('startFrame')){ // ! important ( bugfix/workaround )
 				return this.$.startFrame;
+			}else if(this.cache.startFrame!=undefined){
+				return this.cache.startFrame;	
 			}else{
 				return 0;	
 			}

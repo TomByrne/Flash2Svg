@@ -574,6 +574,9 @@
 		},
 		get keyframes(){
 			return this.getKeyframes({selected:false});
+		},
+		getBoundingBox:function(options){
+			return this.getElements(options).boundingBox;
 		}
 	}
 	ext.extend({Timeline:ExtensibleTimeline});

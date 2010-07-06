@@ -343,7 +343,13 @@
 			});
 			settings.extend(options,true);
 			return ext.Object.prototype.is.call(this,element,settings);
-		}	
+		},	
+		get objectSpaceBounds(){
+			return new ext.Object(this.$.objectSpaceBounds);
+		},
+		set objectSpaceBounds(s){
+			this.$.objectSpaceBounds=s;
+		},
 	}
 	ext.extend({Element:ExtensibleElement});
 })(extensible);

@@ -95,6 +95,23 @@
 				frame=0;
 			}
 			return frame;
+		},
+		/**
+		 * Can be used to get object space bounds specific to a particular frame.
+		 * @param {Object} options
+		 * @param {Number} options.frame
+		 * @param {Array} options.frames
+		 * @param {Boolean} options.includeGuides
+		 * @param {Boolean} options.includeHiddenLayers
+		 */
+		getObjectSpaceBounds:function(options){
+			if(!options){
+				var objectSpaceBounds=this.objectSpaceBounds;
+				if(objectSpaceBounds){
+					return objectSpaceBounds;
+				}
+			}
+			return this.timeline.getBoundingBox(options);
 		}
 	}
 	ext.extend({SymbolInstance:ExtensibleSymbolInstance});

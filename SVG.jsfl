@@ -29,6 +29,7 @@
 			decimalPointPrecision:3,
 			expandSymbols:'None', // 'Nested', 'All', 'None'
 			applyTransformations:true,
+			applyColorEffects:true,
 			curveDegree:3,
 			maskingType:'Clipping',
 			frames:new ext.Array(),
@@ -46,7 +47,7 @@
 			x:0,y:0,
 			width:ext.doc.width,
 			height:ext.doc.height,
-			docString:'',// W3C recommends ommiting DOCTYPE declarations for SVG.
+			docString:'<?xml version="1.0" encoding="utf-8"?>\n<!-- Generator: flash2svg, http://dissentgraphics.com/tools/flash2svg -->\n',
 			version:'1.1',
 			baseProfile:'basic',
 			log:ext.doc.pathURI.stripExtension()+'.log.csv', // debugging log
@@ -94,6 +95,7 @@
 		this.swfPanel=ext.swfPanel(this.swfPanelName); // the swfPanel
 		this._timer=undefined;
 		this._symbols={};
+		this._rootItem={};
 		this._contourCPs=new ext.Object({}); // Holds edge point arrays used in filling gaps.
 		this._tempFolder=ext.lib.uniqueName('temp'); // Library folder holding temporary symbols.
 		this._ids=new ext.Object({}); // Used by uniqueID() for cross-checking IDs.
@@ -197,6 +199,9 @@
 					xml['@transform']=transform;
 				}
 			}
+			if(xml.hasOwnProperty('@filter') && matrix){
+				this._transformFilter(matrix,xml,defs);
+			}
 			for each(var child in (xml.defs.symbol.*+xml.*)){
 				var childName=String(child.localName());
 				if(matrix){
@@ -221,7 +226,10 @@
 						nmx=matrix;
 						nmxString=mxa[0];
 						child['@transform']=nmxString;
-					}			
+					}
+					if(child.hasOwnProperty('@filter') && child.localName()!='g'){
+						this._transformFilter(nmx,child,defs);
+					}
 					if(bApplyVertices){
 						var gradientAttr=['stroke','fill'];
 						for(var i=0;i<gradientAttr.length;i++){
@@ -340,11 +348,209 @@
 						}
 					}
 				}
-				if(childName=='g'){
+				if(child.* && child.*.length() && childName!='defs'){
 					this.applyMatrices(child,defs);	
 				}
 			}
 			return xml;
+		},
+		_applyColorEffects:function(xml,defs,colorX){
+			if(!xml || !xml.*.length()>0){
+				return;
+			}
+			defs=(
+				defs instanceof XML ?
+				defs:(
+					xml.defs instanceof XML ?
+					xml.defs:
+					this.xml.defs
+				)
+			);
+			var color;
+			if(xml.hasOwnProperty('@filter')){
+				var filterID=String(xml.@filter).match(/(?:url\(#)(.*?)(?:\))/);
+				if(filterID && filterID.length>1){
+					var filter=defs.filter.(@id==filterID[1]);
+					if(filter && filter.length()){
+						filter=filter[0];
+						var feAmount=filter.feComponentTransfer.(@result=='colorEffect_amount');
+						var fePercent=filter.feColorMatrix.(@result=='colorEffect_percent');
+						if(feAmount.length() || fePercent.length()){
+							color=new ext.Color([0,0,0,0]);
+							var nodeCount=0;
+							if(feAmount && feAmount.length()>0){
+								nodeCount+=1;
+								feAmount=feAmount[feAmount.length()-1];
+								if(
+									feAmount.feFuncR.length() &&
+									feAmount.feFuncR.hasOwnProperty('@offset')
+								){
+									color.amount[0]=Number(feAmount.feFuncR.@offset)*255;
+								}
+								if(
+									feAmount.feFuncG.length() &&
+									feAmount.feFuncG.hasOwnProperty('@offset')
+								){
+									color.amount[1]=Number(feAmount.feFuncG.@offset)*255;
+								}
+								if(
+									feAmount.feFuncB.length() &&
+									feAmount.feFuncB.hasOwnProperty('@offset')
+								){
+									color.amount[2]=Number(feAmount.feFuncB.@offset)*255;
+								}
+								if(
+									feAmount.feFuncA.length() &&
+									feAmount.feFuncA.hasOwnProperty('@offset')
+								){
+									color.amount[3]=Number(feAmount.feFuncA.@offset)*255;
+								}
+								delete filter.feComponentTransfer.(@result=='colorEffect_amount')[0];//
+							}
+							if(fePercent && fePercent.length()>0){
+								nodeCount+=1;
+								fePercent=fePercent[fePercent.length()-1];
+								var values=String(fePercent.@values).match(/[\d\.\-]*\d/g);
+								if(values.length>16){
+									color.percent[0]=values[0]*100;
+									color.percent[1]=values[6]*100;
+									color.percent[2]=values[12]*100;
+									color.percent[3]=values[18]*100;
+								}
+								delete filter.feColorMatrix.(@result=='colorEffect_percent')[0];
+							}
+							if(filter.*.length()==0){
+								delete xml.@filter;
+								delete defs.filter.(@id==filterID[1])[0];
+							}
+						}
+					}
+					
+				}
+				
+			}
+			if(!color){
+				color=colorX;
+			}else if(colorX){
+				color=color.transform(colorX);
+			}
+			for each(var element in xml.*){
+				if(color){
+					var paintProperties=['fill','stroke'];
+					for(var i=0;i<paintProperties.length;i++){
+						if(element.hasOwnProperty('@'+paintProperties[i])){
+							var paintStr=String(element['@'+paintProperties[i]]);
+							var paintID=paintStr.match(/(?:url\(#)(.*?)(?:\))/);
+							if(paintID && paintID.length>1){
+								paintID=paintID[1];
+								var paint=defs.*.(@id==paintID);
+								if(paint && paint.length()){
+									for each(var stop in paint[0].stop){
+										var newColor=new ext.Color(
+											String(stop['@stop-color'])
+										);
+										if(stop.hasOwnProperty('@stop-color')){
+											newColor.opacity=Number(stop['@stop-opacity']);
+										}else{
+											newColor.opacity=1;
+										}
+										fl.trace(newColor);
+										newColor=color.transform(newColor);
+										stop['@stop-color']=newColor.hex;
+										stop['@stop-opacity']=newColor.opacity;
+									}
+								}
+							}else if(paintStr[0]=='#'){
+								var newColor=new ext.Color(paintStr);
+								if(element.hasOwnProperty('@'+paintProperties[i]+'-opacity')){
+									newColor.opacity=Number(element['@'+paintProperties[i]+'-opacity']);
+								}else{
+									newColor.opacity=1;
+								}
+								fl.trace(newColor);
+								newColor=color.transform(newColor);
+								element['@'+paintProperties[i]]=newColor.hex;
+								element['@'+paintProperties[i]+'-opacity']=newColor.opacity;
+							}
+						}
+					}
+				}
+				if(element.*.length()>0){
+					this._applyColorEffects(element,defs,color);
+				}
+			}
+		},
+		_transformFilter:function(matrix,element,defs){
+			defs=defs||element.defs;
+			if(!defs){
+				return;
+			}
+			if(element.hasOwnProperty('@filter')){
+				var filterID=String(
+					element.@filter
+				).match(
+					/(?:url\(#)(.*?)(?:\))/
+				);
+				if(
+					filterID &&
+					filterID.length>1
+				){
+					var filter=defs.filter.(@id==filterID[1]);
+					if(filter && filter.length()){
+						var marginLeft,marginRight,marginTop,marginBottom;
+						marginLeft=marginRight=marginTop=marginBottom=0;
+						for each(var primitive in filter[0].*){
+							switch(primitive.localName()){
+								case "feGaussianBlur":
+									var blur=new ext.Point(String(primitive.@stdDeviation));
+									marginLeft+=blur.x/2;
+									marginRight+=blur.x/2;
+									marginTop+=blur.y/2;
+									marginBottom+=blur.y/2;
+									primitive.@stdDeviation=[
+										blur.x*matrix.scaleX,
+										blur.y*matrix.scaleY
+									].join(' ');
+									break;
+							}
+						}
+						var newMarginLeft,newMarginRight,newMarginTop,newMarginBottom;
+						newMarginLeft=marginLeft/matrix.scaleX;
+						newMarginRight=marginRight/matrix.scaleX;
+						newMarginTop=marginTop/matrix.scaleY;
+						newMarginBottom=marginBottom/matrix.scaleY;
+						var topLeft=new ext.Point({
+							x:Number(
+								filter[0].@x
+							),
+							y:Number(
+								filter[0].@y
+							)
+						}).transform(
+							matrix
+						);
+						var bottomRight=new ext.Point({
+							x:(
+								Number(filter[0].@x)+
+								Number(filter[0].@width)
+							),
+							y:(
+								Number(filter[0].@y)+
+								Number(filter[0].@height)
+							)
+						}).transform(
+							matrix
+						);
+						
+						// filter is overly large to accomodate Illustrator / Browser discrepancies
+						filter.@x=-newMarginLeft;
+						filter.@y=-newMarginTop;
+						filter.@width=bottomRight.x+newMarginRight+newMarginLeft;
+						filter.@height=bottomRight.y+newMarginBottom+newMarginTop;						
+					}								
+				}
+			}
+			return filter[0];
 		},
 		/**
 		 * Begins processing. 
@@ -478,16 +684,16 @@
 				if(this.expandSymbols && this.expandSymbols!='None'){ // expand symbol instances
 					if(this.expandSymbols=='Nested'){
 						this.expandUse(documents[i].defs.symbol);
-						this.deleteUnusedReferences(documents[i]);
 					}else{
 						this.expandUse(documents[i]);
-						this.deleteUnusedReferences(documents[i]);
-						//delete documents[i].defs.symbol;
+						
 					}
 				}
 				if(this.applyTransformations){
 					this.applyMatrices(documents[i]);
 				}
+				this._applyColorEffects(documents[i],documents[i].defs);
+				this.deleteUnusedReferences(documents[i]);
 				documents[i]['@xmlns']="http://www.w3.org/2000/svg";
 				if(this.file){
 					var outputString=(
@@ -497,10 +703,9 @@
 							'$1xlink:href="#'
 						)
 					);
-					if(this.timelines.length==1){
+					if(documents.length==1){
 						success=FLfile.write(this.file,outputString);
 					}else{
-						fl.trace('go');
 						var rPath=decodeURIComponent(
 							String(
 								documents[i].@id
@@ -524,11 +729,8 @@
 						}
 						var outputPath=(
 							this.file+'/'+
-							rPath.replace(
-								/\s/g,'-'
-							)+'.svg'
+							rPath+'.svg'
 						);
-						fl.trace(outputPath);
 						success=FLfile.write(
 							outputPath,
 							outputString
@@ -603,8 +805,16 @@
 					delete useNode['@transform'];
 				}
 				for each(var node in useNode..*){
-					if(node.@id){
+					if(node.hasOwnProperty('@id') && node.localName()!='mask'){
 						node.@id=this._uniqueID(String(node.@id));
+					}
+					if(node.hasOwnProperty('@mask')){
+						var oldID=String(node.@mask).match(/(?:url\(#)(.*?)(?:\))/);
+						if(oldID && oldID.length>1){
+							var newID=this._uniqueID(oldID[1]);
+							useNode.(@id==oldID).@id=newID;
+							node.@mask='url(#'+newID+')';
+						}
 					}
 					if(this.applyTransformations){
 						for each(var attr in node.@*){
@@ -633,18 +843,17 @@
 		 * Deletes unreferenced defs.
 		 * @parameter {XML} xml
 		 */
-		deleteUnusedReferences:function(xml,defs){
+		deleteUnusedReferences:function(xml){
 			xml=xml||this.xml;
-			defs=defs||xml.defs;
 			if(!xml.defs || xml.defs.length()==0){
 				return xml;	
 			}
-			var refs=this._listReferences(xml,defs);
-			var references=defs.*.copy();
-			delete defs.*;
+			var refs=this._listReferences(xml);
+			var references=xml.defs.*.copy();
+			delete xml.defs.*;
 			for each(var def in references){
 				if(refs.indexOf(String(def.@id))>=0){
-					defs.appendChild(def);
+					xml.defs.appendChild(def);
 				}
 			}
 			return xml;
@@ -658,22 +867,28 @@
 			var refs=new ext.Array();
 			if(!defs){return refs;}
 			for each(var x in xml.*){
-				for each(var a in x.@*){
-					var reference=(
-						String(a).match(/(?:url\(#)(.*?)(?:\))/)||
-						String(a).trim().match(/(?:^#)(.*$)/)
-					);
-					if(
-						reference && 
-						reference.length>1
-					){
-						var ref=defs.(@id==reference[1]);
-						if(ref){
-							refs.push(reference[1]);
-							refs.extend(
-								this._listReferences(ref,defs)
-							);
+				if(x.localName()!='defs'){
+					for each(var a in x.@*){
+						var reference=(
+							String(a).match(/(?:url\(#)(.*?)(?:\))/)||
+							String(a).trim().match(/(?:^#)(.*$)/)
+						);
+						if(
+							(reference instanceof Array) &&
+							reference.length>1
+						){
+							var ref=defs.*.(@id==reference[1]);
+							if(ref && ref.length()){
+								refs.push(reference[1]);
+								refs.extend(this._listReferences(ref[0],defs));
+							}
+							
 						}
+					}
+					if(x.*.length()){
+						refs.extend(
+							this._listReferences(x,defs)
+						);
 					}
 				}
 			}
@@ -1015,8 +1230,9 @@
 			 * Group elements by layer.
 			 */
 			var selection=settings.selection.byFrame({stacked:true});
-			var xml,boundingBox,instanceXML,id;
+			var xml,instanceXML,id;
 			var transformString=this._getMatrix(settings.matrix);
+			var timelineName=timeline.name;
 			/*
 			 * If the timeline is a symbol ( has a libraryItem ), 
 			 * we either create a symbol definition or use the existings one.
@@ -1030,15 +1246,23 @@
 					symbolIDString+='/'+settings.color.idString;
 				}
 				var isNew,instanceID;
-				if(this._symbols[symbolIDString]){
+				if(
+					this._symbols[settings.libraryItem.name] &&
+					this._symbols[settings.libraryItem.name][settings.frame]
+				){
 					isNew=false;
-					id=this._symbols[symbolIDString];
+					id=this._symbols[settings.libraryItem.name][settings.frame].id;
 				}else{
 					isNew=true;
 					id=this._uniqueID(symbolIDString);
-					this._symbols[symbolIDString]=id;
+					if(!this._symbols[settings.libraryItem.name]){
+						this._symbols[settings.libraryItem.name]=new ext.Array();	
+					}
+					this._symbols[settings.libraryItem.name][settings.frame]=new ext.Array();
+					this._symbols[settings.libraryItem.name][settings.frame].id=id;
+					//this._symbols[symbolIDString]=id;
 				}				
-				var instanceID=this._uniqueID(id);		
+				var instanceID=this._uniqueID(id);	
 				xml=new XML('<use xlink-href="#'+id+'" id="'+instanceID+'" />');
 				if(isNew){
 					instanceXML=xml;
@@ -1050,7 +1274,6 @@
 					instanceXML['@overflow']="visible";
 					xml=new XML('<symbol/>');
 					xml['@id']=id;
-					boundingBox=new ext.Object();//top:0,left:0,right:0,bottom:0});
 				}else{
 					var vb=String(this.xml.defs.symbol.(@id==id)[0]['@viewBox']).split(' ');
 					xml['@width']=vb[2];
@@ -1062,11 +1285,17 @@
 					selection.clear();
 				}
 			}else{
-				id=this._uniqueID('timeline');
+				id=this._uniqueID(timelineName+'/'+settings.frame);
 				xml=new XML('<g id="'+id+'" />');
 				if(settings.matrix && !settings.matrix.is(new ext.Matrix())){
 					xml['@transform']=transformString;
 				}
+			}
+			if(settings.isRoot){
+				if(!this._rootItem[timelineName]){
+					this._rootItem[timelineName]=new ext.Array();
+				}
+				this._rootItem[timelineName][settings.frame]=id;
 			}
 			/*
 			 * Loop through the visible frames by layer &
@@ -1075,6 +1304,7 @@
 			 * or process them immediately ( for debugging purposes ).
 			 */
 			var masked=new ext.Array();
+			var boundingBox=settings.selection.boundingBox;
 			for(var i=0;i<selection.length;i++){
 				if(selection[i] && selection[i].length>0){
 					var layer=selection[i][0].layer;
@@ -1083,20 +1313,36 @@
 					if(!lVisible){layer.visible=true;}
 					if(lLocked){layer.locked=false;}
 					var layerXML;
-					var colorX=settings.color;
-					var id=layer.name.camelCase();
-					id=this._uniqueID(id);
+					var id=this._uniqueID(layer.name);
+					if(settings.libraryItem){
+						this._symbols[settings.libraryItem.name][settings.frame][i]=id;
+					}else if(settings.isRoot){
+						this._rootItem[timelineName][settings.frame][i]=id;
+					}
 					/*
 					 * If the masking type is "Alpha" or "Clipping"
 					 * we need to manipulate the color of the mask to ensure
 					 * the proper behavior
 					 */
+					var filtered;
 					if(layer.layerType=='mask'){
-						layerXML=new XML('<mask id="'+id+'" />');
+						var colorX=null;
 						if(this.maskingType=='Alpha'){
-							colorX=new ext.Color('#FFFFFF00');  
+							colorX=new ext.Color('#FFFFFF00');
 						}else if(this.maskingType=='Clipping'){
-							colorX=new ext.Color('#FFFFFFFF');
+							colorX=new ext.Color('#FFFFFF00');
+							colorX.percent[3]=999999999999999999999999999999999999999999999999;							
+						};
+						layerXML=<mask id={id}/>;
+						if(colorX){
+							filtered=<g id={this._uniqueID('g')} />;
+							layerXML.appendChild(filtered);
+							filtered.@filter="url(#"+this._getFilters(
+								null,{
+									color:colorX,
+									boundingBox:boundingBox
+								}
+							)+")";  
 						}
 					}else if(layer.layerType=='masked'){
 						layerXML=new XML('<g id="'+id+'" />');
@@ -1105,35 +1351,6 @@
 					}
 					var layerID=id;
 					for(var n=0;n<selection[i].length;n++){
-						/*
-						 * Keep track of the bounding box...
-						 */
-						if(boundingBox && layer.layerType!='masked'){
-							if(
-								!boundingBox.hasOwnProperty('left') ||
-								selection[i][n].left<boundingBox.left
-							){
-								boundingBox.left=selection[i][n].left;
-							}
-							if(
-								!boundingBox.hasOwnProperty('top') ||
-								selection[i][n].top<boundingBox.top
-							){
-								boundingBox.top=selection[i][n].top;
-							}
-							if(
-								!boundingBox.hasOwnProperty('right') ||
-								selection[i][n].right>boundingBox.right
-							){
-								boundingBox.right=selection[i][n].right;
-							}
-							if(
-								!boundingBox.hasOwnProperty('bottom') ||
-								selection[i][n].bottom>boundingBox.bottom
-							){
-								boundingBox.bottom=selection[i][n].bottom;
-							}
-						}
 						var elementID=this._uniqueID('element');
 						var element=new XML('<g id="'+elementID+'"></g>');
 						if(this._linearProcessing){
@@ -1141,20 +1358,24 @@
 								elementID,
 								selection[i][n],
 								{
-									colorTransform:colorX,
 									frame:settings.frame
 								}
 							]);
 						}else{
 							var element=this._getElement(
 								selection[i][n],{ // 
-									colorTransform:colorX,
 									frame:settings.frame
 								}
 							);
 						}
 						if(element){
-							layerXML.appendChild(element);
+							if(
+								layer.layerType=='mask' && colorX
+							){
+								filtered.appendChild(element);
+							}else{
+								layerXML.appendChild(element);
+							};
 						}
 					}
 					/*
@@ -1166,7 +1387,7 @@
 					}else if(layerXML){
 						xml.appendChild(layerXML);
 						if(layer.layerType=='mask'){
-							var mg=new XML('<g mask="url(#'+id+')"/>');
+							var mg=<g id={this._uniqueID('masked')} mask={"url(#"+id+")"}/>;
 							for(var m=0;m<masked.length;m++){
 								mg.appendChild(masked[m]);
 							}
@@ -1200,18 +1421,7 @@
 				){
 					boundingBox=settings.libraryItem.scalingGridRect;
 				}else{
-					if(!boundingBox.hasOwnProperty('left')){
-						boundingBox.left=0;
-					}
-					if(!boundingBox.hasOwnProperty('top')){
-						boundingBox.top=0;
-					}
-					if(!boundingBox.hasOwnProperty('right')){
-						boundingBox.right=0;
-					}
-					if(!boundingBox.hasOwnProperty('bottom')){
-						boundingBox.bottom=0;
-					}
+					boundingBox=settings.selection.boundingBox;
 				}				
 				instanceXML['@width']=String(boundingBox.right-boundingBox.left);
 				instanceXML['@height']=String(boundingBox.bottom-boundingBox.top);
@@ -1254,17 +1464,256 @@
 			var timeline=instance.timeline;
 			settings.frame=instance.getCurrentFrame(settings.frame);
 			var xml=this._getTimeline(instance.timeline,settings);
-			//xml['@filter']=this._getFilter(instance,options);
+			var filterID=this._getFilters(instance,options);
+			if(filterID){
+				xml['@filter']='url(#'+filterID+')';
+			}
 			if(ext.log){
-				ext.log.pauseTimer(timer);	
+				ext.log.pauseTimer(timer);
 			}
 			return xml;
 		},
-		_getFilter:function(element,options){
+		_getFilters:function(element,options){
 			var settings=new ext.Object({
-				frame:0
+				frame:0,
+				color:undefined,
+				boundingBox:undefined
 			});
-			settings.extend(options);		
+			settings.extend(options);
+			var filterID,filter;
+			var filters=(
+				element?
+				element.getFilters().filter(
+					function(element,index,array){
+						return element.enabled;
+					}
+				):
+				[]
+			);
+			var color=(
+				settings.color ?
+				new ext.Color(settings.color) :
+				new ext.Color(element)
+			);
+			if(
+				!color.amount.is([0,0,0,0]) ||
+				!color.percent.is([100,100,100,100]) ||
+				filters.length
+			){
+				var src="SourceGraphic";
+				filterID=this._uniqueID('filter');
+				filter=new XML('<filter id="'+filterID+'"/>');
+				filter.@filterUnits="userSpaceOnUse";
+				var boundingBox=(
+					settings.boundingBox ||
+					element.objectSpaceBounds
+				);
+				if(
+					element &&
+					!boundingBox && 
+					element.getObjectSpaceBounds
+				){
+					boundingBox=element.getObjectSpaceBounds({
+						includeGuides:this.includeGuides,
+						includeHiddenLayers:this.includeHiddenLayers,
+						frame:(
+							element.getCurrentFrame?
+							element.getCurrentFrame(settings.frame):
+							settings.frame
+						)
+					});
+				}
+				var leftMargin,rightMargin,topMargin,bottomMargin;
+				leftMargin=rightMargin=topMargin=bottomMargin=0;
+				var filterCount={
+					adjustColorFilter:0,
+					bevelFilter:0,
+					blurFilter:0,
+					dropShadowFilter:0,
+					glowFilter:0,
+					gradientBevelFilter:0,
+					gradientGlowFilter:0,
+				};
+				var adj={r:0.2125,g:0.7154,b:0.0721};
+				var adjEq={r:.33333,b:.33333,g:.33333};
+				var adjInv={r:0.7875,g:0.2846,b:0.9279};
+				for(var i=0;i<filters.length;i++){
+					var f=filters[i];
+					var prefix=(
+						f.name.replace(/Filter$/,'')+(
+							filterCount.adjustColorFilter?
+							String(filterCount[f.name]):
+							''
+						)+'_'
+					);
+					switch(f.name){
+						case "adjustColorFilter":
+							/*
+							 * For contrast & saturation with values > 0, reproducing the *exact* same result is not always possible
+							 * because of discrepancies in flash/svg clipping behaviors.
+							 */
+							if(
+								f.brightness!=0
+							){
+								var brightness=f.brightness/100;
+								var feComponentTransfer_brightness=<feComponentTransfer id={this._uniqueID('feComponentTransfer_brightness')} />;
+								var feFuncR=<feFuncR id={this._uniqueID('feFuncR')} />;
+								var feFuncG=<feFuncG id={this._uniqueID('feFuncG')} />;
+								var feFuncB=<feFuncB id={this._uniqueID('feFuncB')} />;
+								feFuncR.@type=feFuncG.@type=feFuncB.@type="gamma";
+								feFuncR.@amplitude=feFuncG.@amplitude=feFuncB.@amplitude=(
+									(
+										1+
+										Math.max(brightness*2,0)+
+										Math.min(brightness*.5,0)
+									)
+								);
+								feFuncR.@exponent=feFuncG.@exponent=feFuncB.@exponent=(
+									1
+								);
+								feFuncR.@offset=feFuncG.@offset=feFuncB.@offset=(
+									brightness/8
+								);
+								feComponentTransfer_brightness.appendChild(feFuncR);
+								feComponentTransfer_brightness.appendChild(feFuncG);
+								feComponentTransfer_brightness.appendChild(feFuncB);
+								feComponentTransfer_brightness['@in']=src;
+								feComponentTransfer_brightness.@result=src=prefix+'feComponentTransfer_brightness';
+								filter.appendChild(feComponentTransfer_brightness);
+							}
+							if(
+								f.contrast!=0
+							){
+								var contrast=f.contrast/100;
+								var feComponentTransfer_contrast=<feComponentTransfer id={this._uniqueID('feComponentTransfer_contrast')} />;
+								var feFuncR=<feFuncR id={this._uniqueID('feFuncR')} />;
+								var feFuncG=<feFuncG id={this._uniqueID('feFuncG')} />;
+								var feFuncB=<feFuncB id={this._uniqueID('feFuncB')} />;
+								feFuncR.@type=feFuncG.@type=feFuncB.@type="gamma";
+								feFuncR.@amplitude=feFuncG.@amplitude=feFuncB.@amplitude=(
+									(
+										1+
+										Math.max(contrast*4,0)+
+										Math.min(contrast,0)
+									)
+								);
+								feFuncR.@exponent=feFuncG.@exponent=feFuncB.@exponent=(
+									1
+								);
+								feFuncR.@offset=feFuncG.@offset=feFuncB.@offset=(
+									-Math.min(contrast/16,0)
+									-Math.max(contrast/8,0)
+								);
+								feComponentTransfer_contrast.appendChild(feFuncR);
+								feComponentTransfer_contrast.appendChild(feFuncG);
+								feComponentTransfer_contrast.appendChild(feFuncB);
+								feComponentTransfer_contrast['@in']=src;
+								feComponentTransfer_contrast.@result=src=prefix+'feComponentTransfer_contrast';
+								filter.appendChild(feComponentTransfer_contrast);
+							}
+							if(f.saturation!=0){
+								var feColorMatrix2=<feColorMatrix id={this._uniqueID('feColorMatrix')} />;
+								feColorMatrix2.@type='matrix';
+								var s=f.saturation/100+1;
+								feColorMatrix2.@values=[
+									adjEq.r+(1-adjEq.r)*s,	adjEq.g-adjEq.g*s,	adjEq.b-adjEq.b*s,0,0,
+									adjEq.r-adjEq.r*s,	adjEq.g+(1-adjEq.g)*s,	adjEq.b-adjEq.b*s,0,0,
+									adjEq.r-adjEq.r*s,	adjEq.g-adjEq.g*s,	adjEq.b+(1-adjEq.b)*s,0,0,
+									0,	0,	0,	1,	0
+								].join(' ');
+								feColorMatrix2['@in']=src;
+								feColorMatrix2.@result=src=prefix+'feColorMatrix2';
+								filter.appendChild(feColorMatrix2);
+							}
+							if(f.hue!=0){
+								var feColorMatrix=<feColorMatrix id={this._uniqueID('feColorMatrix')} />;
+								feColorMatrix.@type='hueRotate';
+								feColorMatrix.@values=f.hue;
+								feColorMatrix['@in']=src;
+								feColorMatrix.@result=src=prefix+'feColorMatrix';
+								filter.appendChild(feColorMatrix);
+							}
+							break;
+						case "bevelFilter":
+							break;
+						case "blurFilter":
+							if(
+								f.blurX!=0 ||
+								f.blurY!=0
+							){
+								var feGaussianBlur=<feGaussianBlur id={this._uniqueID('feGaussianBlur')} />;
+								feGaussianBlur.@stdDeviation=[f.blurX*2,f.blurY*2].join(' ');
+								feGaussianBlur['@in']=src;
+								feGaussianBlur.@result=src=prefix+'feGaussianBlur';
+								filter.appendChild(feGaussianBlur);
+								leftMargin=f.blurX*4>leftMargin?f.blurX*4:leftMargin;
+								rightMargin=f.blurX*4>rightMargin?f.blurX*4:rightMargin;
+								topMargin=f.blurY*4>topMargin?f.blurY*4:topMargin;
+								bottomMargin=f.blurY*4>bottomMargin?f.blurY*4:bottomMargin;
+							}
+							break;
+						case "dropShadowFilter":
+							break;
+						case "glowFilter":
+							break;
+						case "gradientBevelFilter":
+							break;
+						case "gradientGlowFilter":
+							break;
+					}
+				}
+				filter.@width=(boundingBox.right-boundingBox.left)+leftMargin+rightMargin;
+				filter.@height=(boundingBox.bottom-boundingBox.top)+topMargin+bottomMargin;
+				filter.@x=boundingBox.left-leftMargin;
+				filter.@y=boundingBox.top-topMargin;
+				if(!color.percent.is([100,100,100,100])){
+					feColorMatrix=<feColorMatrix id={this._uniqueID('feColorMatrix')} />;
+					feColorMatrix.@type="matrix";
+					feColorMatrix['@in']=src;
+					feColorMatrix.@values=[
+						color.percent[0]/100,0,0,0,0,
+						0,color.percent[1]/100,0,0,0,
+						0,0,color.percent[2]/100,0,0,
+						0,0,0,color.percent[3]/100,0
+					].join(' ');
+					feColorMatrix['@result']=src="colorEffect_percent";
+					filter.appendChild(feColorMatrix);
+				}
+				if(!color.amount.is([0,0,0,0])){
+					var feComponentTransfer=<feComponentTransfer id={this._uniqueID('feComponentTransfer')} />;
+					feComponentTransfer['@in']=src;
+					feComponentTransfer.@result=src='colorEffect_amount';
+					var feFuncR=<feFuncR id={this._uniqueID('feFuncR')} />;
+					feFuncR.@type="gamma";
+					feFuncR.@amplitude="1";
+					feFuncR.@exponent="1";
+					feFuncR.@offset=color.amount[0]/255;
+					var feFuncG=<feFuncG id={this._uniqueID('feFuncG')} />;
+					feFuncG.@type="gamma";
+					feFuncG.@amplitude="1";
+					feFuncG.@exponent="1";
+					feFuncG.@offset=color.amount[1]/255;
+					var feFuncB=<feFuncB id={this._uniqueID('feFuncB')} />;
+					feFuncB.@type="gamma";
+					feFuncB.@amplitude="1";
+					feFuncB.@exponent="1";
+					feFuncB.@offset=color.amount[2]/255;
+					var feFuncA=<feFuncA id={this._uniqueID('feFuncA')} />;
+					feFuncA.@type="gamma";
+					feFuncA.@amplitude="1";
+					feFuncA.@exponent="1";
+					feFuncA.@offset=color.amount[3]/255;
+					feComponentTransfer.appendChild(feFuncR);
+					feComponentTransfer.appendChild(feFuncG);
+					feComponentTransfer.appendChild(feFuncB);
+					feComponentTransfer.appendChild(feFuncA);
+					filter.appendChild(feComponentTransfer);
+				}
+			}
+			if(filter && filterID){
+				this.xml.defs.appendChild(filter);
+				return filterID;
+			}
 		},
 		_getBitmapInstance:function(bitmapInstance,options){
 			var id=this._uniqueID('bitmap');
@@ -1866,8 +2315,12 @@
 					var	textWidth=element.$.textWidth;
 					var	textHeight=element.$.textHeight;
 				}
-				var frame=settings.frame||element.frame;
 				var layer=element.layer;
+				var frame=(
+					settings.frame!=undefined?
+					layer.frames[settings.frame]:
+					element.frame
+				);
 				var index=element.frame.elements.expandGroups().indexOf(element);
 				var matrix=element.matrix;
 				var id=element.uniqueDataName(String('temporaryID_'+String(Math.floor(Math.random()*9999))));
@@ -1945,6 +2398,7 @@
 						ext.doc.breakApart();
 					}catch(e){}
 				}
+				ext.doc.union();
 				options.matrix=matrix.concat(tempMatrix.invert()).concat(options.matrix);
 				var xml=this._getShape(currentTimeline.layers[tempLayerIndex].elements[0],options);
 				currentTimeline.deleteLayer(tempLayerIndex);
@@ -1996,9 +2450,10 @@
 					xml['@enable-background']='new '+String(symbol.@viewBox);
 					this.expandUse(element,false,this.xml.defs);
 					xml.@id=id;
+				}else{
+					xml.@id=element.@id;	
 				}
 				xml.appendChild(element);
-				//this.deleteUnusedReferences(xml);
 				documents.push(xml);
 			}
 			if(ext.log){

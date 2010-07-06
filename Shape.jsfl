@@ -139,12 +139,6 @@
 			}
 		},
 		set vertices(){},
-		get objectSpaceBounds(){
-			return new ext.Object(this.$.objectSpaceBounds);
-		},
-		set objectSpaceBounds(s){
-			this.$.objectSpaceBounds=s;
-		},
 		is:function(element,options){
 			var settings=new ext.Object({
 				checklist:[
