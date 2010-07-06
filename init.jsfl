@@ -1,5 +1,7 @@
-﻿/* DAVID BELAIS 2010 DAVID@DISSENTGRAPHICS.COM
- * EXTENSIBLE : A javascript Framework for extending Flash. */
+﻿/* 
+ * DAVID BELAIS 2010 DAVID@DISSENTGRAPHICS.COM
+ * EXTENSIBLE : A javascript Framework for extending Flash.
+ */
  
 (function(dom){
 	function Extensible(options){
