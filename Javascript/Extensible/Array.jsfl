@@ -54,13 +54,13 @@
 	ExtensibleArray.prototype={
 		__proto__:Array.prototype,
 		type:ExtensibleArray,
-		/*
+		/**
 		 * @return {Array} a native javascript Array.
 		 */
 		get $(){
 			return Array.prototype.slice.call(this);
 		},
-		/*
+		/**
 		 * @parameter {Number} index A positive or negative integer.
 		 * @return The element at the specified index if positive, 
 		 * or the element at this.length-index if negative.
@@ -72,7 +72,7 @@
 				return this[index];	
 			}
 		},
-		/*
+		/**
 		 * @property {Object} An Object containing the non-enumerable properties of the Array object. 
 		 */
 		get attributes(){
@@ -111,7 +111,7 @@
 				}
 			}
 		},
-		/*
+		/**
 		 * @parameter {Boolean} capitalize If true, the first letter will be capitalized.
 		 * @return {String} A joined string in camelCase format. 
 		 */
@@ -125,7 +125,7 @@
 			}
 			return output;
 		},
-		/*
+		/**
 		 * Clears all enumberable elements and (optionally) populates the Array with new elements.
 		 * @parameter {Array} newElements An array of elements to add after clearing the array.
 		 */
@@ -141,7 +141,7 @@
 			}
 			return this;
 		},
-		/*
+		/**
 		 * @return A concatenated array of class [this.type].
 		 */
 		concat:function(){
@@ -159,7 +159,7 @@
 			}
 			return c;
 		},
-		/*
+		/**
 		 * @parameter {Array} array Extends this with the elements of array.
 		 * @parameter {Boolean} noDuplicates Prevents the addition of redundant
 		 * elements. Does not remove existing redundancies.
@@ -172,7 +172,7 @@
 			}
 			return this;
 		},
-		/*
+		/**
 		 * Works like the native javascript method Array.filter(), but returns an object of class [this.type].
 		 * @see Array.filter
 		 */
@@ -182,7 +182,7 @@
 			filtered.clear(a);
 			return(filtered);
 		},
-		/*
+		/**
 		 * @parameter {Boolean} recursive If true, reverses child Arrays.
 		 * @return A copy of [this], in reversed order.
 		 */
@@ -206,7 +206,7 @@
 			}
 			return r;
 		},
-		/*
+		/**
 		 * Works like the native javascript method Array.indexOf(), but return an object of class [this.type].
 		 * @see Array.indexOf
 		 */
@@ -236,7 +236,7 @@
 			}
 			return -1;
 		},
-		/*
+		/**
 		 * @parameter {Array} array An array with which to compare [this].
 		 * @return An Array object of type this.type containing the elements
 		 * present in this and present in array, in the order they appear in [this].
@@ -260,7 +260,7 @@
 			},array);
 			return filtered;
 		},
-		/*
+		/**
 		 * @parameter {Array} array An Array object with which to compare [this].
 		 * @return {Boolean} Returns true if the elements of [this] match the elements of array.
 		 */
@@ -290,8 +290,9 @@
 			}
 			return true;
 		},
-		/*
-		 * @parameter
+		/**
+		 * @parameter array
+		 * @parameter noDuplicates
 		 */
 		prepend:function(array,noDuplicates){
 			if(noDuplicates){
@@ -313,7 +314,7 @@
 			}
 			return this;
 		},
-		/*
+		/**
 		 * @parameter elements An element, or an array of elements, to remove from [this].
 		 * @return An Array object of class [this.type] with elements matching any in [array]
 		 * removed.
@@ -335,7 +336,7 @@
 			});
 			return filtered;
 		},
-		/*
+		/**
 		 * Reverses the order of the enumerable elements in [this].
 		 * @parameter {Boolean} recursive If true, child Array elements are also reversed.
 		 */
@@ -351,7 +352,7 @@
 			}
 			return this;
 		},
-		/*
+		/**
 		 * @parameter {Number} i A positive or negative integer.
 		 * @return An object of class [this.type] whith the element at index i removed.
 		 */
@@ -360,7 +361,7 @@
 				return(index!=i);
 			});
 		},
-		/*
+		/**
 		 * A copy of [this], in reversed order.
 		 */
 		get reversed(){
@@ -369,7 +370,7 @@
 		set reversed(){
 			return;
 		},
-		/*
+		/**
 		 * @see Array.toSource()
 		 * @addon
 		 */
