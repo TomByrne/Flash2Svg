@@ -1496,9 +1496,10 @@
 				new ext.Color(element)
 			);
 			if(
-				!color.amount.is([0,0,0,0]) ||
-				!color.percent.is([100,100,100,100]) ||
-				filters.length
+				(
+					( element.colorMode!='none' || settings.color ) &&
+					( !color.amount.is([0,0,0,0]) || !color.percent.is([100,100,100,100]) )
+				) || filters.length
 			){
 				var src="SourceGraphic";
 				filterID=this._uniqueID('filter');
@@ -1666,48 +1667,50 @@
 				filter.@height=(boundingBox.bottom-boundingBox.top)+topMargin+bottomMargin;
 				filter.@x=boundingBox.left-leftMargin;
 				filter.@y=boundingBox.top-topMargin;
-				if(!color.percent.is([100,100,100,100])){
-					feColorMatrix=<feColorMatrix id={this._uniqueID('feColorMatrix')} />;
-					feColorMatrix.@type="matrix";
-					feColorMatrix['@in']=src;
-					feColorMatrix.@values=[
-						color.percent[0]/100,0,0,0,0,
-						0,color.percent[1]/100,0,0,0,
-						0,0,color.percent[2]/100,0,0,
-						0,0,0,color.percent[3]/100,0
-					].join(' ');
-					feColorMatrix['@result']=src="colorEffect_percent";
-					filter.appendChild(feColorMatrix);
-				}
-				if(!color.amount.is([0,0,0,0])){
-					var feComponentTransfer=<feComponentTransfer id={this._uniqueID('feComponentTransfer')} />;
-					feComponentTransfer['@in']=src;
-					feComponentTransfer.@result=src='colorEffect_amount';
-					var feFuncR=<feFuncR id={this._uniqueID('feFuncR')} />;
-					feFuncR.@type="gamma";
-					feFuncR.@amplitude="1";
-					feFuncR.@exponent="1";
-					feFuncR.@offset=color.amount[0]/255;
-					var feFuncG=<feFuncG id={this._uniqueID('feFuncG')} />;
-					feFuncG.@type="gamma";
-					feFuncG.@amplitude="1";
-					feFuncG.@exponent="1";
-					feFuncG.@offset=color.amount[1]/255;
-					var feFuncB=<feFuncB id={this._uniqueID('feFuncB')} />;
-					feFuncB.@type="gamma";
-					feFuncB.@amplitude="1";
-					feFuncB.@exponent="1";
-					feFuncB.@offset=color.amount[2]/255;
-					var feFuncA=<feFuncA id={this._uniqueID('feFuncA')} />;
-					feFuncA.@type="gamma";
-					feFuncA.@amplitude="1";
-					feFuncA.@exponent="1";
-					feFuncA.@offset=color.amount[3]/255;
-					feComponentTransfer.appendChild(feFuncR);
-					feComponentTransfer.appendChild(feFuncG);
-					feComponentTransfer.appendChild(feFuncB);
-					feComponentTransfer.appendChild(feFuncA);
-					filter.appendChild(feComponentTransfer);
+				if(element.colorMode!='none' || settings.color){
+					if(!color.percent.is([100,100,100,100])){
+						feColorMatrix=<feColorMatrix id={this._uniqueID('feColorMatrix')} />;
+						feColorMatrix.@type="matrix";
+						feColorMatrix['@in']=src;
+						feColorMatrix.@values=[
+							color.percent[0]/100,0,0,0,0,
+							0,color.percent[1]/100,0,0,0,
+							0,0,color.percent[2]/100,0,0,
+							0,0,0,color.percent[3]/100,0
+						].join(' ');
+						feColorMatrix['@result']=src="colorEffect_percent";
+						filter.appendChild(feColorMatrix);
+					}
+					if(!color.amount.is([0,0,0,0])){
+						var feComponentTransfer=<feComponentTransfer id={this._uniqueID('feComponentTransfer')} />;
+						feComponentTransfer['@in']=src;
+						feComponentTransfer.@result=src='colorEffect_amount';
+						var feFuncR=<feFuncR id={this._uniqueID('feFuncR')} />;
+						feFuncR.@type="gamma";
+						feFuncR.@amplitude="1";
+						feFuncR.@exponent="1";
+						feFuncR.@offset=color.amount[0]/255;
+						var feFuncG=<feFuncG id={this._uniqueID('feFuncG')} />;
+						feFuncG.@type="gamma";
+						feFuncG.@amplitude="1";
+						feFuncG.@exponent="1";
+						feFuncG.@offset=color.amount[1]/255;
+						var feFuncB=<feFuncB id={this._uniqueID('feFuncB')} />;
+						feFuncB.@type="gamma";
+						feFuncB.@amplitude="1";
+						feFuncB.@exponent="1";
+						feFuncB.@offset=color.amount[2]/255;
+						var feFuncA=<feFuncA id={this._uniqueID('feFuncA')} />;
+						feFuncA.@type="gamma";
+						feFuncA.@amplitude="1";
+						feFuncA.@exponent="1";
+						feFuncA.@offset=color.amount[3]/255;
+						feComponentTransfer.appendChild(feFuncR);
+						feComponentTransfer.appendChild(feFuncG);
+						feComponentTransfer.appendChild(feFuncB);
+						feComponentTransfer.appendChild(feFuncA);
+						filter.appendChild(feComponentTransfer);
+					}
 				}
 			}
 			if(filter && filterID){
