@@ -602,7 +602,9 @@
 			var xml=this.getOptionsXML(true);
 			xml['swfPanelName']='SVG';
 			if(this.dev){
-				MMExecute('fl.runScript(fl.configURI+"Javascript/Extensible/init.jsfl");');
+				MMExecute([
+					'fl.runScript(fl.configURI+"Javascript/Extensible/init.jsfl");',
+				].joing('\n'));
 			}
 			var cmd=[
 				'extensible.que.push(',

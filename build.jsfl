@@ -33,8 +33,6 @@
 							FLfile.read(source)
 						);
 					}
-					fl.trace(FLfile.exists(destination));
-					fl.trace('writing '+destination);
 				}
 			}
 		}
@@ -89,4 +87,4 @@
 			}
 		}
 	}
-})(extensible)
+})(this.extensible)
