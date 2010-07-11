@@ -454,7 +454,6 @@
 										}else{
 											newColor.opacity=1;
 										}
-										fl.trace(newColor);
 										newColor=color.transform(newColor);
 										stop['@stop-color']=newColor.hex;
 										stop['@stop-opacity']=newColor.opacity;
@@ -467,7 +466,6 @@
 								}else{
 									newColor.opacity=1;
 								}
-								fl.trace(newColor);
 								newColor=color.transform(newColor);
 								element['@'+paintProperties[i]]=newColor.hex;
 								element['@'+paintProperties[i]+'-opacity']=newColor.opacity;
@@ -686,7 +684,6 @@
 						this.expandUse(documents[i].defs.symbol);
 					}else{
 						this.expandUse(documents[i]);
-						
 					}
 				}
 				if(this.applyTransformations){
@@ -738,7 +735,6 @@
 					}
 					if(!success){
 						ext.warn('Problem writing '+outputPath||this.file);
-						//writeSuccess=false;
 					}
 				}
 			}
@@ -1487,8 +1483,7 @@
 					function(element,index,array){
 						return element.enabled;
 					}
-				):
-				[]
+				):[]
 			);
 			var color=(
 				settings.color ?
@@ -1497,7 +1492,7 @@
 			);
 			if(
 				(
-					( element.colorMode!='none' || settings.color ) &&
+					( (element?element.colorMode!='none':false) || settings.color ) &&
 					( !color.amount.is([0,0,0,0]) || !color.percent.is([100,100,100,100]) )
 				) || filters.length
 			){
@@ -1541,12 +1536,9 @@
 				for(var i=0;i<filters.length;i++){
 					var f=filters[i];
 					var prefix=(
-						f.name.replace(/Filter$/,'')+(
-							filterCount.adjustColorFilter?
-							String(filterCount[f.name]):
-							''
-						)+'_'
+						f.name.replace(/Filter$/,'')+String(filterCount[f.name])+'_'
 					);
+					filterCount[f.name]+=1;
 					switch(f.name){
 						case "adjustColorFilter":
 							/*
@@ -1667,7 +1659,7 @@
 				filter.@height=(boundingBox.bottom-boundingBox.top)+topMargin+bottomMargin;
 				filter.@x=boundingBox.left-leftMargin;
 				filter.@y=boundingBox.top-topMargin;
-				if(element.colorMode!='none' || settings.color){
+				if((element?element.colorMode!='none':false) || settings.color){
 					if(!color.percent.is([100,100,100,100])){
 						feColorMatrix=<feColorMatrix id={this._uniqueID('feColorMatrix')} />;
 						feColorMatrix.@type="matrix";

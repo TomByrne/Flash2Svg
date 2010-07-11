@@ -188,9 +188,6 @@
 			this.percent[3]=100;
 		},
 		transform:function(color){
-			fl.trace('\npercent: '+color.percent);
-			fl.trace('amount: '+color.amount);
-			fl.trace('output: '+color.output);
 			color=new this.type(color);
 			if(this.percent[0]){
 				color.amount[0]+=this.amount[0]/(this.percent[0]/100);

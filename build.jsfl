@@ -1,3 +1,8 @@
+/* 
+ * DAVID BELAIS 2010 DAVID@DISSENTGRAPHICS.COM
+ * EXTENSIBLE : A javascript Framework for extending Flash.
+ */
+
 (function(ext){
 	if(ext){
 		ext.builderURI=fl.scriptURI;

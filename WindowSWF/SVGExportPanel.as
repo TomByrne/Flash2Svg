@@ -33,7 +33,7 @@
 		var debugging:Boolean=true;
 		var init:Object={
 			width:240,
-			height:360
+			height:390
 		};
 		var timer:Timer=new Timer(1);
 		var isCanceled:Boolean=false;
@@ -604,7 +604,10 @@
 			if(this.dev){
 				MMExecute([
 					'fl.runScript(fl.configURI+"Javascript/Extensible/init.jsfl");',
-				].joing('\n'));
+					'if(extensible.builderURI){',
+					'	fl.runScript(extensible.builderURI)',
+					'}'
+				].join('\n'));
 			}
 			var cmd=[
 				'extensible.que.push(',

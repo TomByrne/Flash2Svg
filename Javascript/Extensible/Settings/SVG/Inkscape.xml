@@ -1,5 +1,5 @@
 <Settings title="Inkscape">
-  <maskingType>Clipping</maskingType>
+  <maskingType>Alpha</maskingType>
   <curveDegree>Cubic</curveDegree>
   <expandSymbols>None</expandSymbols>
   <applyTransformations>false</applyTransformations>
