@@ -8,13 +8,24 @@
 		BridgeTalk.apply(this,[]);
 		this._modules=[];
 		this.warnings=true;
-		this.dev=true;
 		this.log=undefined;
 		for(var o in options){
 			this[o]=options[o];
 		}
 		this.progressbar=undefined;
 		this.dir=fl.scriptURI.replace(/\/[^\/]*?$/g,"");
+		if(FLfile.exists(this.dir+'/.builders')){
+			var xml=new XML(FLfile.read(this.dir+'/.builders'));
+			var fileName=fl.scriptURI.split('/').pop();
+			var scriptXML;
+			try{
+				scriptXML=xml.script.(@file==fileName);
+			}catch(e){}
+			if(scriptXML && scriptXML.length()){
+				this.dev=true;
+				this.builderURI=String(scriptXML[0].@builder);
+			}			
+		}
 		return this;
 	}
 	Extensible.prototype={
@@ -185,7 +196,9 @@
 			}
 		}
 	};
-	dom.extensible=new Extensible();
+	dom.extensible=new Extensible({
+		builderURI:(dom.extensible?dom.extensible.builderURI:undefined)
+	});
 })(this);
 extensible.load(
 	[

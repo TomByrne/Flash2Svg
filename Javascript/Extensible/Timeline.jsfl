@@ -543,7 +543,7 @@
 		},
 		getFrames:function(options){
 			var settings=new ext.Object({
-				position:null,
+				position:undefined,
 				includeHiddenLayers:ext.includeHiddenLayers,
 				includeGuides:false
 			});
@@ -555,10 +555,12 @@
 					(layers[l].visible || settings.includeHiddenLayers) && 
 					(layers[l].layerType!='guide' || settings.includeGuides)
 				){
-					if(settings.position!==null && layers[l].frameCount>settings.position){
-						f.push(layers[l].frames[settings.position]);	
-					}else{
+					if(settings.position==undefined){
 						f=f.concat(layers[l].frames);
+					}else{
+						if(layers[l].frameCount>settings.position){
+							f.push(layers[l].frames[settings.position]);	
+						}
 					}
 				}
 			}

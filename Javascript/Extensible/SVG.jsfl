@@ -244,75 +244,78 @@
 							}
 							if(gradientID!==undefined){
 								var gradient=defs.*.(@id==gradientID);
-								if(
-									gradient && 
-									gradient.length() && 
-									gradient.localName()=='radialGradient'
-								){
-									var gtr=gradient['@gradientTransform'];
-									if(gtr){
-										gtr=String(gtr);
-										var cmxa=/matrix\(.*?\)/.exec(gtr);
-										if(cmxa && cmxa.length){
-											var cmx=new ext.Matrix(cmxa[0]);
+								if(gradient && gradient.length()){
+									gradient=gradient[0].copy();
+									gradientID=this._uniqueID(String(gradient.@id));
+									gradient.@id=gradientID;
+									child['@'+gradientAttr[i]]='url(#'+gradientID+')';
+									defs.appendChild(gradient);
+									if(gradient.localName()=='radialGradient'){
+										var gtr=gradient['@gradientTransform'];
+										if(gtr){
+											gtr=String(gtr);
+											var cmxa=/matrix\(.*?\)/.exec(gtr);
+											if(cmxa && cmxa.length){
+												var cmx=new ext.Matrix(cmxa[0]);
+											}else{
+												cmx=new ext.Matrix();
+											}
 										}else{
 											cmx=new ext.Matrix();
 										}
-									}else{
-										cmx=new ext.Matrix();
+										var gmx=cmx.concat(nmx);
+										var fp=new ext.Point({
+											x:Number(gradient['@fx']),
+											y:Number(gradient['@fy'])
+										});
+										var cp=new ext.Point({
+											x:Number(gradient['@cx']),
+											y:Number(gradient['@cy'])
+										});
+										var rp=new ext.Point({
+											x:cp.x+Number(gradient['@r']),
+											y:cp.y
+										});
+										var mx=new ext.Matrix({
+											a:gmx.scaleX,
+											b:0,
+											c:0,
+											d:gmx.scaleX,
+											tx:gmx.tx,
+											ty:gmx.ty
+										});
+										fp=fp.transform(mx).roundTo(this.decimalPointPrecision);
+										cp=cp.transform(mx).roundTo(this.decimalPointPrecision);
+										rp=rp.transform(mx).roundTo(this.decimalPointPrecision);
+										gmx=mx.invert().concat(gmx).roundTo(this.decimalPointPrecision);
+										gradient['@r']=String(Math.roundTo(cp.distanceTo(rp),this.decimalPointPrecision));
+										gradient['@cx']=String(cp.x);
+										gradient['@cy']=String(cp.y);
+										gradient['@fx']=String(fp.x);
+										gradient['@fy']=String(fp.y);
+										var gmxString=this._getMatrix(gmx);
+										if(gtr){
+											gtr=gtr.replace(cmxa[0],gmxString);
+										}else{
+											gtr=gmxString;
+										}
+										gradient['@gradientTransform']=gtr;
+									}else if(gradient.name()=='linearGradient'){
+										var p1=new ext.Point({
+											x:Number(gradient['@x1']),
+											y:Number(gradient['@y1'])
+										});
+										var p2=new ext.Point({
+											x:Number(gradient['@x2']),
+											y:Number(gradient['@y2'])
+										});
+										p1=p1.transform(nmx).roundTo(this.decimalPointPrecision);
+										p2=p2.transform(nmx).roundTo(this.decimalPointPrecision);
+										gradient['@x1']=String(p1.x);
+										gradient['@y1']=String(p1.y);
+										gradient['@x2']=String(p2.x);
+										gradient['@y2']=String(p2.y);
 									}
-									var gmx=cmx.concat(nmx);
-									var fp=new ext.Point({
-										x:Number(gradient['@fx']),
-										y:Number(gradient['@fy'])
-									});
-									var cp=new ext.Point({
-										x:Number(gradient['@cx']),
-										y:Number(gradient['@cy'])
-									});
-									var rp=new ext.Point({
-										x:cp.x+Number(gradient['@r']),
-										y:cp.y
-									});
-									var mx=new ext.Matrix({
-										a:gmx.scaleX,
-										b:0,
-										c:0,
-										d:gmx.scaleX,
-										tx:gmx.tx,
-										ty:gmx.ty
-									});
-									fp=fp.transform(mx).roundTo(this.decimalPointPrecision);
-									cp=cp.transform(mx).roundTo(this.decimalPointPrecision);
-									rp=rp.transform(mx).roundTo(this.decimalPointPrecision);
-									gmx=mx.invert().concat(gmx).roundTo(this.decimalPointPrecision);
-									gradient['@r']=String(Math.roundTo(cp.distanceTo(rp),this.decimalPointPrecision));
-									gradient['@cx']=String(cp.x);
-									gradient['@cy']=String(cp.y);
-									gradient['@fx']=String(fp.x);
-									gradient['@fy']=String(fp.y);
-									var gmxString=this._getMatrix(gmx);
-									if(gtr){
-										gtr=gtr.replace(cmxa[0],gmxString);
-									}else{
-										gtr=gmxString;
-									}
-									gradient['@gradientTransform']=gtr;
-								}else if(gradient.name()=='linearGradient'){
-									var p1=new ext.Point({
-										x:Number(gradient['@x1']),
-										y:Number(gradient['@y1'])
-									});
-									var p2=new ext.Point({
-										x:Number(gradient['@x2']),
-										y:Number(gradient['@y2'])
-									});
-									p1=p1.transform(nmx).roundTo(this.decimalPointPrecision);
-									p2=p2.transform(nmx).roundTo(this.decimalPointPrecision);
-									gradient['@x1']=String(p1.x);
-									gradient['@y1']=String(p1.y);
-									gradient['@x2']=String(p2.x);
-									gradient['@y2']=String(p2.y);
 								}
 							}
 						}	
@@ -355,8 +358,12 @@
 			return xml;
 		},
 		_applyColorEffects:function(xml,defs,colorX){
-			if(!xml || !xml.*.length()>0){
-				return;
+			var name=xml.localName();
+			if( name=='filter' || /Gradient/.test(name) || /Color/.test(name)){
+				return;	
+			}
+			if(name=='mask' && xml..use.length()>0){
+				this.expandUse( xml,true,defs );
 			}
 			defs=(
 				defs instanceof XML ?
@@ -366,117 +373,150 @@
 					this.xml.defs
 				)
 			);
-			var color;
+			var filter,newFilter;
+			var color=colorX;
 			if(xml.hasOwnProperty('@filter')){
 				var filterID=String(xml.@filter).match(/(?:url\(#)(.*?)(?:\))/);
 				if(filterID && filterID.length>1){
-					var filter=defs.filter.(@id==filterID[1]);
-					if(filter && filter.length()){
-						filter=filter[0];
-						var feAmount=filter.feComponentTransfer.(@result=='colorEffect_amount');
-						var fePercent=filter.feColorMatrix.(@result=='colorEffect_percent');
-						if(feAmount.length() || fePercent.length()){
-							color=new ext.Color([0,0,0,0]);
-							var nodeCount=0;
-							if(feAmount && feAmount.length()>0){
-								nodeCount+=1;
-								feAmount=feAmount[feAmount.length()-1];
-								if(
-									feAmount.feFuncR.length() &&
-									feAmount.feFuncR.hasOwnProperty('@offset')
-								){
-									color.amount[0]=Number(feAmount.feFuncR.@offset)*255;
+					filter=defs.filter.(@id==filterID[1]);
+					if(filter){
+						if(filter.length()){
+							filter=filter[0];
+							color=this._colorFromEffect(filter);
+							if(color){
+								var n=0;
+								if(!color.amount.is([0,0,0,0])){
+									n+=1;
 								}
-								if(
-									feAmount.feFuncG.length() &&
-									feAmount.feFuncG.hasOwnProperty('@offset')
-								){
-									color.amount[1]=Number(feAmount.feFuncG.@offset)*255;
+								if(!color.percent.is([100,100,100,100])){
+									n+=1;
 								}
-								if(
-									feAmount.feFuncB.length() &&
-									feAmount.feFuncB.hasOwnProperty('@offset')
-								){
-									color.amount[2]=Number(feAmount.feFuncB.@offset)*255;
+								if(filter.*.length()<=n){
+									delete xml.@filter;
+								}else{
+									newFilter=filter.copy();
+									var newFilterID=this._uniqueID(String(newFilter.@id));
+									newFilter.@id=newFilterID;
+									xml.@filter="url(#"+newFilterID+")";
+									if(!color.amount.is([0,0,0,0])){
+										delete newFilter.feComponentTransfer.(@result=='colorEffect_amount');
+									}
+									if(!color.percent.is([100,100,100,100])){
+										delete newFilter.feColorMatrix.(@result=='colorEffect_percent');
+									}
+									defs.appendChild(newFilter);
+									filter=newFilter;
 								}
-								if(
-									feAmount.feFuncA.length() &&
-									feAmount.feFuncA.hasOwnProperty('@offset')
-								){
-									color.amount[3]=Number(feAmount.feFuncA.@offset)*255;
-								}
-								delete filter.feComponentTransfer.(@result=='colorEffect_amount')[0];//
 							}
-							if(fePercent && fePercent.length()>0){
-								nodeCount+=1;
-								fePercent=fePercent[fePercent.length()-1];
-								var values=String(fePercent.@values).match(/[\d\.\-]*\d/g);
-								if(values.length>16){
-									color.percent[0]=values[0]*100;
-									color.percent[1]=values[6]*100;
-									color.percent[2]=values[12]*100;
-									color.percent[3]=values[18]*100;
-								}
-								delete filter.feColorMatrix.(@result=='colorEffect_percent')[0];
-							}
-							if(filter.*.length()==0){
-								delete xml.@filter;
-								delete defs.filter.(@id==filterID[1])[0];
-							}
+						}else{
+							delete xml.@filter;
 						}
 					}
-					
 				}
-				
 			}
-			if(!color){
-				color=colorX;
-			}else if(colorX){
-				color=color.transform(colorX);
+			if(color){
+				var painted=false;
+				var paintProperties=[
+					'fill',
+					'stroke'
+				];
+				for(var i=0;i<paintProperties.length;i++){
+					if(xml.hasOwnProperty('@'+paintProperties[i])){
+						painted=true;
+						var paintStr=String(xml['@'+paintProperties[i]]);
+						var paintID=paintStr.match(/(?:url\(#)(.*?)(?:\))/);
+						if(paintID && paintID.length>1){
+							paintID=paintID[1];
+							var paint=defs.*.(@id==paintID);
+							if(paint && paint.length()){
+								for each(var stop in paint[0].stop){
+									var stopColor=new ext.Color(
+										String(stop['@stop-color'])
+									);
+									if(stop.hasOwnProperty('@stop-opacity')){
+										stopColor.amount[3]=Number(stop['@stop-opacity'])*255;
+									}else{
+										stopColor.amount[3]=255;
+									}
+									var newColor=color.transform(stopColor);
+									stop['@stop-color']=newColor.hex;
+									stop['@stop-opacity']=newColor.opacity;
+								}
+							}
+						}else if(paintStr[0]=='#'){
+							var newColor=new ext.Color(paintStr);
+							if(xml.hasOwnProperty('@'+paintProperties[i]+'-opacity')){
+								newColor.amount[3]=Number(xml['@'+paintProperties[i]+'-opacity'])*255;
+							}else{
+								newColor.amount[3]=255;
+							}
+							newColor=color.transform(newColor);
+							xml['@'+paintProperties[i]]=newColor.hex;
+							xml['@'+paintProperties[i]+'-opacity']=newColor.opacity;
+						}
+					}
+				}
+				if(!painted && !xml.*.length()){
+					var f=this._getFilters(
+						null,{color:color},defs
+					);
+					if(xml.hasOwnProperty('@filter') && filter){
+						for each(var fe in defs.filter.(@id==f).*){
+							filter.appendChild(fe);	
+						}
+					}else{
+						xml.@filter=f;
+					}
+				}
 			}
 			for each(var element in xml.*){
-				if(color){
-					var paintProperties=['fill','stroke'];
-					for(var i=0;i<paintProperties.length;i++){
-						if(element.hasOwnProperty('@'+paintProperties[i])){
-							var paintStr=String(element['@'+paintProperties[i]]);
-							var paintID=paintStr.match(/(?:url\(#)(.*?)(?:\))/);
-							if(paintID && paintID.length>1){
-								paintID=paintID[1];
-								var paint=defs.*.(@id==paintID);
-								if(paint && paint.length()){
-									for each(var stop in paint[0].stop){
-										var newColor=new ext.Color(
-											String(stop['@stop-color'])
-										);
-										if(stop.hasOwnProperty('@stop-color')){
-											newColor.opacity=Number(stop['@stop-opacity']);
-										}else{
-											newColor.opacity=1;
-										}
-										newColor=color.transform(newColor);
-										stop['@stop-color']=newColor.hex;
-										stop['@stop-opacity']=newColor.opacity;
-									}
-								}
-							}else if(paintStr[0]=='#'){
-								var newColor=new ext.Color(paintStr);
-								if(element.hasOwnProperty('@'+paintProperties[i]+'-opacity')){
-									newColor.opacity=Number(element['@'+paintProperties[i]+'-opacity']);
-								}else{
-									newColor.opacity=1;
-								}
-								newColor=color.transform(newColor);
-								element['@'+paintProperties[i]]=newColor.hex;
-								element['@'+paintProperties[i]+'-opacity']=newColor.opacity;
-							}
-						}
+				this._applyColorEffects(element,defs,color);
+			}
+		},
+		_colorFromEffect:function(filter){
+			var feAmount=filter.feComponentTransfer.(@result=='colorEffect_amount');
+			var fePercent=filter.feColorMatrix.(@result=='colorEffect_percent');
+			if(!(feAmount.length() || fePercent.length())){
+				return;
+			}
+			var color=new ext.Color([0,0,0,0]);
+			var n=0;
+			if(feAmount.length()){
+				n+=1;
+				feAmount=feAmount[feAmount.length()-1];
+				if(feAmount.feFuncR.length()){
+					if(feAmount.feFuncR.hasOwnProperty('@intercept')){
+						color.amount[0]=Number(feAmount.feFuncR.@intercept)*255;
 					}
 				}
-				if(element.*.length()>0){
-					this._applyColorEffects(element,defs,color);
+				if(feAmount.feFuncG.length()){
+					if(feAmount.feFuncG.hasOwnProperty('@intercept')){
+						color.amount[1]=Number(feAmount.feFuncG.@intercept)*255;
+					}
+				}
+				if(feAmount.feFuncB.length()){
+					if(feAmount.feFuncB.hasOwnProperty('@intercept')){
+						color.amount[2]=Number(feAmount.feFuncB.@intercept)*255;
+					}
+				}
+				if(feAmount.feFuncA.length()){
+					if(feAmount.feFuncA.hasOwnProperty('@intercept')){
+						color.amount[3]=Number(feAmount.feFuncA.@intercept)*255;
+					}
 				}
 			}
+			if(fePercent.length()){
+				n+=1;
+				fePercent=fePercent[fePercent.length()-1];
+				var values=String(fePercent.@values).match(/[\d\.\-]*\d/g);
+				if(values.length>16){
+					color.percent[0]=values[0]*100;
+					color.percent[1]=values[6]*100;
+					color.percent[2]=values[12]*100;
+					color.percent[3]=values[18]*100;
+				}
+			}
+			return color;
 		},
 		_transformFilter:function(matrix,element,defs){
 			defs=defs||element.defs;
@@ -495,56 +535,27 @@
 				){
 					var filter=defs.filter.(@id==filterID[1]);
 					if(filter && filter.length()){
-						var marginLeft,marginRight,marginTop,marginBottom;
-						marginLeft=marginRight=marginTop=marginBottom=0;
+						var sx=matrix.scaleX;
+						var sy=matrix.scaleY;
 						for each(var primitive in filter[0].*){
 							switch(primitive.localName()){
 								case "feGaussianBlur":
 									var blur=new ext.Point(String(primitive.@stdDeviation));
-									marginLeft+=blur.x/2;
-									marginRight+=blur.x/2;
-									marginTop+=blur.y/2;
-									marginBottom+=blur.y/2;
 									primitive.@stdDeviation=[
-										blur.x*matrix.scaleX,
-										blur.y*matrix.scaleY
+										blur.x*sx,
+										blur.y*sy
 									].join(' ');
 									break;
 							}
-						}
-						var newMarginLeft,newMarginRight,newMarginTop,newMarginBottom;
-						newMarginLeft=marginLeft/matrix.scaleX;
-						newMarginRight=marginRight/matrix.scaleX;
-						newMarginTop=marginTop/matrix.scaleY;
-						newMarginBottom=marginBottom/matrix.scaleY;
-						var topLeft=new ext.Point({
-							x:Number(
-								filter[0].@x
-							),
-							y:Number(
-								filter[0].@y
-							)
-						}).transform(
-							matrix
-						);
-						var bottomRight=new ext.Point({
-							x:(
-								Number(filter[0].@x)+
-								Number(filter[0].@width)
-							),
-							y:(
-								Number(filter[0].@y)+
-								Number(filter[0].@height)
-							)
-						}).transform(
-							matrix
-						);
-						
-						// filter is overly large to accomodate Illustrator / Browser discrepancies
-						filter.@x=-newMarginLeft;
-						filter.@y=-newMarginTop;
-						filter.@width=bottomRight.x+newMarginRight+newMarginLeft;
-						filter.@height=bottomRight.y+newMarginBottom+newMarginTop;						
+						}			
+						var x=parseFloat(filter.@x);
+						var y=parseFloat(filter.@y);
+						var width=parseFloat(filter.@width);
+						var height=parseFloat(filter.@height);
+						filter.@x=String(x/(1-sx))+'%';
+						filter.@y=String(y/(1-sy))+'%';
+						filter.@width=String(100+(width-100)/(1-sx))+'%';
+						filter.@height=String(100+(height-100)/(1-sy))+'%';						
 					}								
 				}
 			}
@@ -582,6 +593,7 @@
 			ext.doc.selectNone(); // selection slows performance & can cause crashes
 			this.xml=new XML('<svg xmlns:xlink="http://www.w3.org/1999/xlink"/>');
 			this.xml['@id']=this.id;
+			this.xml['@image-rendering']='optimizeSpeed';
 			this.xml['@baseProfile']=this.baseProfile;
 			this.xml['@version']=this.version;
 			this.xml['@style']="background-color:"+this.backgroundColor;
@@ -681,7 +693,9 @@
 			for(var i=0;i<documents.length;i++){
 				if(this.expandSymbols && this.expandSymbols!='None'){ // expand symbol instances
 					if(this.expandSymbols=='Nested'){
-						this.expandUse(documents[i].defs.symbol);
+						for each(var symbol in documents[i].defs.symbol){
+							this.expandUse(symbol,true,documents[i].defs);
+						}
 					}else{
 						this.expandUse(documents[i]);
 					}
@@ -783,13 +797,13 @@
 					continue;
 				}
 				var id=String(useNode['@xlink-href']).slice(1);
-				var symbol=defs.symbol.(@id==id)[0];
+				var symbol=defs.symbol.(@id==id)[0].copy();
 				if(recursive){
-					this.expandUse(symbol,recursive,defs);
+					symbol=this.expandUse(symbol,recursive,defs);
 				}
 				useNode.setName('g');
 				for each(var child in symbol.*){
-					useNode.appendChild(child.copy());
+					useNode.appendChild(child);
 				}
 				useNode['@id']=this._uniqueID(String(symbol['@id'])+'_1');
 				delete useNode['@xlink-href'];
@@ -808,23 +822,21 @@
 						var oldID=String(node.@mask).match(/(?:url\(#)(.*?)(?:\))/);
 						if(oldID && oldID.length>1){
 							var newID=this._uniqueID(oldID[1]);
-							useNode.(@id==oldID).@id=newID;
+							useNode.(@id==oldID[1]).@id=newID;
 							node.@mask='url(#'+newID+')';
 						}
 					}
-					if(this.applyTransformations){
-						for each(var attr in node.@*){
-							if(attr.name()!='id'){
-								var ida=String(attr).match(/(?:url\(#)(.*?)(?:\))/);
-								if(ida && ida.length>1){
-									var origDef=defs.*.(@id==ida[1]);
-									if(origDef && origDef.length()){
-										var newDef=origDef[0].copy();
-										var newID=this._uniqueID(ida[1]);
-										newDef.@id=newID;
-										node['@'+attr.name()]='url(#'+newID+')';
-										defs.appendChild(newDef);
-									}
+					for each(var attr in node.@*){
+						if(attr.name()!='id'){
+							var ida=String(attr).match(/(?:url\(#)(.*?)(?:\))/);
+							if(ida && ida.length>1){
+								var origDef=defs.*.(@id==ida[1]);
+								if(origDef && origDef.length()){
+									var newDef=origDef[0].copy();
+									var newID=this._uniqueID(ida[1]);
+									newDef.@id=newID;
+									node['@'+attr.name()]='url(#'+newID+')';
+									defs.appendChild(newDef);
 								}
 							}
 						}
@@ -834,6 +846,7 @@
 			if( rootIsUse && recursive ){
 				this.expandUse( xml,recursive,defs );
 			}
+			return xml;
 		},
 		/**
 		 * Deletes unreferenced defs.
@@ -848,7 +861,12 @@
 			var references=xml.defs.*.copy();
 			delete xml.defs.*;
 			for each(var def in references){
-				if(refs.indexOf(String(def.@id))>=0){
+				if(
+					refs.indexOf(String(def.@id))>=0 && (
+						def.localName()!='filter' ||
+						def.*.length()>0
+					)
+				){
 					xml.defs.appendChild(def);
 				}
 			}
@@ -1321,26 +1339,37 @@
 					 * the proper behavior
 					 */
 					var filtered;
+					var isMasked=false;
 					if(layer.layerType=='mask'){
 						var colorX=null;
 						if(this.maskingType=='Alpha'){
 							colorX=new ext.Color('#FFFFFF00');
 						}else if(this.maskingType=='Clipping'){
 							colorX=new ext.Color('#FFFFFF00');
-							colorX.percent[3]=999999999999999999999999999999999999999999999999;							
+							colorX.percent[3]=999999999999999;						
 						};
 						layerXML=<mask id={id}/>;
 						if(colorX){
 							filtered=<g id={this._uniqueID('g')} />;
 							layerXML.appendChild(filtered);
-							filtered.@filter="url(#"+this._getFilters(
+							var f=this._getFilters(
 								null,{
 									color:colorX,
 									boundingBox:boundingBox
 								}
-							)+")";  
+							);
+							if(f){
+								filtered.@filter="url(#"+f+")";
+							}
 						}
-					}else if(layer.layerType=='masked'){
+					}else if(
+						layer.layerType=='masked' && (
+							layer.parentLayer && 
+							(layer.parentLayer.visible || this.includeHiddenLayers) &&
+							(layer.parentLayer.layerType!='guide' || this.includeGuides)
+						)
+					){
+						isMasked=true;
 						layerXML=new XML('<g id="'+id+'" />');
 					}else{
 						layerXML=new XML('<g id="'+id+'" />');
@@ -1378,7 +1407,7 @@
 					 * Masked layers are grouped together and inserted after
 					 * the mask.
 					 */
-					if(layer.layerType=='masked'){  // 
+					if(isMasked){  // 
 						masked.push(layerXML);
 					}else if(layerXML){
 						xml.appendChild(layerXML);
@@ -1461,7 +1490,7 @@
 			settings.frame=instance.getCurrentFrame(settings.frame);
 			var xml=this._getTimeline(instance.timeline,settings);
 			var filterID=this._getFilters(instance,options);
-			if(filterID){
+			if(filterID && this.xml.defs.filter.(@id==filterID).length()){
 				xml['@filter']='url(#'+filterID+')';
 			}
 			if(ext.log){
@@ -1469,7 +1498,8 @@
 			}
 			return xml;
 		},
-		_getFilters:function(element,options){
+		_getFilters:function(element,options,defs){
+			defs=defs||this.xml.defs;
 			var settings=new ext.Object({
 				frame:0,
 				color:undefined,
@@ -1487,22 +1517,28 @@
 			);
 			var color=(
 				settings.color ?
-				new ext.Color(settings.color) :
-				new ext.Color(element)
+				new ext.Color(settings.color) : (
+					element?
+					new ext.Color(element):
+					undefined
+				)
 			);
 			if(
 				(
-					( (element?element.colorMode!='none':false) || settings.color ) &&
+					color &&
 					( !color.amount.is([0,0,0,0]) || !color.percent.is([100,100,100,100]) )
 				) || filters.length
 			){
 				var src="SourceGraphic";
 				filterID=this._uniqueID('filter');
-				filter=new XML('<filter id="'+filterID+'"/>');
-				filter.@filterUnits="userSpaceOnUse";
+				filter=new XML('<filter id="'+filterID+'"/>');				
 				var boundingBox=(
 					settings.boundingBox ||
-					element.objectSpaceBounds
+					(
+						element?
+						element.objectSpaceBounds:
+						null
+					)
 				);
 				if(
 					element &&
@@ -1553,18 +1589,15 @@
 								var feFuncR=<feFuncR id={this._uniqueID('feFuncR')} />;
 								var feFuncG=<feFuncG id={this._uniqueID('feFuncG')} />;
 								var feFuncB=<feFuncB id={this._uniqueID('feFuncB')} />;
-								feFuncR.@type=feFuncG.@type=feFuncB.@type="gamma";
-								feFuncR.@amplitude=feFuncG.@amplitude=feFuncB.@amplitude=(
+								feFuncR.@type=feFuncG.@type=feFuncB.@type="linear";
+								feFuncR.@slope=feFuncG.@slope=feFuncB.@slope=(
 									(
 										1+
 										Math.max(brightness*2,0)+
 										Math.min(brightness*.5,0)
 									)
 								);
-								feFuncR.@exponent=feFuncG.@exponent=feFuncB.@exponent=(
-									1
-								);
-								feFuncR.@offset=feFuncG.@offset=feFuncB.@offset=(
+								feFuncR.@intercept=feFuncG.@intercept=feFuncB.@intercept=(
 									brightness/8
 								);
 								feComponentTransfer_brightness.appendChild(feFuncR);
@@ -1582,18 +1615,15 @@
 								var feFuncR=<feFuncR id={this._uniqueID('feFuncR')} />;
 								var feFuncG=<feFuncG id={this._uniqueID('feFuncG')} />;
 								var feFuncB=<feFuncB id={this._uniqueID('feFuncB')} />;
-								feFuncR.@type=feFuncG.@type=feFuncB.@type="gamma";
-								feFuncR.@amplitude=feFuncG.@amplitude=feFuncB.@amplitude=(
+								feFuncR.@type=feFuncG.@type=feFuncB.@type="linear";
+								feFuncR.@slope=feFuncG.@slope=feFuncB.@slope=(
 									(
 										1+
 										Math.max(contrast*4,0)+
 										Math.min(contrast,0)
 									)
 								);
-								feFuncR.@exponent=feFuncG.@exponent=feFuncB.@exponent=(
-									1
-								);
-								feFuncR.@offset=feFuncG.@offset=feFuncB.@offset=(
+								feFuncR.@intercept=feFuncG.@intercept=feFuncB.@intercept=(
 									-Math.min(contrast/16,0)
 									-Math.max(contrast/8,0)
 								);
@@ -1634,15 +1664,17 @@
 								f.blurX!=0 ||
 								f.blurY!=0
 							){
+								var sx=element.matrix.scaleX;
+								var sy=element.matrix.scaleY;
 								var feGaussianBlur=<feGaussianBlur id={this._uniqueID('feGaussianBlur')} />;
-								feGaussianBlur.@stdDeviation=[f.blurX*2,f.blurY*2].join(' ');
+								feGaussianBlur.@stdDeviation=[f.blurX*2/sx,f.blurY*2/sy].join(' ');
 								feGaussianBlur['@in']=src;
 								feGaussianBlur.@result=src=prefix+'feGaussianBlur';
 								filter.appendChild(feGaussianBlur);
-								leftMargin=f.blurX*4>leftMargin?f.blurX*4:leftMargin;
-								rightMargin=f.blurX*4>rightMargin?f.blurX*4:rightMargin;
-								topMargin=f.blurY*4>topMargin?f.blurY*4:topMargin;
-								bottomMargin=f.blurY*4>bottomMargin?f.blurY*4:bottomMargin;
+								leftMargin+=f.blurX*4/sx;
+								rightMargin+=f.blurX*4/sx;
+								topMargin+=f.blurY*4/sy;
+								bottomMargin+=f.blurY*4/sy;
 							}
 							break;
 						case "dropShadowFilter":
@@ -1655,10 +1687,15 @@
 							break;
 					}
 				}
-				filter.@width=(boundingBox.right-boundingBox.left)+leftMargin+rightMargin;
-				filter.@height=(boundingBox.bottom-boundingBox.top)+topMargin+bottomMargin;
-				filter.@x=boundingBox.left-leftMargin;
-				filter.@y=boundingBox.top-topMargin;
+				filter.@filterUnits="objectBoundingBox";
+				var width=(1+(leftMargin+rightMargin)/(boundingBox.right-boundingBox.left))*100;
+				var height=(1+(topMargin+bottomMargin)/(boundingBox.bottom-boundingBox.top))*100;
+				var x=(-leftMargin/(boundingBox.right-boundingBox.left))*100;
+				var y=(-topMargin/(boundingBox.bottom-boundingBox.top))*100;
+				filter.@width=String(width)+'%';
+				filter.@height=String(height)+'%';
+				filter.@x=String(x)+'%';
+				filter.@y=String(y)+'%';
 				if((element?element.colorMode!='none':false) || settings.color){
 					if(!color.percent.is([100,100,100,100])){
 						feColorMatrix=<feColorMatrix id={this._uniqueID('feColorMatrix')} />;
@@ -1678,25 +1715,15 @@
 						feComponentTransfer['@in']=src;
 						feComponentTransfer.@result=src='colorEffect_amount';
 						var feFuncR=<feFuncR id={this._uniqueID('feFuncR')} />;
-						feFuncR.@type="gamma";
-						feFuncR.@amplitude="1";
-						feFuncR.@exponent="1";
-						feFuncR.@offset=color.amount[0]/255;
 						var feFuncG=<feFuncG id={this._uniqueID('feFuncG')} />;
-						feFuncG.@type="gamma";
-						feFuncG.@amplitude="1";
-						feFuncG.@exponent="1";
-						feFuncG.@offset=color.amount[1]/255;
 						var feFuncB=<feFuncB id={this._uniqueID('feFuncB')} />;
-						feFuncB.@type="gamma";
-						feFuncB.@amplitude="1";
-						feFuncB.@exponent="1";
-						feFuncB.@offset=color.amount[2]/255;
 						var feFuncA=<feFuncA id={this._uniqueID('feFuncA')} />;
-						feFuncA.@type="gamma";
-						feFuncA.@amplitude="1";
-						feFuncA.@exponent="1";
-						feFuncA.@offset=color.amount[3]/255;
+						feFuncR.@type=feFuncG.@type=feFuncB.@type=feFuncA.@type="linear";
+						feFuncR.@slope=feFuncG.@slope=feFuncB.@slope=feFuncA.@slope=1;
+						feFuncR.@intercept=color.amount[0]/255;
+						feFuncG.@intercept=color.amount[1]/255;
+						feFuncB.@intercept=color.amount[2]/255;
+						feFuncA.@intercept=color.amount[3]/255;
 						feComponentTransfer.appendChild(feFuncR);
 						feComponentTransfer.appendChild(feFuncG);
 						feComponentTransfer.appendChild(feFuncB);
@@ -1705,8 +1732,8 @@
 					}
 				}
 			}
-			if(filter && filterID){
-				this.xml.defs.appendChild(filter);
+			if(filter && filterID && filter.*.length()){
+				defs.appendChild(filter);
 				return filterID;
 			}
 		},
@@ -2162,7 +2189,7 @@
 						stop['@stop-color']=c.hex;
 						stop['@stop-opacity']=c.opacity;
 						if(i<fillObj.posArray.length){
-							stop['@offset']=String(Math.roundTo((fillObj.posArray[i]/255.0)*100,this.decimalPointPrecision))+'%';
+							stop['@offset']=String(Math.roundTo((fillObj.posArray[i]/255.0),this.decimalPointPrecision+2));
 						}
 						xml.appendChild(stop);
 					}

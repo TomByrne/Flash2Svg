@@ -3,9 +3,10 @@
  * EXTENSIBLE : A javascript Framework for extending Flash.
  */
 
-(function(ext){
-	if(ext){
-		ext.builderURI=fl.scriptURI;
+(function(dom){
+	var storeURI=true;
+	if(dom.extensible){
+		dom.extensible.builderURI=fl.scriptURI;
 	}
 	function copy(source,destination){
 		var success=true;
@@ -29,6 +30,30 @@
 				var moveDir=destination.replace(/\/?[^\/]*?$/g,"");
 				if(!FLfile.exists(moveDir)){
 					success=FLfile.createFolder(moveDir);
+				}
+				if(storeURI){
+					var fileName=source.split('/').pop();
+					var builderXML,scriptXML;
+					if(FLfile.exists(moveDir+'/'+'.builders')){
+						builderXML=new XML(FLfile.read(moveDir+'/'+'.builders'));
+						if(builderXML && builderXML.length()){
+							try{
+								scriptXML=builderXML.script.(@file==fileName);
+								if(scriptXML && scriptXML.length()){
+									delete builderXML.script.(@file==fileName);
+								}
+							}catch(e){
+								delete builderXML.script;
+							}
+						}else{
+							builderXML=<builders />;
+						}
+					}else{
+						builderXML=<builders />;
+					}
+					scriptXML=<script type="text/jsfl" builder={fl.scriptURI} file={fileName} />;
+					builderXML.appendChild(scriptXML);
+					FLfile.write(moveDir+'/'+'.builders',builderXML.toXMLString());
 				}
 				if(success){
 					success=FLfile.copy(source,destination);
@@ -92,4 +117,4 @@
 			}
 		}
 	}
-})(this.extensible)
+})(this)

@@ -1,9 +1,9 @@
 (function(ext){
 	/**
-	 * @classDescription A utility class for translating and manipulating colors and color effects.
-	 * Can take as parameters a hex string ( with or without alpha ), a symbol instance, a contour, a 
-	 * shape ( it will use the first fill in the shape ), a fill, or up to 4 Numbers representing red, green,
-	 * blue, and alpha values from 0 to 255.
+	 * A utility class for translating, manipulating, and combining colors and color effects.
+	 * Can take as parameters a 3 or 4 digit hexadecimal value ( rgb & rgba ), a symbol instance ( extracted from
+	 * the symbols colorEffect ), a Contour, a Fill, a Shape ( it will use the Fill from the first Contour in the shape ),
+	 * or up to 4 Numbers representing red, green, blue, and alpha values from 0 to 255.
 	 * @param {
 	 * 		Fill,
 	 * 		Shape,
@@ -33,7 +33,9 @@
 			if(typeof args[0]=='string'){
 				this.hex=args[0];
 			}else if(args[0] instanceof this.type){
-				ext.Object.apply(this,args);
+				ext.Object.apply(this,args,1);
+				this.amount=new ext.Array(args[0].amount);
+				this.percent=new ext.Array(args[0].percent);
 			}else if(args[0] instanceof ext.Contour){
 				this.hex=args[0].fill.color;
 			}else if(args[0] instanceof ext.Fill){
@@ -41,7 +43,10 @@
 			}else if(args[0] instanceof ext.Element){
 				if(args[0] instanceof ext.Shape){
 					this.hex=args[0].contours[0].fill.color;
-				}else if(args[0] instanceof ext.SymbolInstance){
+				}else if(
+					args[0] instanceof ext.SymbolInstance && 
+					args[0].colorMode!='none'
+				){
 					var rgba=[
 						'colorRedAmount',
 						'colorGreenAmount',
@@ -124,7 +129,6 @@
 				var indexB=Math.floor(c[i]-(16.0*indexA));
 				hex.push(hexDigit[indexA]);
 				hex.push(hexDigit[indexB]);
-				
 			}
 			return hex.join('');
 		},
@@ -181,7 +185,7 @@
 			return this.alpha;
 		},
 		get opacity(){
-			return this.output[3]/255.0;
+			return this.alpha/255.0;
 		},
 		set opacity(value){
 			this.amount[3]=value*255.0;
@@ -189,34 +193,20 @@
 		},
 		transform:function(color){
 			color=new this.type(color);
-			if(this.percent[0]){
-				color.amount[0]+=this.amount[0]/(this.percent[0]/100);
-				color.percent[0]*=this.percent[0]/100;
-			}else{
-				color.amount[0]=this.amount[0];
+			for(var i=0;i<4;i++){
+				color.amount[i]=(
+					(
+						color.percent[i]?
+						color.amount[i]:
+						color.amount[i]
+					)+(
+						this.percent[i]?
+						this.amount[i]/(this.percent[i]/100):
+						this.amount[i]
+					)
+				);
+				color.percent[i]*=(this.percent[i]/100);
 			}
-			if(this.percent[1]){
-				color.amount[1]+=this.amount[1]/(this.percent[1]/100);
-				color.percent[1]*=this.percent[1]/100;
-			}else{
-				color.amount[1]=this.amount[1];
-			}
-			if(this.percent[2]){
-				color.amount[2]+=this.amount[2]/(this.percent[2]/100);
-				color.percent[2]*=this.percent[2]/100;
-			}else{
-				color.amount[2]=this.amount[2];
-			}
-			if(this.percent[3]){
-				color.amount[3]+=this.amount[3]/(this.percent[3]/100);
-				color.percent[3]*=this.percent[3]/100;
-			}else{
-				color.amount[3]=this.amount[3];
-			}
-			/*for(var i=0;i<4;i++){
-				color.amount[i]=Math.min(color.amount[i],255);
-				color.amount[i]=Math.max(color.amount[i],0);
-			}*/
 			return color;
 		},
 		get idString(){
@@ -241,6 +231,15 @@
 		set idString(){},
 		toString:function(){
 			return this.getHex(true);	
+		},
+		is:function(color){
+			if(!(color instanceof this.type)){
+				color=new this.type(color);
+			}
+			return(
+				this.amount.is(color.amount) &&
+				this.percent.is(color.percent)
+			);
 		}
 	};
 	ext.extend({

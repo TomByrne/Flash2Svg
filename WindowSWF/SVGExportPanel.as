@@ -603,10 +603,10 @@
 			xml['swfPanelName']='SVG';
 			if(this.dev){
 				MMExecute([
-					'fl.runScript(fl.configURI+"Javascript/Extensible/init.jsfl");',
-					'if(extensible.builderURI){',
-					'	fl.runScript(extensible.builderURI)',
-					'}'
+					'if(extensible && extensible.builderURI){',
+					'	fl.runScript(extensible.builderURI);',
+					'}',
+					'fl.runScript(fl.configURI+"Javascript/Extensible/init.jsfl");'
 				].join('\n'));
 			}
 			var cmd=[

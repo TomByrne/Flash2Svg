@@ -3,10 +3,8 @@
 	 * @this extensible.Object
 	 * @extends Object
 	 * @constructor
-	 * @parameter {Object} obj A native object.
-	 * @parameter {Number,Boolean} recursive If true, converts descendant Objects
-	 * to class extensible.Object, and converts descendant Arrays to class extensible.Array.
-	 * If a Number is passed, converts descendants up to the [recursive] generation. 
+	 * @parameter {Object} obj
+	 * @parameter {Number,Boolean} recursive If recursive>0, descendant Arrays & Objects are converted ( to the nth recursion if recursive is a Number ).
 	 */
 	function ExtensibleObject(obj,recursive){
 		if(obj){
