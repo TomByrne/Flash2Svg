@@ -7,4 +7,5 @@
   <fillGaps>false</fillGaps>
   <knockoutBackgroundColor>false</knockoutBackgroundColor>
   <convertTextToOutlines>true</convertTextToOutlines>
+  <convertPatternsToSymbols>true</convertPatternsToSymbols>
 </Settings>

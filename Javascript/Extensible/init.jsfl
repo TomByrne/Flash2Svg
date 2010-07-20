@@ -152,40 +152,6 @@
 				delete this.log;
 			}
 		},
-		buildExtension:function(options){
-			var settings=new this.Object({
-				name:undefined,
-				commands:undefined,
-				modules:undefined
-			});
-			settings.extend(options);
-			var url=this.dir+"/"+settings.name+'.mxi';
-			var xmlString=FLfile.read(url);
-			var header=/<\?xml.*?\?>/.exec(xmlString);
-			var xmlString;
-			if(header.length){
-				header=header[0];
-				xmlString=xmlString.replace(header,'');
-			}else{
-				header='';	
-			}
-			var xml=new XML(xmlString);
-			delete xml.files.file;
-			var modules=settings.modules||this._modules;
-			for(var i=0;i<settings.commands.length;i++){
-				var x=new XML('<file/>');
-				x['@source']='Commands/'+settings.commands[i]+'.jsfl';
-				x['@destination']='$flash/Commands';
-				xml.files.appendChild(x);
-			}			
-			for(var i=0;i<modules.length;i++){
-				var x=new XML('<file/>');
-				x['@source']=modules[i]+'.jsfl';
-				x['@destination']='$flash/Javascript/Extensible';
-				xml.files.appendChild(x);
-			}
-			FLfile.write(this.dir+"/"+settings.name+'.mxi',header+'\n'+xml.toXMLString());
-		},
 		warn:function(warning){
 			var message='Warning: '+warning;
 			if(this.warnings){
@@ -229,6 +195,7 @@ extensible.load(
 		'Timeline',
 		'Selection',
 		'LibraryItem',
+		'BitmapItem',
 		'FolderItem',
 		'SymbolItem',
 		'Library',

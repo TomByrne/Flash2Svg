@@ -129,6 +129,10 @@
 				Event.CHANGE,
 				setOptionsToCustom
 			);
+			this.controls.convertPatternsToSymbolsCheckBox.addEventListener(
+				Event.CHANGE,
+				setOptionsToCustom
+			);
 			this.scrollBar.addEventListener(
 				ScrollEvent.SCROLL,
 				scroll
@@ -184,7 +188,7 @@
 		
 		private function browseForFile(e:MouseEvent){
 			var fileURI:String=MMExecute('fl.browseForFileURL("save","Export")');
-			var filePath:String=MMExecute('FLfile.uriToPlatformPath("'+fileURI+'").relativeToDocument');
+			var filePath:String=MMExecute('"'+fileURI+'".relativeToDocument');
 			this.controls.fileTextInput.text=filePath;
 		}
 		
@@ -198,7 +202,7 @@
 				if(MMExecute('extensible.doc.documentHasData("SVGExportPath")')=='true'){
 					this.controls.fileTextInput.text=MMExecute('extensible.doc.getDataFromDocument("SVGExportPath")');
 				}else if(MMExecute('extensible.doc.pathURI')!=='undefined'){
-					this.controls.fileTextInput.text=MMExecute('FLfile.uriToPlatformPath(extensible.doc.pathURI.stripExtension())')+'.svg';
+					this.controls.fileTextInput.text=MMExecute('extensible.doc.pathURI.relativeToDocument.stripExtension()')+'.svg';
 				}else{
 					this.controls.fileTextInput.text=MMExecute('extensible.doc.name.stripExtension()')+'.svg';
 				}
@@ -520,7 +524,7 @@
 		{
 			var controlList=[
 				'maskingType','curveDegree','expandSymbols','applyTransformations','decimalPointPrecision',
-				'fillGaps','knockoutBackgroundColor','convertTextToOutlines'
+				'fillGaps','knockoutBackgroundColor','convertTextToOutlines','convertPatternsToSymbols'
 			];
 			if(includeFileSpecificSettings){
 				controlList.push(

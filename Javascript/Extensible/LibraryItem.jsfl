@@ -31,7 +31,7 @@
 			return this.$.hasData(name);
 		},
 		removeData:function(name){
-			return this.$.removeData(name);	
+			return this.$.removeData(name);
 		},
 		get itemType(){
 			return this.$.itemType;	

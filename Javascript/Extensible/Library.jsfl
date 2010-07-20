@@ -35,6 +35,9 @@
 		findItemIndex:function(namePath){
 			return this.$.findItemIndex(namePath);
 		},
+		getItem:function(namePath){
+			return this.items[this.findItemIndex(namePath)];;
+		},
 		getItemProperty:function(property){
 			return this.$.getItemProperty(property);
 		},
@@ -49,6 +52,8 @@
 					item=new ext.FolderItem(items[i]);
 				}else if(items[i] instanceof SymbolItem){
 					item=new ext.SymbolItem(items[i]);
+				}else if(items[i] instanceof BitmapItem){
+					item=new ext.BitmapItem(items[i]);
 				}else{
 					item=new ext.LibraryItem(items[i]);
 				}
@@ -71,6 +76,8 @@
 					item=new ext.FolderItem(items[i]);
 				}else if(item instanceof SymbolItem){
 					item=new ext.SymbolItem(items[i]);
+				}else if(item instanceof BitmapItem){
+					item=new ext.BitmapItem(items[i]);
 				}else{
 					item=new ext.LibraryItem(items[i]);
 				}

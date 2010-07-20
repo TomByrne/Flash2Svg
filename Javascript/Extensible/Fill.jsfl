@@ -1,5 +1,6 @@
 (function(ext){
 	function ExtensibleFill(fill){
+		this.cache={};
 		var settings=new ext.Object({
 			style:'solid',
 			color:'#000000',

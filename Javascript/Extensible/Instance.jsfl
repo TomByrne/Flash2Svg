@@ -14,7 +14,7 @@
 			this.$.instanceType=s;
 		},
 		get libraryItem(){
-			return this.$.libraryItem;
+			return this.$.libraryItem;//new ext.LibraryItem
 		},
 		set libraryItem(s){
 			this.$.libraryItem=s;

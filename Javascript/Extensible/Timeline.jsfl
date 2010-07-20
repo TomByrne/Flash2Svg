@@ -175,7 +175,7 @@
 			return this.$.cutFrames(startFrameIndex,endFrameIndex);
 		},
 		deleteLayer:function(index){
-			return this.$.deleteLayer(index);
+			return this.$.deleteLayer.apply(this.$,arguments);
 		},
 		expandFolder:function(bExpand,bRecurseNestedParents,index){
 			return this.$.expandFolder(bExpand,bRecurseNestedParents,index);

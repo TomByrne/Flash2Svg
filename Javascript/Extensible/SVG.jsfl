@@ -20,6 +20,7 @@
 	function SVG(options){
 		this.DEFAULT_GRADIENT_LENGTH=819.2; // Pre-transformation length of ALL linear gradients in flash.
 		this.DEFAULT_GRADIENT_RADIUS=810.7; // Pre-transformation radius of ALL radial gradients in flash.
+		this.DEFAULT_BITMAP_SCALE=1/20;
 		this.MAX_INLINE_CALL_COUNT=2999; // Max recursions
 		this.IDENTITY_MATRIX='matrix(1 0 0 1 0 0)';
 		this.DOCUMENT_DATA='SVGExportOptions';
@@ -28,6 +29,7 @@
 			file:undefined,
 			decimalPointPrecision:3,
 			expandSymbols:'None', // 'Nested', 'All', 'None'
+			convertPatternsToSymbols:true,
 			applyTransformations:true,
 			applyColorEffects:true,
 			curveDegree:3,
@@ -35,6 +37,7 @@
 			frames:new ext.Array(),
 			startFrame:undefined,
 			endFrame:undefined,
+			animated:false,
 			timelines:new ext.Array([]),
 			backgroundColor:ext.doc.backgroundColor,
 			knockoutBackgroundColor:false,
@@ -77,7 +80,7 @@
 			this.file &&
 			!/^file\:/.test(this.file)
 		){
-			this.file=FLfile.platformPathToURI(this.file);
+			this.file=this.file.absoluteURI(ext.doc.pathURI.dir);			
 		}
 		if(this.frames=='Current'){
 			this.frames=new ext.Array([]);
@@ -95,6 +98,7 @@
 		this.swfPanel=ext.swfPanel(this.swfPanelName); // the swfPanel
 		this._timer=undefined;
 		this._symbols={};
+		this._bitmaps={};
 		this._rootItem={};
 		this._contourCPs=new ext.Object({}); // Holds edge point arrays used in filling gaps.
 		this._tempFolder=ext.lib.uniqueName('temp'); // Library folder holding temporary symbols.
@@ -104,7 +108,6 @@
 		this._minProgressIncrement=1; // Is later set to this._progressMax/this.MAX_INLINE_CALL_COUNT in order to prevent recursion
 		this._origSelection=new ext.Selection([]);
 		this._linearProcessing=true;//Boolean(this.swfPanel);//If true, a timeline is processed one level deep in it's entirety before progressing to descendants.
-		
 		if(this.startFrame!==undefined){
 			if(
 				this.endFrame==undefined ||
@@ -300,7 +303,7 @@
 											gtr=gmxString;
 										}
 										gradient['@gradientTransform']=gtr;
-									}else if(gradient.name()=='linearGradient'){
+									}else if(gradient.localName()=='linearGradient'){
 										var p1=new ext.Point({
 											x:Number(gradient['@x1']),
 											y:Number(gradient['@y1'])
@@ -315,6 +318,20 @@
 										gradient['@y1']=String(p1.y);
 										gradient['@x2']=String(p2.x);
 										gradient['@y2']=String(p2.y);
+									}else if(gradient.localName()=='pattern'){
+										var ptr=gradient.@patternTransform;
+										if(ptr){
+											ptr=String(ptr);
+											var pmxa=/matrix\(.*?\)/.exec(ptr);
+											if(pmxa && pmxa.length){
+												var pmx=new ext.Matrix(pmxa[0]);
+											}else{
+												pmx=new ext.Matrix();
+											}
+										}else{
+											pmx=new ext.Matrix();
+										}
+										gradient.@patternTransform=this._getMatrix(pmx.concat(nmx));
 									}
 								}
 							}
@@ -456,16 +473,25 @@
 						}
 					}
 				}
-				if(!painted && !xml.*.length()){
+				if(
+					!painted &&
+					xml.*.length()==(
+						xml.animate?xml.animate.length():0+
+						xml.animateMotion?xml.animateMotion.length():0+
+						xml.animateColor?xml.animateColor.length():0+
+						xml.animateTransform?xml.animateTransform.length():0
+					)
+				){
 					var f=this._getFilters(
 						null,{color:color},defs
 					);
+					
 					if(xml.hasOwnProperty('@filter') && filter){
 						for each(var fe in defs.filter.(@id==f).*){
 							filter.appendChild(fe);	
 						}
 					}else{
-						xml.@filter=f;
+						xml.@filter='url(#'+f+')';	
 					}
 				}
 			}
@@ -621,7 +647,7 @@
 					if(
 						this.timelines[i].matrix.is(new ext.Matrix()) &&
 						this.timelines.length==1 &&
-						this.timelines[i].frames.length==1
+						(this.timelines[i].frames.length==1 || this.animated)
 					){ // skip unnecessary identity matrix
 						for each(var e in x.*){
 							this.xml.appendChild(e);
@@ -689,13 +715,12 @@
 					throw new Error('Problem creating folder.');
 				}
 			}
+			
 			var writeSuccess=true;
 			for(var i=0;i<documents.length;i++){
 				if(this.expandSymbols && this.expandSymbols!='None'){ // expand symbol instances
 					if(this.expandSymbols=='Nested'){
-						for each(var symbol in documents[i].defs.symbol){
-							this.expandUse(symbol,true,documents[i].defs);
-						}
+						this.expandUse(documents[i],'nested',documents[i].defs);
 					}else{
 						this.expandUse(documents[i]);
 					}
@@ -710,10 +735,11 @@
 					var outputString=(
 						this.docString+
 						documents[i].toXMLString().replace(
-							/(<use.*?)xlink-href="#/g,
-							'$1xlink:href="#'
+							/(<[^>]*?)xlink-(.*?)="/g,
+							'$1xlink:$2="'
 						)
 					);
+					
 					if(documents.length==1){
 						success=FLfile.write(this.file,outputString);
 					}else{
@@ -736,7 +762,6 @@
 							if(!FLfile.exists(rDir)){
 								FLfile.createFolder(this.file+'/'+rDir);
 							}
-							
 						}
 						var outputPath=(
 							this.file+'/'+
@@ -793,11 +818,23 @@
 					)
 				)
 			){
-				if( useNode.name()!='use' || !useNode['@xlink-href'] ){
+				if( useNode.localName()!='use' || !useNode['@xlink-href'] ){
 					continue;
 				}
 				var id=String(useNode['@xlink-href']).slice(1);
-				var symbol=defs.symbol.(@id==id)[0].copy();
+				var symbol=defs.symbol.(@id==id);
+				if(
+					!symbol || 
+					!symbol.length() || (
+						recursive=='nested' && !(
+							symbol[0]..use && 
+							symbol[0]..use.length()
+						)
+					)
+				){
+					continue;
+				}
+				symbol=symbol[0].copy();
 				if(recursive){
 					symbol=this.expandUse(symbol,recursive,defs);
 				}
@@ -1043,7 +1080,7 @@
 				position:frame,
 				includeHiddenLayers:this.includeHiddenLayers,
 				includeGuides:this.includeGuides
-			});
+			});			
 			increments=ELEMENT_VALUE;
 			for(var k=0;k<frames.length;k++){
 				if(frames[k].tweenType!=='none'){
@@ -1531,7 +1568,7 @@
 			){
 				var src="SourceGraphic";
 				filterID=this._uniqueID('filter');
-				filter=new XML('<filter id="'+filterID+'"/>');				
+				filter=new XML('<filter id="'+filterID+'" />');			
 				var boundingBox=(
 					settings.boundingBox ||
 					(
@@ -1688,47 +1725,78 @@
 					}
 				}
 				filter.@filterUnits="objectBoundingBox";
-				var width=(1+(leftMargin+rightMargin)/(boundingBox.right-boundingBox.left))*100;
-				var height=(1+(topMargin+bottomMargin)/(boundingBox.bottom-boundingBox.top))*100;
-				var x=(-leftMargin/(boundingBox.right-boundingBox.left))*100;
-				var y=(-topMargin/(boundingBox.bottom-boundingBox.top))*100;
-				filter.@width=String(width)+'%';
-				filter.@height=String(height)+'%';
-				filter.@x=String(x)+'%';
-				filter.@y=String(y)+'%';
+				if(boundingBox){
+					var width=(1+(leftMargin+rightMargin)/(boundingBox.right-boundingBox.left))*100;
+					var height=(1+(topMargin+bottomMargin)/(boundingBox.bottom-boundingBox.top))*100;
+					var x=(-leftMargin/(boundingBox.right-boundingBox.left))*100;
+					var y=(-topMargin/(boundingBox.bottom-boundingBox.top))*100;
+					filter.@width=String(width)+'%';
+					filter.@height=String(height)+'%';
+					filter.@x=String(x)+'%';
+					filter.@y=String(y)+'%';
+				}else{
+					filter.@width='120%';
+					filter.@height='120%';
+					filter.@x='-10%';
+					filter.@y='-10%';
+				}
 				if((element?element.colorMode!='none':false) || settings.color){
-					if(!color.percent.is([100,100,100,100])){
-						feColorMatrix=<feColorMatrix id={this._uniqueID('feColorMatrix')} />;
-						feColorMatrix.@type="matrix";
-						feColorMatrix['@in']=src;
-						feColorMatrix.@values=[
-							color.percent[0]/100,0,0,0,0,
-							0,color.percent[1]/100,0,0,0,
-							0,0,color.percent[2]/100,0,0,
-							0,0,0,color.percent[3]/100,0
-						].join(' ');
-						feColorMatrix['@result']=src="colorEffect_percent";
-						filter.appendChild(feColorMatrix);
-					}
-					if(!color.amount.is([0,0,0,0])){
-						var feComponentTransfer=<feComponentTransfer id={this._uniqueID('feComponentTransfer')} />;
-						feComponentTransfer['@in']=src;
-						feComponentTransfer.@result=src='colorEffect_amount';
-						var feFuncR=<feFuncR id={this._uniqueID('feFuncR')} />;
-						var feFuncG=<feFuncG id={this._uniqueID('feFuncG')} />;
-						var feFuncB=<feFuncB id={this._uniqueID('feFuncB')} />;
-						var feFuncA=<feFuncA id={this._uniqueID('feFuncA')} />;
-						feFuncR.@type=feFuncG.@type=feFuncB.@type=feFuncA.@type="linear";
-						feFuncR.@slope=feFuncG.@slope=feFuncB.@slope=feFuncA.@slope=1;
-						feFuncR.@intercept=color.amount[0]/255;
-						feFuncG.@intercept=color.amount[1]/255;
-						feFuncB.@intercept=color.amount[2]/255;
-						feFuncA.@intercept=color.amount[3]/255;
-						feComponentTransfer.appendChild(feFuncR);
-						feComponentTransfer.appendChild(feFuncG);
-						feComponentTransfer.appendChild(feFuncB);
-						feComponentTransfer.appendChild(feFuncA);
-						filter.appendChild(feComponentTransfer);
+					if( // colorMode "tint"
+						color.percent[0]==color.percent[1]==color.percent[2] && 
+						color.percent[3]==100 &&
+						color.amount[3]==0 &&
+						false
+					){
+						/*
+						var tintSrc=src;
+						var tintOpacity=1-(color.percent[0]/100);
+						var tintColor=new ext.Color(color);
+						var tintColor.percent=[100,100,100,100];
+						var feFlood=<feFlood id={this._uniqueID('feFlood')} />;
+						feFlood['@flood-color']=tintColor.hex;
+						feFlood['@flood-opacity']=tintOpacity;
+						feColorMatrix['@result']=src="tint_feFlood";
+						filter.appendChild(feFlood);
+						var feComposite=<feComposite id={this._uniqueID('feComposite')} />;
+						feComposite.@operator=atop;
+						feComposite.@in=tintSrc;
+						feComposite.@in2=src;
+						feComposite.@result='tint_feComposite';
+						*/
+					}else{
+						if(!color.percent.is([100,100,100,100])){
+							feColorMatrix=<feColorMatrix id={this._uniqueID('feColorMatrix')} />;
+							feColorMatrix.@type="matrix";
+							feColorMatrix['@in']=src;
+							feColorMatrix.@values=[
+								color.percent[0]/100,0,0,0,0,
+								0,color.percent[1]/100,0,0,0,
+								0,0,color.percent[2]/100,0,0,
+								0,0,0,color.percent[3]/100,0
+							].join(' ');
+							feColorMatrix['@result']=src="colorEffect_percent";
+							filter.appendChild(feColorMatrix);
+						}
+						if(!color.amount.is([0,0,0,0])){
+							var feComponentTransfer=<feComponentTransfer id={this._uniqueID('feComponentTransfer')} />;
+							feComponentTransfer['@in']=src;
+							feComponentTransfer.@result=src='colorEffect_amount';
+							var feFuncR=<feFuncR id={this._uniqueID('feFuncR')} />;
+							var feFuncG=<feFuncG id={this._uniqueID('feFuncG')} />;
+							var feFuncB=<feFuncB id={this._uniqueID('feFuncB')} />;
+							var feFuncA=<feFuncA id={this._uniqueID('feFuncA')} />;
+							feFuncR.@type=feFuncG.@type=feFuncB.@type=feFuncA.@type="linear";
+							feFuncR.@slope=feFuncG.@slope=feFuncB.@slope=feFuncA.@slope=1;
+							feFuncR.@intercept=color.amount[0]/255;
+							feFuncG.@intercept=color.amount[1]/255;
+							feFuncB.@intercept=color.amount[2]/255;
+							feFuncA.@intercept=color.amount[3]/255;
+							feComponentTransfer.appendChild(feFuncR);
+							feComponentTransfer.appendChild(feFuncG);
+							feComponentTransfer.appendChild(feFuncB);
+							feComponentTransfer.appendChild(feFuncA);
+							filter.appendChild(feComponentTransfer);
+						}
 					}
 				}
 			}
@@ -1738,8 +1806,65 @@
 			}
 		},
 		_getBitmapInstance:function(bitmapInstance,options){
-			var id=this._uniqueID('bitmap');
-			return new XML('<g id="'+id+'" />');
+			var item=bitmapInstance.libraryItem;
+			var bitmapURI=this._getBitmapItem(item);
+			var xml=<image overflow='visible' id={this._uniqueID(item.name.basename.stripExtension())} />;
+			xml['@xlink-href']=bitmapURI;
+			var bits=bitmapInstance.getBits();
+			xml.@height=bitmapInstance.vPixels;
+			xml.@width=bitmapInstance.hPixels;
+			xml.@transform=this._getMatrix(bitmapInstance.matrix);
+			return xml;
+		},
+		_getBitmapItem:function(item){
+			var bitmapURI=this._bitmaps[item.name];
+			if(!bitmapURI){
+				if(this.timelines.length==1 && (this.timelines[0].frames.length==1 || this.animated)){
+					bitmapURI=this.file.dir+'/'+item.name.basename;
+				}else{
+					bitmapURI=this.file+'/'+item.name;
+					if(
+						FLfile.exists(this.file) &&
+						FLfile.getAttributes(this.file).indexOf("D")<0
+					){
+						FLfile.remove(this.file);
+					}
+					if(!FLfile.exists(this.file)){
+						FLfile.createFolder(this.file);
+					}
+				}
+				var ext=item.sourceFilePath.extension;
+				var re=new RegExp('\.'+ext+'$');
+				if(!re.test(bitmapURI)){
+					bitmapURI+='.'+ext;
+				}
+				var success,xml;
+				if(item.sourceFileExists && item.sourceFileIsCurrent){
+					if(!item.sourceFilePath==bitmapURI){
+						if(FLfile.exists(bitmapURI)){
+							FLfile.remove(bitmapURI);
+						}
+						success=FLfile.copy(item.sourceFilePath,bitmapURI);
+						if(!success){
+							FLfile.write(bitmapURI,FLfile.read(item.sourceFilePath));
+						}
+					}
+				}else if(FLfile.exists(bitmapURI)){
+					var uniqueFileName=bitmapURI.uniqueFileName;
+					item.exportToFile(uniqueFileName);
+					var compareStr=FLfile.read(bitmapURI);
+					if(FLfile.read(uniqueFileName)==FLfile.read(bitmapURI)){
+						FLfile.remove(uniqueFileName);
+					}else{
+						bitmapURI=uniqueFileName;
+					}
+				}else{
+					item.exportToFile(bitmapURI);	
+				}
+				bitmapURI=bitmapURI.relativeTo(this.file.dir);
+				this._bitmaps[item.name]=bitmapURI;
+			}
+			return bitmapURI;
 		},
 		/**
 		 * Retrieves svg data for a Shape Element.
@@ -1976,7 +2101,6 @@
 						fillString=String(fill['@solid-color']);
 						opacityString=String(fill['@solid-opacity']);
 					}else{
-						//fills.push(fill);
 						this.xml.defs.appendChild(fill)
 						fillString='url(#'+String(fill['@id'])+')';
 					}
@@ -2011,7 +2135,7 @@
 									idString+
 									xform+
 									'fill="none" '+
-									this._getStroke(stroke)+
+									this._getStroke(stroke,{shape:contour.shape})+
 									'd="'+this._getCurve(cp,false)+'" '+
 									'/>\n'
 								);
@@ -2247,7 +2371,36 @@
 					}
 					break;
 				case 'bitmap':
-					xml=new XML('<pattern/>');
+					xml=<pattern id={this._uniqueID('pattern')} />;
+					var image=<image id={this._uniqueID(fillObj.bitmapPath.basename)} />;
+					xml.@patternUnits=xml.@patternContentUnits='userSpaceOnUse';
+					var item=ext.lib.getItem(fillObj.bitmapPath);
+					var bitmapURI=this._getBitmapItem(item);
+					image['@xlink-href']=bitmapURI;
+					xml.@width=image.@width=item.width;
+					xml.@height=image.@height=item.height;
+					xml.@viewBox='0 0 '+String(xml.@width)+' '+String(xml.@height);
+					var fMatrix=new ext.Matrix(fillObj.matrix);
+					fMatrix.a*=this.DEFAULT_BITMAP_SCALE;
+					fMatrix.b*=this.DEFAULT_BITMAP_SCALE;
+					fMatrix.c*=this.DEFAULT_BITMAP_SCALE;
+					fMatrix.d*=this.DEFAULT_BITMAP_SCALE;
+					xml.@patternTransform=this._getMatrix(fMatrix);
+					if(this.convertPatternsToSymbols){
+						var symbol=<symbol id={this._uniqueID(fillObj.bitmapPath.basename+'_symbol')} />;
+						symbol.@viewBox=String(xml.@viewBox);
+						var use=<use id={this._uniqueID(fillObj.bitmapPath.basename+'_use')} />;
+						use.@width=String(image.@width);
+						use.@height=String(image.@height);
+						use.@x=use.@y=0;
+						use['@xlink-href']='#'+String(symbol.@id);
+						use.@externalResourcesRequired='true';
+						symbol.appendChild(image);
+						xml.appendChild(symbol);
+						xml.appendChild(use);
+					}else{
+						xml.appendChild(image);
+					}
 					break;
 				case 'solid':
 					var color=new ext.Color(fillObj.color);
@@ -2517,7 +2670,7 @@
 			}
 		},
 		toString:function(){
-			return this.docString+this.xml.toXMLString().replace(/(<use.*?)xlink-href="#/g,'$1xlink:href="#');
+			return this.docString+this.xml.toXMLString().replace(/(\<[^\>]*?)xlink\-(.*?)=/g,'$1xlink:$2=');
 		}
 	};
 	ext.extend({SVG:SVG});
