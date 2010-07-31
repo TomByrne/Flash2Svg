@@ -12,12 +12,12 @@ In order to remain unobtrusive, Extensible avoids modification of built-in's
 like Array and Object, instead appending new classes to the global object
 'extensible', usually aliased as 'ext' for brevity.
 
-The naming convention put each class in a file of the same name, so the
+The naming convention puta each class in a file of the same name, so the
 definition for 'extensible.Array' is located under
 'Javascript/Extensible/Array.jsfl'.
 
-The build script 'build.jsfl' references any '.mxi' files in the same directory,
-and pushes the associated files to all present flash installations for ease of testing.
+For testing & development, the script 'build.jsfl' at the root of the project
+will install/re-install all the extensions, from source, for all flash versions present.
 
 *Flash to SVG ( flash2svg ) *WIP
 

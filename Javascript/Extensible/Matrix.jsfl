@@ -36,32 +36,32 @@
 			);
 		},
 		concat:function(matrix){
-			//return new this.type(fl.Math.concatMatrix(this,new this.type(matrix)));
 			if(!(matrix)){
 				return this;
 			}
 			if(!(matrix instanceof this.type)){
 				matrix=new this.type(matrix);
 			}
-			return new this.type({
+			return new this.type(fl.Math.concatMatrix(this,new this.type(matrix)));
+			/*return new this.type({
 				a:(this.a*matrix.a)+(this.b*matrix.c),
 				b:(this.a*matrix.b)+(this.b*matrix.d),
 				c:(this.c*matrix.a)+(this.d*matrix.c),
 				d:(this.c*matrix.b)+(this.d*matrix.d),
 				tx:(this.tx*matrix.a)+(this.ty*matrix.c)+(matrix.tx),
 				ty:(this.tx*matrix.b)+(this.ty*matrix.d)+(matrix.ty)
-			});
+			});*/
 		},
 		invert:function(){
-			//return new this.type(fl.Math.invertMatrix(this));
-			return new this.type({
-				a:this.d/(this.a*this.d-this.b*this.c),
-				b:-this.b/(this.a*this.d-this.b*this.c),
-				c:-this.c/(this.a*this.d-this.b*this.c),
-				d:this.a/(this.a*this.d-this.b*this.c),
-				tx:(this.c*this.ty-this.d*this.tx)/(this.a*this.d-this.b*this.c),
-				ty:-(this.a*this.ty-this.b*this.tx)/(this.a*this.d-this.b*this.c)
-			});
+			return new this.type(fl.Math.invertMatrix(this));fl.trace(result);
+			/*return new this.type({
+				a:this.d/((this.a*this.d)-(this.b*this.c)),
+				b:-this.b/((this.a*this.d)-(this.b*this.c)),
+				c:-this.c/((this.a*this.d)-(this.b*this.c)),
+				d:this.a/((this.a*this.d)-(this.b*this.c)),
+				tx:((this.c*this.ty)-(this.d*this.tx))/((this.a*this.d)-(this.b*this.c)),
+				ty:-((this.a*this.ty)-(this.b*this.tx))/((this.a*this.d)-(this.b*this.c))
+			});*/
 		},
 		scale:function(scaleX,scaleY){
 			this.scaleX=scaleX;

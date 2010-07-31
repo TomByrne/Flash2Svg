@@ -173,59 +173,17 @@
 					var cp;
 					if(e.isLine){
 						cp=new ext.Curve([e.getControl(0),e.getControl(2)]);
-						/*var c0=e.getControl(0);
-						if(c0){
-							var c2=e.getControl(2);
-							if(c2){
-								cp=new ext.Curve([c0,c2]);
-							}
-						}*/
-					}else{//if(cp.length<2)
+					}else{
 						if(settings.curveDegree==3){
 							if(e.cubicSegmentIndex){
 								cp=this.shape.getCubicSegmentPoints(
-									e.cubicSegmentIndex,
-									{
-										edge:e
-									}
+									e.cubicSegmentIndex,{edge:e}
 								);
 							}else{
 								cp=new ext.Curve([e.getControl(0),e.getControl(1),e.getControl(2)]);
-								/*var c0=e.getControl(0);
-								if(c0){
-									var c1=e.getControl(1);
-									if(c1){
-										var c2=e.getControl(2);
-										if(c2){
-											cp.extend([c0,c1,c2]);
-										}
-									}
-								}
-								if(!cp.length)
-									var ohe=he.getOppositeHalfEdge();
-									if(ohe){
-										var ov=ohe.getVertex();
-										if(ov){
-											var v=he.getVertex();
-											if(v){
-												cp.extend([v,ov]);
-											}
-										}
-									}
-								}*/
 							}
 						}else{
 							cp=new ext.Curve([e.getControl(0),e.getControl(1),e.getControl(2)]);
-							/*var c0=e.getControl(0);
-							if(c0){
-								var c1=e.getControl(1);
-								if(c1){
-									var c2=e.getControl(2);
-									if(c2){
-										cp=new ext.Array([c0,c1,c2]);
-									}
-								}
-							}*/
 						}
 					}
 					if(cp.length>0 && (points.length==0 || !cp.is(points[points.length-1]))){				
@@ -239,7 +197,7 @@
 					ext.log.pauseTimer(timer);
 				}
 				edgeIDs.sort(function(a,b){return(a-b);});
-				this.cache['edgeIDs']=edgeIDs;
+				this.cache.edgeIDs=edgeIDs;
 				if(points.length==0){return;}
 				controlPoints=new ext.Array([]);
 				points[points.length-1].remove();
@@ -250,7 +208,9 @@
 				}
 				var removeNum=0;
 				var isLine,nextIsLine,prevIsLine;
-				for(var i=0;i<points.length;i++){ // Check to make sure that all points are correctly ordered and do not overlap.
+				var broken=false;
+				// Check to make sure that all points are correctly ordered and do not overlap.
+				for(var i=0;i<points.length;i++){ 
 					var prev=i>0?i-1-removeNum:points.length-1;
 					var next=i<points.length-1?i+1:0;
 					var prevdegree=points[prev].length-1;
@@ -344,12 +304,84 @@
 								controlPoints.pop();
 								edges.pop();
 							}	
+						}
+						if(
+							controlPoints.length>1 &&
+							!controlPoints[controlPoints.length-1][0].is(
+								controlPoints[controlPoints.length-2][controlPoints[controlPoints.length-2].length-1]
+							)
+						){
+							broken=true;
 						}						
 					}
 				}
+				if(broken){
+					var segments=new ext.Array([new ext.Array([controlPoints[0]])]);
+					for(i=1;i<controlPoints.length;i++){
+						if(controlPoints[i-1].at(-1).is(controlPoints[i][0])){
+							segments[segments.length-1].push(controlPoints[i]);
+						}else{
+							segments.push(new ext.Array([controlPoints[i]]));
+						}
+					}
+					controlPoints.clear();
+					controlPoints.extend(segments.shift());
+					var success=true;
+					while(segments.length>0 && success){
+						success=false;
+						var start=controlPoints[0][0];
+						var end=controlPoints.at(-1).at(-1);
+						for(i=0;i<segments.length;i++){
+							if(end.is(segments[i][0][0])){
+								controlPoints.extend(segments.splice(i,1)[0]);
+								success=true;
+								break;
+							}else if(end.is(segments[i].at(-1).at(-1))){
+								segments[i].reverse(true);
+								controlPoints.extend(segments.splice(i,1)[0]);
+								success=true;
+								break;
+							}else if(start.is(segments[i].at(-1).at(-1))){
+								controlPoints.prepend(segments.splice(i,1)[0]);
+								success=true;
+								break;
+							}else if(start.is(segments[i][0][0])){
+								segments[i].reverse(true);
+								controlPoints.prepend(segments.splice(i,1)[0]);
+								success=true;
+								break;
+							}
+						}
+					}
+					while(segments.length>0){
+						var rev=false;
+						var end=controlPoints.at(-1).at(-1);
+						var dist=end.distanceTo(segments[0][0][0]);
+						var closest=0;
+						for(i=0;i<segments.length;i++){
+							var qDist=end.distanceTo(segments[i][0][0]);
+							if(qDist<dist){
+								rev=false;
+								closest=i;
+								dist=qDist;
+							}else{
+								qDist=end.distanceTo(segments[i].at(-1).at(-1));
+								if(qDist<dist){
+									rev=true;
+									closest=i;
+									dist=qDist;
+								}
+							}
+						}
+						if(rev){
+							segments[closest].reverse(true);
+						}
+						controlPoints.extend(segments.splice(closest,1)[0]);
+					}
+				}
 				if( // When < 3 edges are present, re-ordering can reverse the contour, so double check.
-					controlPoints.length<3 && controlPoints.length>0 &&
-					[-1,1][Number(Boolean(controlPoints[0].isReversed))]==this.orientation
+					controlPoints.length<3 && controlPoints.length>0 && 
+					[-1,1][Number(Boolean(controlPoints[0].isReversed))]!=this.orientation
 				){
 					controlPoints.reverse(true);	
 				}

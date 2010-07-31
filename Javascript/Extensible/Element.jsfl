@@ -350,6 +350,9 @@
 		set objectSpaceBounds(s){
 			this.$.objectSpaceBounds=s;
 		},
+		exportPNG:function(fileURI,frame){
+			
+		}
 	}
 	ext.extend({Element:ExtensibleElement});
 })(extensible);

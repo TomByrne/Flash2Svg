@@ -165,9 +165,17 @@
 		 * elements. Does not remove existing redundancies.
 		 */
 		extend:function(array,noDuplicates){
-			for(var i=0;i<array.length;i++){
-				if(!noDuplicates || this.indexOf(array[i])<0){
-					this.push(array[i]);
+			if(noDuplicates){
+				for(var i=0;i<array.length;i++){
+					if(this.indexOf(array[i])<0){
+						this.push(array[i]);
+					}
+				}
+			}else{
+				if(array instanceof this.type){
+					this.push.apply(this,array.$);
+				}else{
+					this.push.apply(this,array);
 				}
 			}
 			return this;

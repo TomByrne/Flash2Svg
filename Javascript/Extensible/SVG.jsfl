@@ -100,14 +100,13 @@
 		this._symbols={};
 		this._bitmaps={};
 		this._rootItem={};
-		this._contourCPs=new ext.Object({}); // Holds edge point arrays used in filling gaps.
 		this._tempFolder=ext.lib.uniqueName('temp'); // Library folder holding temporary symbols.
-		this._ids=new ext.Object({}); // Used by uniqueID() for cross-checking IDs.
+		this._ids={}; // Used by uniqueID() for cross-checking IDs.
 		this._progressMax=0;
 		this._progress=0;
 		this._minProgressIncrement=1; // Is later set to this._progressMax/this.MAX_INLINE_CALL_COUNT in order to prevent recursion
 		this._origSelection=new ext.Selection([]);
-		this._linearProcessing=true;//Boolean(this.swfPanel);//If true, a timeline is processed one level deep in it's entirety before progressing to descendants.
+		this._linearProcessing=true;// If true, a timeline is processed one level deep in it's entirety before progressing to descendants.
 		if(this.startFrame!==undefined){
 			if(
 				this.endFrame==undefined ||
@@ -136,7 +135,7 @@
 			if(this.frames.length){
 				timeline.frames.extend(this.frames);
 			}else{
-				timeline.frames.push(ext.frame);	
+				timeline.frames.push(ext.frame);
 			}
 			this.timelines.push(timeline);
 		}else if(this.source=='Selected Library Items'){
@@ -184,11 +183,12 @@
 		 * Applies transformation matrices recursively given an SVG graphic element.
 		 * @parameter {XML} xml An SVG graphic element or an SVG document. 
 		 */
-		applyMatrices:function(xml,defs){
+		applyMatrices:function(xml,defs,strokeX){
+			strokeX=strokeX||new ext.Matrix();
 			xml=xml!==undefined?xml:this.xml;
-			defs=defs||xml.defs;	
+			defs=defs||xml.defs;
 			var bApplyVertices=true;
-			var transform,matrix,mxs;
+			var transform,mxs,matrix;
 			if(xml.hasOwnProperty('@transform')){
 				transform=String(xml['@transform']);
 				var mxa=transform.match(/matrix\(.*?\)/g);
@@ -202,174 +202,187 @@
 					xml['@transform']=transform;
 				}
 			}
+			if(!matrix){
+				matrix=new ext.Matrix();
+				mxa=[this._getMatrix(matrix)];
+			}
+			var id=String(xml['@id']);
+			var reStrokeX=/^group|drawingObject|rectangleObject|ovalObject|path/;
+			if(reStrokeX.test(id)){
+				strokeX.concat(matrix.invert());
+			}else{
+				strokeX=new ext.Matrix();
+			}
 			if(xml.hasOwnProperty('@filter') && matrix){
 				this._transformFilter(matrix,xml,defs);
-			}
+			}		
 			for each(var child in (xml.defs.symbol.*+xml.*)){
 				var childName=String(child.localName());
-				if(matrix){
-					var tr=child['@transform'];
-					var nmx;
-					var nmxString;
-					if(tr){
-						tr=String(tr);
-						var cmxa=/matrix\(.*?\)/.exec(tr);
-						if(cmxa && cmxa.length){
-							var cmx=new ext.Matrix(cmxa[0]);
-							nmx=cmx.concat(matrix);
-							nmxString=this._getMatrix(nmx);
-							tr=tr.replace(cmxa[0],nmxString);
-						}else{
-							tr=mxa[0]+' '+tr;
-							nmxString=mxa[0];
-							nmx=matrix;
-						}
-						child['@transform']=tr;
+				var cid=child.hasOwnProperty('@id')?String(child['@id']):'';
+				var cmx=undefined;
+				var tr=child['@transform'];
+				var nmx;
+				var nmxString;
+				if(tr){
+					tr=String(tr);
+					var cmxa=/matrix\(.*?\)/.exec(tr);
+					if(cmxa && cmxa.length){
+						cmx=new ext.Matrix(cmxa[0]);
+						nmx=cmx.concat(matrix);
+						nmxString=this._getMatrix(nmx);
+						tr=tr.replace(cmxa[0],nmxString);
 					}else{
-						nmx=matrix;
+						tr=mxa[0]+' '+tr;
 						nmxString=mxa[0];
-						child['@transform']=nmxString;
+						nmx=matrix;
 					}
-					if(child.hasOwnProperty('@filter') && child.localName()!='g'){
-						this._transformFilter(nmx,child,defs);
-					}
-					if(bApplyVertices){
-						var gradientAttr=['stroke','fill'];
-						for(var i=0;i<gradientAttr.length;i++){
-							var attrString=child['@'+gradientAttr[i]];
-							var gradientID=undefined;
-							if(attrString){
-								attrString=String(attrString);
-								var ida=attrString.match(/(?:url\(#)(.*?)(?:\))/);
-								if(ida && ida.length>1){
-									gradientID=ida[1];
-								}
+					child['@transform']=tr;
+				}else{
+					nmx=matrix;
+					nmxString=mxa[0];
+					child['@transform']=nmxString;
+				}				
+				if(child.hasOwnProperty('@filter') && child.localName()!='g'){
+					this._transformFilter(nmx,child,defs);
+				}
+				if(bApplyVertices){
+					var gradientAttr=['stroke','fill'];
+					for(var i=0;i<gradientAttr.length;i++){
+						var attrString=child['@'+gradientAttr[i]];
+						var gradientID=undefined;
+						if(attrString){
+							attrString=String(attrString);
+							var ida=attrString.match(/(?:url\(#)(.*?)(?:\))/);
+							if(ida && ida.length>1){
+								gradientID=ida[1];
 							}
-							if(gradientID!==undefined){
-								var gradient=defs.*.(@id==gradientID);
-								if(gradient && gradient.length()){
-									gradient=gradient[0].copy();
-									gradientID=this._uniqueID(String(gradient.@id));
-									gradient.@id=gradientID;
-									child['@'+gradientAttr[i]]='url(#'+gradientID+')';
-									defs.appendChild(gradient);
-									if(gradient.localName()=='radialGradient'){
-										var gtr=gradient['@gradientTransform'];
-										if(gtr){
-											gtr=String(gtr);
-											var cmxa=/matrix\(.*?\)/.exec(gtr);
-											if(cmxa && cmxa.length){
-												var cmx=new ext.Matrix(cmxa[0]);
-											}else{
-												cmx=new ext.Matrix();
-											}
+						}
+						if(gradientID!==undefined){
+							var gradient=defs.*.(@id==gradientID);
+							if(gradient && gradient.length()){
+								gradient=gradient[0].copy();
+								gradientID=this._uniqueID(String(gradient.@id));
+								gradient.@id=gradientID;
+								child['@'+gradientAttr[i]]='url(#'+gradientID+')';
+								defs.appendChild(gradient);
+								if(gradient.localName()=='radialGradient'){
+									var gtr=gradient['@gradientTransform'];
+									if(gtr){
+										gtr=String(gtr);
+										var cmxa=/matrix\(.*?\)/.exec(gtr);
+										if(cmxa && cmxa.length){
+											var cmx=new ext.Matrix(cmxa[0]);
 										}else{
 											cmx=new ext.Matrix();
 										}
-										var gmx=cmx.concat(nmx);
-										var fp=new ext.Point({
-											x:Number(gradient['@fx']),
-											y:Number(gradient['@fy'])
-										});
-										var cp=new ext.Point({
-											x:Number(gradient['@cx']),
-											y:Number(gradient['@cy'])
-										});
-										var rp=new ext.Point({
-											x:cp.x+Number(gradient['@r']),
-											y:cp.y
-										});
-										var mx=new ext.Matrix({
-											a:gmx.scaleX,
-											b:0,
-											c:0,
-											d:gmx.scaleX,
-											tx:gmx.tx,
-											ty:gmx.ty
-										});
-										fp=fp.transform(mx).roundTo(this.decimalPointPrecision);
-										cp=cp.transform(mx).roundTo(this.decimalPointPrecision);
-										rp=rp.transform(mx).roundTo(this.decimalPointPrecision);
-										gmx=mx.invert().concat(gmx).roundTo(this.decimalPointPrecision);
-										gradient['@r']=String(Math.roundTo(cp.distanceTo(rp),this.decimalPointPrecision));
-										gradient['@cx']=String(cp.x);
-										gradient['@cy']=String(cp.y);
-										gradient['@fx']=String(fp.x);
-										gradient['@fy']=String(fp.y);
-										var gmxString=this._getMatrix(gmx);
-										if(gtr){
-											gtr=gtr.replace(cmxa[0],gmxString);
-										}else{
-											gtr=gmxString;
-										}
-										gradient['@gradientTransform']=gtr;
-									}else if(gradient.localName()=='linearGradient'){
-										var p1=new ext.Point({
-											x:Number(gradient['@x1']),
-											y:Number(gradient['@y1'])
-										});
-										var p2=new ext.Point({
-											x:Number(gradient['@x2']),
-											y:Number(gradient['@y2'])
-										});
-										p1=p1.transform(nmx).roundTo(this.decimalPointPrecision);
-										p2=p2.transform(nmx).roundTo(this.decimalPointPrecision);
-										gradient['@x1']=String(p1.x);
-										gradient['@y1']=String(p1.y);
-										gradient['@x2']=String(p2.x);
-										gradient['@y2']=String(p2.y);
-									}else if(gradient.localName()=='pattern'){
-										var ptr=gradient.@patternTransform;
-										if(ptr){
-											ptr=String(ptr);
-											var pmxa=/matrix\(.*?\)/.exec(ptr);
-											if(pmxa && pmxa.length){
-												var pmx=new ext.Matrix(pmxa[0]);
-											}else{
-												pmx=new ext.Matrix();
-											}
+									}else{
+										cmx=new ext.Matrix();
+									}
+									var gmx=cmx.concat(nmx);
+									var fp=new ext.Point({
+										x:Number(gradient['@fx']),
+										y:Number(gradient['@fy'])
+									});
+									var cp=new ext.Point({
+										x:Number(gradient['@cx']),
+										y:Number(gradient['@cy'])
+									});
+									var rp=new ext.Point({
+										x:cp.x+Number(gradient['@r']),
+										y:cp.y
+									});
+									var mx=new ext.Matrix({
+										a:gmx.scaleX,
+										b:0,
+										c:0,
+										d:gmx.scaleX,
+										tx:gmx.tx,
+										ty:gmx.ty
+									});
+									fp=fp.transform(mx).roundTo(this.decimalPointPrecision);
+									cp=cp.transform(mx).roundTo(this.decimalPointPrecision);
+									rp=rp.transform(mx).roundTo(this.decimalPointPrecision);
+									gmx=mx.invert().concat(gmx).roundTo(this.decimalPointPrecision);
+									gradient['@r']=String(Math.roundTo(cp.distanceTo(rp),this.decimalPointPrecision));
+									gradient['@cx']=String(cp.x);
+									gradient['@cy']=String(cp.y);
+									gradient['@fx']=String(fp.x);
+									gradient['@fy']=String(fp.y);
+									var gmxString=this._getMatrix(gmx);
+									if(gtr){
+										gtr=gtr.replace(cmxa[0],gmxString);
+									}else{
+										gtr=gmxString;
+									}
+									gradient['@gradientTransform']=gtr;
+								}else if(gradient.localName()=='linearGradient'){
+									var p1=new ext.Point({
+										x:Number(gradient['@x1']),
+										y:Number(gradient['@y1'])
+									});
+									var p2=new ext.Point({
+										x:Number(gradient['@x2']),
+										y:Number(gradient['@y2'])
+									});
+									p1=p1.transform(nmx).roundTo(this.decimalPointPrecision);
+									p2=p2.transform(nmx).roundTo(this.decimalPointPrecision);
+									gradient['@x1']=String(p1.x);
+									gradient['@y1']=String(p1.y);
+									gradient['@x2']=String(p2.x);
+									gradient['@y2']=String(p2.y);
+								}else if(gradient.localName()=='pattern'){
+									var ptr=gradient.@patternTransform;
+									if(ptr){
+										ptr=String(ptr);
+										var pmxa=/matrix\(.*?\)/.exec(ptr);
+										if(pmxa && pmxa.length){
+											var pmx=new ext.Matrix(pmxa[0]);
 										}else{
 											pmx=new ext.Matrix();
 										}
-										gradient.@patternTransform=this._getMatrix(pmx.concat(nmx));
+									}else{
+										pmx=new ext.Matrix();
 									}
+									gradient.@patternTransform=this._getMatrix(pmx.concat(nmx));
 								}
 							}
-						}	
-						if(child.hasOwnProperty('@d')){
-							var curveData=child['@d'];
-							var points=curveData.match(/[A-Ya-y]?[\d\.\-]*[\d\.\-][\s\,]*[\d\.\-]*[\d\.\-][Zz]?/g);
-							if(points && points.length){
-								var newPoints=new ext.Array([]);
-								for(var i=0;i<points.length;i++){
-									if(points[i].trim()==''){continue;}
-									var point=new ext.Point(points[i]);
-									point=point.transform(nmx).roundTo(this.decimalPointPrecision);
-									var pointString=String(point.x)+','+String(point.y);
-									var prefix=/^[A-Za-z]/.exec(points[i]);
-									if(prefix){
-										pointString=prefix[0]+pointString;
-									}
-									var suffix=/[A-Za-z]$/.exec(points[i]);
-									if(suffix){
-										pointString=pointString+suffix[0];
-									}
-									newPoints.push(pointString);							
-								}
-								child['@d']=newPoints.join(' ');
-								child['@transform']=String(child['@transform']).replace(nmxString,'');
-								if(String(child['@transform']).trim()==''){
-									delete child['@transform'];
-								}
-							}
-						}
-						if(child.hasOwnProperty('@stroke-width')){
-							child['@stroke-width']=Math.roundTo(Number(child['@stroke-width'])*((nmx.scaleX+nmx.scaleY)/2),this.decimalPointPrecision);
 						}
 					}
+					if(child.hasOwnProperty('@d')){
+						var curveData=child['@d'];
+						var points=curveData.match(/[A-Ya-y]?[\d\.\-]*[\d\.\-][\s\,]*[\d\.\-]*[\d\.\-][Zz]?/g);
+						if(points && points.length){
+							var newPoints=new ext.Array([]);
+							for(var i=0;i<points.length;i++){
+								if(points[i].trim()==''){continue;}
+								var point=new ext.Point(points[i]);
+								point=point.transform(nmx).roundTo(this.decimalPointPrecision);
+								var pointString=String(point.x)+','+String(point.y);
+								var prefix=/^[A-Za-z]/.exec(points[i]);
+								if(prefix){
+									pointString=prefix[0]+pointString;
+								}
+								var suffix=/[A-Za-z]$/.exec(points[i]);
+								if(suffix){
+									pointString=pointString+suffix[0];
+								}
+								newPoints.push(pointString);							
+							}
+							child['@d']=newPoints.join(' ');
+							child['@transform']=String(child['@transform']).replace(nmxString,'');
+							if(String(child['@transform']).trim()==''){
+								delete child['@transform'];
+							}
+						}
+					}
+					if(child.hasOwnProperty('@stroke-width')){
+						var strokeScale=cmx?nmx.concat(strokeX.concat(cmx.invert())):nmx.concat(strokeX);
+						child['@stroke-width']=Math.roundTo(Number(child['@stroke-width'])*((strokeScale.scaleX+strokeScale.scaleY)/2),this.decimalPointPrecision);
+					}
+					
 				}
 				if(child.* && child.*.length() && childName!='defs'){
-					this.applyMatrices(child,defs);	
+					this.applyMatrices(child,defs,strokeX?(cmx?strokeX.concat(cmx.invert()):strokeX):undefined);
 				}
 			}
 			return xml;
@@ -715,7 +728,6 @@
 					throw new Error('Problem creating folder.');
 				}
 			}
-			
 			var writeSuccess=true;
 			for(var i=0;i<documents.length;i++){
 				if(this.expandSymbols && this.expandSymbols!='None'){ // expand symbol instances
@@ -739,7 +751,6 @@
 							'$1xlink:$2="'
 						)
 					);
-					
 					if(documents.length==1){
 						success=FLfile.write(this.file,outputString);
 					}else{
@@ -792,8 +803,10 @@
 			if(this.swfPanel){
 				epSuccess=this.swfPanel.call('endProgress');	
 			}
-			
-			return( writeSuccess && epSuccess && this.que.next() );
+			if(writeSuccess && epSuccess){
+				ext.message('Export Successful: '+this.file);
+			}
+			return(writeSuccess && epSuccess && this.que.next());
 		},
 		/**
 		 * Expands symbol instances ( use tags ).
@@ -859,8 +872,11 @@
 						var oldID=String(node.@mask).match(/(?:url\(#)(.*?)(?:\))/);
 						if(oldID && oldID.length>1){
 							var newID=this._uniqueID(oldID[1]);
-							useNode.(@id==oldID[1]).@id=newID;
-							node.@mask='url(#'+newID+')';
+							var old=useNode.(@id==oldID[1]);
+							if(old.length()){
+								old[0].@id=newID;
+								node.@mask='url(#'+newID+')';
+							}
 						}
 					}
 					for each(var attr in node.@*){
@@ -1616,11 +1632,10 @@
 						case "adjustColorFilter":
 							/*
 							 * For contrast & saturation with values > 0, reproducing the *exact* same result is not always possible
-							 * because of discrepancies in flash/svg clipping behaviors.
+							 * because color-rendering behaviors for out of gamut colors differ, and although SVG specifications
+							 * provide for color profiles, most svg implementations do not use them.
 							 */
-							if(
-								f.brightness!=0
-							){
+							if(f.brightness!=0){
 								var brightness=f.brightness/100;
 								var feComponentTransfer_brightness=<feComponentTransfer id={this._uniqueID('feComponentTransfer_brightness')} />;
 								var feFuncR=<feFuncR id={this._uniqueID('feFuncR')} />;
@@ -1644,9 +1659,7 @@
 								feComponentTransfer_brightness.@result=src=prefix+'feComponentTransfer_brightness';
 								filter.appendChild(feComponentTransfer_brightness);
 							}
-							if(
-								f.contrast!=0
-							){
+							if(f.contrast!=0){
 								var contrast=f.contrast/100;
 								var feComponentTransfer_contrast=<feComponentTransfer id={this._uniqueID('feComponentTransfer_contrast')} />;
 								var feFuncR=<feFuncR id={this._uniqueID('feFuncR')} />;
@@ -1740,7 +1753,7 @@
 					filter.@x='-10%';
 					filter.@y='-10%';
 				}
-				if((element?element.colorMode!='none':false) || settings.color){
+				if( ( element?element.colorMode!='none':false ) || settings.color ){
 					if( // colorMode "tint"
 						color.percent[0]==color.percent[1]==color.percent[2] && 
 						color.percent[3]==100 &&
@@ -1877,12 +1890,6 @@
 		 * 
 		 */
 		_getShape:function(shape,options){
-			/*if(ext.log){
-				var timer=ext.log.startTimer('');	
-			}
-			if(ext.log){
-				ext.log.pauseTimer(timer);	
-			}*/
 			if(ext.log){
 				var timer=ext.log.startTimer('extensible.SVG._getShape() >> 1');	
 			}
@@ -1896,7 +1903,13 @@
 			var descendantMatrix=new ext.Matrix();
 			var pathMatrix=null;
 			var layerLocked=shape.layer.locked;
-			if(shape.isRectangleObject || shape.isOvalObject){ // ! important
+			var id;
+			if( shape.isRectangleObject || shape.isOvalObject ){ // ! important
+				id=(
+					shape.isRectangleObject?
+					this._uniqueID('rectangleObject'):
+					this._uniqueID('ovalObject')
+				);
 				shape.setTransformationPoint({x:0.0,y:0.0});
 				var origin=new ext.Point({
 					x:(shape.objectSpaceBounds.left-shape.objectSpaceBounds.right)/2,
@@ -1908,12 +1921,14 @@
 				if(shape.objectSpaceBounds.left!=0 || shape.objectSpaceBounds.top!=0){
 					pathMatrix=new ext.Matrix({
 						tx:-shape.objectSpaceBounds.left,
-						ty:-shape.objectSpaceBounds.top}
-					);
+						ty:-shape.objectSpaceBounds.top
+					});
 				}
 			}else if(shape.isDrawingObject){
+				id=this._uniqueID('drawingObject');
 				matrix=matrix.concat(settings.matrix);
 			}else if(shape.isGroup){
+				id=this._uniqueID('group');
 				descendantMatrix=matrix.invert();
 				pathMatrix=new ext.Matrix({
 					tx:(shape.objectSpaceBounds.left+shape.objectSpaceBounds.right)/2.0,
@@ -1922,6 +1937,7 @@
 				pathMatrix=pathMatrix.invert();
 				matrix=matrix.concat(settings.matrix);
 			}else{
+				id=this._uniqueID('shape');
 				matrix.tx=shape.left;
 				matrix.ty=shape.top;
 				matrix=matrix.concat(settings.matrix);
@@ -1945,6 +1961,7 @@
 			var tobeCut=null;
 			var ii;
 			var validContours=new ext.Array([]);
+			
 			for(i=0;i<contours.length;i++){
 				var s=this._getContour(contours[i],{
 					colorTransform:settings.colorTransform,
@@ -1954,10 +1971,19 @@
 					validContours.push(contours[i]);
 					svgArray.push(s);
 					if(contours[i].interior){
-						if(filled.length>0 && contours[i].oppositeFill.style!='noFill' ){
+						var oppositeFill=contours[i].oppositeFill;
+						var fill=contours[i].fill;
+						if(
+							filled.length>0  //&& contours[i].oppositeFill.style!='noFill'
+						){
 							for(var n=filled.length-1;n>-1;n-=1){
-								if(contours[i].oppositeFill.is(validContours[filled[n]].fill)){
-									if(!contours[i].fill.is(validContours[filled[n]].fill)){
+								if(
+									oppositeFill.is(validContours[filled[n]].fill) || (
+										oppositeFill.style=='noFill' &&
+										fill.style=='noFill'
+									)
+								){
+									if(!fill.is(validContours[filled[n]].fill)){
 										var cutID=String(svgArray[filled[n]].path[0]['@id']);
 										s=this._getContour(contours[i],{
 											colorTransform:settings.colorTransform,
@@ -1989,8 +2015,7 @@
 						}
 					}
 				}
-			}
-			var id=this._uniqueID('shape');
+			}			
 			var svg=new XML('<g id="'+id+'"/>');
 			svg['@transform']=this._getMatrix(matrix);
 			for(var i=0;i<svgArray.length;i++){
@@ -2106,7 +2131,7 @@
 					}
 				}
 				var cdata;
-				cdata=this._getCurve(controlPoints,true);
+				cdata=this._getCurve(controlPoints,contour.orientation);
 				id=this._uniqueID('path');
 				idString='id="'+id+'" ';
 				paths.push('<path  '+idString+xform+'fill="'+fillString+'" fill-opacity="'+opacityString+'" d="'+cdata+'"/>\n');
@@ -2136,7 +2161,7 @@
 									xform+
 									'fill="none" '+
 									this._getStroke(stroke,{shape:contour.shape})+
-									'd="'+this._getCurve(cp,false)+'" '+
+									'd="'+this._getCurve(cp,contour.orientation)+'" '+
 									'/>\n'
 								);
 							}
@@ -2153,7 +2178,7 @@
 								xform+
 								'fill="none" '+
 								this._getStroke(stroke)+
-								'd="'+this._getCurve(cp,false)+'" '+
+								'd="'+this._getCurve(cp,contour.orientation)+'" '+
 								'/>\n'
 							);
 						}
@@ -2168,7 +2193,7 @@
 					){//if the stroke on the beginning of the contour matches that at the end, connect them
 						var pathID=interior?1:0;
 						var x=new XML(paths[pathID]);
-						var cd1=this._getCurve(cp,false).trim();
+						var cd1=this._getCurve(cp,contour.orientation).trim();
 						var cd2=x['@d'].trim();
 						var cd1Points=cd1.split(' ');
 						var cd2Points=cd2.split(' ');
@@ -2192,7 +2217,7 @@
 							xform+
 							'fill="none" '+
 							this._getStroke(stroke)+
-							'd="'+this._getCurve(cp,(contour.interior && paths.length<2))+'" '+
+							'd="'+this._getCurve(cp,(contour.orientation && paths.length<2))+'" '+
 							'/>\n'
 						);
 					}
@@ -2250,7 +2275,7 @@
 					curveString.push(controlPoints[i][n].x+","+controlPoints[i][n].y+(n==deg?"":" "));
 				}
 				if(
-					close && 
+					close &&
 					controlPoints[i][deg].is(controlPoints[0][0])
 				){
 					curveString.push('z ');
@@ -2472,7 +2497,7 @@
 			}
 			return svg.join(' ')+' ';
 		},
-		_getText:function(element,options){			
+		_getText:function(element,options){
 			if(ext.log){
 				var timer=ext.log.startTimer('extensible.SVG._getText()');	
 			}
@@ -2530,8 +2555,12 @@
 					){
 						tempElement=searchElements[i];
 					}else{
-						ext.sel=[searchElements[i]];
-						ext.doc.deleteSelection();
+						//for(var i=0;i<10 && ext.sel.length==0;i++){
+							ext.sel=[searchElements[i]];
+						//}
+						//if(ext.sel.length){
+							ext.doc.deleteSelection();
+						//}
 					}
 				}
 				var tempMatrix=new ext.Matrix();
@@ -2589,7 +2618,14 @@
 			if(!(matrix instanceof ext.Matrix)){
 				matrix=new ext.Matrix(matrix);
 			}
-			return('matrix('+matrix.a+' '+matrix.b+' '+matrix.c+' '+matrix.d+' '+matrix.tx+' '+matrix.ty+')');
+			return([
+				'matrix('+String(matrix.a),
+				String(matrix.b),
+				String(matrix.c),
+				String(matrix.d),
+				String(matrix.tx),
+				String(matrix.ty)+')'
+			].join(' '));
 		},
 		/**
 		 * Splits the xml into multiple documents. For use when exporting multiple root timelines.
@@ -2663,7 +2699,7 @@
 			}
 			if(this._ids[base]!==undefined){
 				this._ids[base]+=1;
-				return base+String(this._ids[base]);
+				return String(base)+String(this._ids[base]);
 			}else{
 				this._ids[base]=increment;
 				return id;

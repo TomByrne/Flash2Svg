@@ -16,7 +16,9 @@
 			try{
 				result=this.apply(context,args);
 				break;
-			}catch(e){}
+			}catch(e){
+				result=e;
+			}
 		}
 		if(result==undefined && e!==undefined){
 			if(this.log){
@@ -24,8 +26,8 @@
 			}
 			if(bThrowError){
 				throw e;
-			}else if(this.warnings){
-				fl.trace(e);
+			}else{
+				ext.warn(e);
 			}
 		}
 		return result;

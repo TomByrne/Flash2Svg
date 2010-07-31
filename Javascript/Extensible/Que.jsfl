@@ -137,16 +137,20 @@
 		process:function(){
 			this.isProcessing=true;
 			if(this.currentTask){
-				var success=this.currentTask.process.attempt(this.currentTask);
+				var result=this.currentTask.process.attempt(this.currentTask,undefined,undefined,true);
+				var success=result!=undefined && !(result instanceof Error);
 				if(success){
 					this.isProcessing=false;
 					return true;
 				}else{
+					if(result instanceof Error){
+						fl.trace(result);
+					}
 					return false;
 				}
 			}
 			this.isProcessing=false;
-			return false;
+			return true;
 		},
 		/**
 		 * Kills the current task.
@@ -155,8 +159,12 @@
 		 */
 		kill:function(force){
 			if(this.currentTask){
-				var success=this.currentTask.end.attempt(this.currentTask,[],100);
+				var result=this.currentTask.end.attempt(this.currentTask,[],100,true);
+				var success=result!=undefined && !(result instanceof Error);
 				if(!success && force){
+					if(result instanceof Error){
+						fl.trace(result);
+					}
 					return this.next();
 				}else{
 					return success;

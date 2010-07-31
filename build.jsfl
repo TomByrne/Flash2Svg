@@ -1,6 +1,5 @@
 /* 
  * DAVID BELAIS 2010 DAVID@DISSENTGRAPHICS.COM
- * EXTENSIBLE : A javascript Framework for extending Flash.
  */
 
 (function(dom){
@@ -88,9 +87,16 @@
 				return(/\.mxi$/.test(element));
 			}
 		);
+		var success,n;
 		var completed=[];
 		for(i=0;i<mxi.length;i++){
-			var xmlString=FLfile.read(dir+'/'+mxi[i])
+			var xmlString=FLfile.read(dir+'/'+mxi[i]);
+			for(n=0;n<configURI.length;n++){
+				success=copy(dir+'/'+mxi[i],configURI[n]+'/Extensions/'+mxi[i]);
+				if(!success){
+					fl.trace('Problem copying "'+dir+'/'+mxi[i]+'" to "'+configURI[n]+'/Extensions/'+mxi[i]+'"');
+				}
+			}
 			if(xmlString){
 				var xml=new XML(xmlString.replace(/\<\?.*?\?\>/,''));
 				for each(var file in xml..files.file){
@@ -102,9 +108,9 @@
 							var isDir=FLfile.getAttributes(sourceURI).indexOf('D')>-1;
 							var destinationTemplate=String(file.@destination)+'/'+relativePath.split('/').pop();
 							var re=/^\$flash/;					
-							for(var n=0;n<configURI.length;n++){
+							for(n=0;n<configURI.length;n++){
 								var destinationURI=destinationTemplate.replace(re,configURI[n]);
-								var success=copy(sourceURI,destinationURI);
+								success=copy(sourceURI,destinationURI);
 								if(!success){
 									fl.trace('Problem copying '+sourceURI+' to '+destinationURI);
 								}

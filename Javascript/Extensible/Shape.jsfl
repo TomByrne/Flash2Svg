@@ -2,7 +2,6 @@
 	function ExtensibleShape(shape,options){
 		ext.Element.apply(this,arguments);
 		this.cache.cubicSegmentPoints=this.cache.cubicSegmentPoints||new ext.Array();
-		this.cache.gapFilled=this.cache.gapFilled||new ext.Array([]);
 		return this;
 	}
 	ExtensibleShape.prototype={
@@ -14,7 +13,7 @@
 		getCubicSegmentPoints:function(cubicSegmentIndex,options){
 			if(cubicSegmentIndex){
 				if(ext.log){
-					var timerCSPL=ext.log.startTimer('Cubic segment point lookup.');	
+					var timerCSPL=ext.log.startTimer('Cubic segment point lookup.');
 				}
 				var settings=new ext.Object({
 					shape:this,

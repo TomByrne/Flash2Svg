@@ -160,6 +160,9 @@
 			if(this.log){
 				this.log.append(message);
 			}
+		},
+		message:function(message){
+			fl.trace(message);	
 		}
 	};
 	dom.extensible=new Extensible({

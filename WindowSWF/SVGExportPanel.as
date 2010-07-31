@@ -37,6 +37,7 @@
 		};
 		var timer:Timer=new Timer(1);
 		var isCanceled:Boolean=false;
+		var finished:Boolean=false;
 		var jsDir:String;
 		var exportInProgress=false;
 		var swfPanelName:String='SVG';
@@ -574,7 +575,7 @@
 		
 		private function exportSVG(e:Event):void
 		{
-			this.isCanceled=false;
+			this.isCanceled=this.finished=false;
 			//Switch exportBttn to 'Cancel'
 			this.exportInProgress=true;
 			this.controls.exportBttn.label='Cancel';
@@ -628,6 +629,7 @@
 		}*/
 		private function cancel(e:Event):void
 		{
+			if(this.isCanceled||this.finished){return;}
 			this.isCanceled=true;
 			this.endProgress();
 			var killed;
@@ -637,22 +639,26 @@
 			if(!killed=='true'){ // If kill command does not return "true"
 				this.controls.progressbar.setProgress(0,100);
 			}
-			MMExecute('fl.trace("SVG Export Canceled")');
+			MMExecute('fl.trace("SVG Export Failed")');
 		}
 		
 		private function processQue(e:Event):void
 		{
-			if(this.isCanceled){return;}
+			if(this.isCanceled||this.finished){return;}
 			if(this.timer.delay<100){this.timer.delay=100;}
 			// attempt to process the que
-			var success;
+			var success,err;
 			try{
 				success=MMExecute('extensible.que.process()');
-			}catch(e){}
-			if(success=='true'){ 
+			}catch(err){}
+			if(success=='true'){
 				this.timer.stop();
 			}else{ // increase the delay with each failure
-				this.timer.delay+=20;
+				//MMExecute('fl.trace("'+success+'")');
+				//if(this.timer.delay>120){
+					this.cancel(e);
+				//}
+				//this.timer.delay+=20;
 			}
 		}
 		
@@ -696,7 +702,7 @@
 			}
 			if(!this.isCanceled){
 				this.setProgress(100,100);
-				MMExecute('fl.trace("Export Successful: "+decodeURIComponent("'+encodeURIComponent(this.controls.fileTextInput.text)+'"))');
+				//MMExecute('fl.trace("Export Successful: "+decodeURIComponent("'+encodeURIComponent(this.controls.fileTextInput.text)+'"))');
 			}
 			return true;
 		}
