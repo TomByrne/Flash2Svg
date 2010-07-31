@@ -5,25 +5,14 @@ http://dissentgraphics.com
 *Extensible is a javascript library for Flash Professional CS4 & CS5.
 
 Extensible provides wrappers for flash-specific classes used in 
-Flash Professional's Spydermonkey implementation which are, unlike the
+Flash Professional's SpyderMonkey implementation which are, unlike the
 built-in classes, extensible.
-
-In order to remain unobtrusive, Extensible avoids modification of built-in's
-like Array and Object, instead appending new classes to the global object
-'extensible', usually aliased as 'ext' for brevity.
-
-The naming convention puta each class in a file of the same name, so the
-definition for 'extensible.Array' is located under
-'Javascript/Extensible/Array.jsfl'.
-
-For testing & development, the script 'build.jsfl' at the root of the project
-will install/re-install all the extensions, from source, for all flash versions present.
 
 *Flash to SVG ( flash2svg ) *WIP
 
 Flash to SVG exports SVG images directly from Flash. After
 installing flash2svg.mxi, it can be accessed from 'Windows > Other Panels > SVG'.
-Currently only still images and sequences are supported, however animated output is in development.
+Currently only still images and sequences are supported. Animated output is in development.
 
 *In Place Cut, Copy, & Paste ( inPlaceClipboard.mxi )
 
