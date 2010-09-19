@@ -1930,9 +1930,22 @@
 			}else if(shape.isGroup){
 				id=this._uniqueID('group');
 				descendantMatrix=matrix.invert();
+				var c=shape.center;
+				var tr=shape.getTransformationPoint();
+				var osb=shape.objectSpaceBounds;
+				osb.left=Math.min(osb.left,c.x-tr.x);
+				osb.right=Math.max(osb.right,c.x-tr.x);
+				osb.top=Math.min(osb.top,c.y-tr.y);
+				osb.bottom=Math.max(osb.bottom,c.y-tr.y);
 				pathMatrix=new ext.Matrix({
-					tx:(shape.objectSpaceBounds.left+shape.objectSpaceBounds.right)/2.0,
-					ty:(shape.objectSpaceBounds.top+shape.objectSpaceBounds.bottom)/2.0
+					tx:(
+						osb.left+
+						osb.right
+					)/2.0,
+					ty:(
+						osb.top+
+						osb.bottom
+					)/2.0
 				});
 				pathMatrix=pathMatrix.invert();
 				matrix=matrix.concat(settings.matrix);
@@ -1970,36 +1983,41 @@
 				if(s){
 					validContours.push(contours[i]);
 					svgArray.push(s);
-					if(contours[i].interior){
+					if(contours[i].orientation!=0){
 						var oppositeFill=contours[i].oppositeFill;
 						var fill=contours[i].fill;
 						if(
-							filled.length>0  //&& contours[i].oppositeFill.style!='noFill'
+							filled.length>0  && contours[i].oppositeFill.style!='noFill'
 						){
+							var found=false;
 							for(var n=filled.length-1;n>-1;n-=1){
 								if(
-									oppositeFill.is(validContours[filled[n]].fill) || (
-										oppositeFill.style=='noFill' &&
-										fill.style=='noFill'
-									)
+									(
+										oppositeFill.is(validContours[filled[n]].fill) || (
+											oppositeFill.style=='noFill' &&
+											fill.style=='noFill'
+										)
+									) && !fill.is(validContours[filled[n]].fill)
 								){
-									if(!fill.is(validContours[filled[n]].fill)){
-										var cutID=String(svgArray[filled[n]].path[0]['@id']);
-										s=this._getContour(contours[i],{
-											colorTransform:settings.colorTransform,
-											reversed:cutID
-										});
-										if(s){
-											var pStr=String(s.path[0]['@d']).trim();
-											if(pStr[pStr.length-1]!=='z'){
-												pStr+='z';
-											}
-											svgArray[filled[n]].path[0]['@d']+=/^[^Zz]*[Zz]?/.exec(pStr)[0];
-											break;
+									var cutID=String(svgArray[filled[n]].path[0]['@id']);
+									s=this._getContour(contours[i],{
+										colorTransform:settings.colorTransform,
+										reversed:Boolean(
+											contours[i].orientation==validContours[filled[n]].orientation
+										)
+									});
+									if(s){
+										found=true;
+										var pStr=String(s.path[0]['@d']).trim();
+										if(pStr[pStr.length-1]!=='z'){
+											pStr+='z';
 										}
+										svgArray[filled[n]].path[0]['@d']+=/^[^Zz]*[Zz]?/.exec(pStr)[0];
+										break;
 									}
 								}
 							}
+							fl.trace(found);
 							if(contours[i].fill.style=='noFill'){
 								ii=0;
 								for each(n in svgArray[svgArray.length-1].*){
@@ -2306,6 +2324,7 @@
 			if(typeof fillObj=='string'){
 				fillObj=new ext.Fill(fillObj);
 			}else if(fillObj.style=='noFill'){
+				if(ext.log){ext.log.pauseTimer(timer);}
 				return;
 			}
 			id=this._uniqueID(fillObj.style);
@@ -2317,7 +2336,10 @@
 					defaultMeasurement=this.DEFAULT_GRADIENT_LENGTH;
 				case 'radialGradient':
 					defaultMeasurement=defaultMeasurement||this.DEFAULT_GRADIENT_RADIUS;
-					if(!shape){return;}
+					if(!shape){
+						if(ext.log){ext.log.pauseTimer(timer);}
+						return;
+					}
 					xml=new XML('<'+fillObj.style+'/>');
 					xml['@gradientUnits']=settings.gradientUnits;
 					xml['@color-interpolation']=fillObj.linearRGB?'linearRGB':'sRGB';
@@ -2435,9 +2457,7 @@
 					break;
 			}
 			xml['@id']=id;
-			if(ext.log){
-				ext.log.pauseTimer(timer);	
-			}
+			if(ext.log){ext.log.pauseTimer(timer);}
 			return xml;
 		},
 		/**

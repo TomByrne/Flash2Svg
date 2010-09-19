@@ -334,15 +334,16 @@
 			}else if(args.length>0){
 				rlist=Array.prototype.slice.call(args);
 			}else{
-				rlist=[undefined];
+				rlist=[];
 			}
-			if(!(rlist instanceof this.type)){
-				rlist=new this.type(rlist);
+			if(rlist.length==0){return this;}
+			if(!(rlist instanceof ext.Array)){
+				rlist=new ext.Array(rlist);
 			}
-			var filtered=this.filter(function(element,index,array){
-				return rlist.indexOf(element)<0 ;
-			});
-			return filtered;
+			var f=this.filter(function(element,index,array){
+				return this.indexOf(element)<0;
+			},rlist);
+			return f;
 		},
 		/**
 		 * Reverses the order of the enumerable elements in [this].

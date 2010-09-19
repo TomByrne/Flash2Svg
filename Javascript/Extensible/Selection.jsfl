@@ -165,7 +165,7 @@
 		concat:function(){
 			var c=new this.type(this,this.options);
 			for(var i=0;i<arguments.length;i++){
-				if(arguments[i].constructor.name=='Array'){
+				if(arguments[i] && arguments[i].constructor && arguments[i].constructor.name=='Array'){
 					for(var n=0;n<arguments[i].length;n++){
 						c.push(arguments[i][n]);
 					}

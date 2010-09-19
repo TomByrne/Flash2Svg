@@ -95,12 +95,24 @@
 		},
 		set sel(s){
 			var sel=this.sel;
-			s=new this.Selection(s);
-			var removeSel=sel.remove(s);
-			var addSel=s.remove(sel);
-			for(i=0;i<removeSel.length;i++){removeSel[i].selected=false;}
+			if(s.type!==extensible.Selection){
+				s=new this.Selection(s);
+			}
+			var removeSel=s.length==0?sel:(sel.length==0?[]:sel.remove(s));
+			var addSel=s.length==0?[]:(sel.length==0?s:s.remove(sel));
+			for(i=0;i<removeSel.length;i++){
+				try{
+					removeSel[i].selected=false;
+				}catch(e){
+					this.warn('Error');
+				}
+			}
 			for(i=0;i<addSel.length;i++){
-				addSel[i].selected=true;
+				try{
+					addSel[i].selected=true;
+				}catch(e){
+					this.warn('Error');
+				}
 			}
 		},
 		get viewMatrix(){

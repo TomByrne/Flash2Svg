@@ -56,7 +56,7 @@
 			return this.getEdgeIDs();
 		},set edgeIDs(){},					
 		get oppositeFill(){
-			if(this.cache['oppositeFill']==undefined){
+			if(this.cache.oppositeFill==undefined){
 				this.cache.oppositeFill=this.getOppositeFill();
 			}
 			return this.cache.oppositeFill;
@@ -65,10 +65,11 @@
 			this.cache.oppositeFill=fill;
 		},
 		get oppositeFills(){
-			if(this.cache['oppositeFill']===undefined){
-				this.cache.oppositeFill=this.getOppositeFill();
+			if(this.cache['oppositeFills']===undefined){
+				this.cache.oppositeFills=this.getOppositeFills();
+				this.cache.oppositeFill=this.cache.oppositeFills[0];
 			}
-			return this.cache.oppositeFill;
+			return this.cache.oppositeFills;
 		},set oppositeFills(){},
 		getEdgeIDs:function(){
 			return this.getEdges(true);
@@ -94,10 +95,11 @@
 				id=he.id;
 			}
 			edgeIDs.sort(function(a,b){return(a-b);});
+			edges.sort(function(a,b){return(a.id-b.id);});
 			this.cache['edgeIDs']=edgeIDs;
 			this.cache['edges']=edges;
 			if(ext.log){
-				ext.log.pauseTimer(timer);	
+				ext.log.pauseTimer(timer);
 			}
 			return getIDs?edgeIDs:edges;
 		},
@@ -117,18 +119,23 @@
 				if(all){
 					if(contours[i].edgeIDs.intersect(edgeIDs).length>0){
 						this.cache.oppositeFills.push(contours[i].fill);
-						opposites.push(contours[i].fill);
 					}
 				}else if(contours[i].edgeIDs.is(edgeIDs)){
 					this.cache.oppositeFill=contours[i].fill;
 					return contours[i].fill;
 				}
 			}
+			if(all){
+				return 	this.cache.oppositeFills;
+			}
+		},
+		getOppositeFills:function(){
+			return this.getOppositeFill(true);
 		},
 		/**
 		 * Retrieves a complete list of control points and/or cubic segment points, 
 		 * grouped in ordered arrays. When options.degree==3, cubic segment points 
-		 * are used where available. On rare occasions, cubic segment points are out 
+		 * are used where available. On rare occasions, cubic segment points are out
 		 * of sync with a contour's quadratic control points used for display, but are 
 		 * still retrievable, and therefore are used in this output. This usually only
 		 * occurs when migrating from an earlier version of flash, so in the future we
@@ -250,6 +257,12 @@
 							points[prev].reverse();
 						}
 					}
+					if(controlPoints.length){ // safegaurd
+						var join=points[i].indexOf(controlPoints[0][0]);
+						if(join>-1 && join<deg){
+							break;
+						}						
+					}
 					if(i<points.length){
 						prevIsLine=(i>0 && !removeNum)?isLine:points[prev].isLine;			
 						isLine=i>0?nextIsLine:points[i].isLine;
@@ -315,7 +328,7 @@
 						}						
 					}
 				}
-				if(broken){
+				if(broken){// && !this.interior
 					var segments=new ext.Array([new ext.Array([controlPoints[0]])]);
 					for(i=1;i<controlPoints.length;i++){
 						if(controlPoints[i-1].at(-1).is(controlPoints[i][0])){

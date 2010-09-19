@@ -552,8 +552,10 @@
 			var layers=this.layers;
 			for(var l=0;l<layers.length;l++){
 				if(
-					(layers[l].visible || settings.includeHiddenLayers) && 
-					(layers[l].layerType!='guide' || settings.includeGuides)
+					( layers[l].visible || settings.includeHiddenLayers ) && (
+						( layers[l].layerType!='guide' && layers[l].layerType!="folder" ) || 
+						settings.includeGuides
+					)
 				){
 					if(settings.position==undefined){
 						f=f.concat(layers[l].frames);

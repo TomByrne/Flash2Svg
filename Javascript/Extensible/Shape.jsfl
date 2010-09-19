@@ -13,7 +13,7 @@
 		getCubicSegmentPoints:function(cubicSegmentIndex,options){
 			if(cubicSegmentIndex){
 				if(ext.log){
-					var timerCSPL=ext.log.startTimer('Cubic segment point lookup.');
+					var timerCSPL=ext.log.startTimer('Extensible.Shape.getCubicSegmentPoints()');
 				}
 				var settings=new ext.Object({
 					shape:this,
@@ -23,6 +23,7 @@
 				var cachePoints;
 				cachePoints=this.cache.cubicSegmentPoints[cubicSegmentIndex];
 				if(cachePoints && cachePoints.length){
+					if(ext.log){ext.log.pauseTimer(timerCSPL);}
 					return this.cache.cubicSegmentPoints[cubicSegmentIndex];
 				}
 				var csp=this.$.getCubicSegmentPoints(cubicSegmentIndex);
@@ -33,9 +34,7 @@
 					);
 				}
 				this.cache.cubicSegmentPoints[cubicSegmentIndex]=new ext.Array(points);
-				if(ext.log){
-					ext.log.pauseTimer(timerCSPL);
-				}
+				if(ext.log){ext.log.pauseTimer(timerCSPL);}
 				return points;
 			}else{
 				return;

@@ -51,7 +51,7 @@
 		},
 		paste:function(){
 			ext.doc.clipPaste(true);
-			var originalSelection=ext.sel;
+			var originalSelection=new ext.Selection(ext.sel);
 			var sel=originalSelection.expandGroups();
 			var groups=sel.getGroups();
 			sel=sel.remove(groups);
@@ -62,7 +62,7 @@
 				mx.push(gmx.concat(ext.viewMatrix.invert()));
 			}
 			for(var i=0;i<sel.length;i++){
-				if(!(sel[i].isGroup && sel[i].parent)){
+				if(!(sel[i].isGroup && sel[i].parent!==undefined)){
 					sel[i].x=mx[i].tx;
 					sel[i].y=mx[i].ty;
 					sel[i].matrix=mx[i];
