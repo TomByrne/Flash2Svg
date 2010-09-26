@@ -56,7 +56,7 @@
 			return this.getEdgeIDs();
 		},set edgeIDs(){},					
 		get oppositeFill(){
-			if(this.cache.oppositeFill==undefined){
+			if(this.cache['oppositeFill']==undefined){
 				this.cache.oppositeFill=this.getOppositeFill();
 			}
 			return this.cache.oppositeFill;
@@ -65,11 +65,10 @@
 			this.cache.oppositeFill=fill;
 		},
 		get oppositeFills(){
-			if(this.cache['oppositeFills']===undefined){
-				this.cache.oppositeFills=this.getOppositeFills();
-				this.cache.oppositeFill=this.cache.oppositeFills[0];
+			if(this.cache['oppositeFill']===undefined){
+				this.cache.oppositeFill=this.getOppositeFill();
 			}
-			return this.cache.oppositeFills;
+			return this.cache.oppositeFill;
 		},set oppositeFills(){},
 		getEdgeIDs:function(){
 			return this.getEdges(true);
@@ -95,11 +94,10 @@
 				id=he.id;
 			}
 			edgeIDs.sort(function(a,b){return(a-b);});
-			edges.sort(function(a,b){return(a.id-b.id);});
 			this.cache['edgeIDs']=edgeIDs;
 			this.cache['edges']=edges;
 			if(ext.log){
-				ext.log.pauseTimer(timer);
+				ext.log.pauseTimer(timer);	
 			}
 			return getIDs?edgeIDs:edges;
 		},
@@ -119,18 +117,13 @@
 				if(all){
 					if(contours[i].edgeIDs.intersect(edgeIDs).length>0){
 						this.cache.oppositeFills.push(contours[i].fill);
+						opposites.push(contours[i].fill);
 					}
 				}else if(contours[i].edgeIDs.is(edgeIDs)){
 					this.cache.oppositeFill=contours[i].fill;
 					return contours[i].fill;
 				}
 			}
-			if(all){
-				return 	this.cache.oppositeFills;
-			}
-		},
-		getOppositeFills:function(){
-			return this.getOppositeFill(true);
 		},
 		/**
 		 * Retrieves a complete list of control points and/or cubic segment points, 

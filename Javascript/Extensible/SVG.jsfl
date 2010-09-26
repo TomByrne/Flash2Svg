@@ -1987,45 +1987,75 @@
 						var oppositeFill=contours[i].oppositeFill;
 						var fill=contours[i].fill;
 						if(
-							filled.length>0  && contours[i].oppositeFill.style!='noFill'
+							filled.length>0 && !(
+								oppositeFill.style=='noFill' &&
+								fill.style=='noFill'
+							)
 						){
-							var found=false;
 							for(var n=filled.length-1;n>-1;n-=1){
+								var insideOut=fill.is(validContours[filled[n]].fill);
+								var sameDir=(
+									contours[i].orientation<0
+									//|| contours[i].getControlPoints( {curveDegree:this.curveDegree} ).isReversed
+								)==(
+									validContours[filled[n]].orientation<0
+									//|| validContours[filled[n]].getControlPoints( {curveDegree:this.curveDegree} ).isReversed
+								);
 								if(
-									(
-										oppositeFill.is(validContours[filled[n]].fill) || (
-											oppositeFill.style=='noFill' &&
-											fill.style=='noFill'
-										)
-									) && !fill.is(validContours[filled[n]].fill)
+									svgArray[filled[n]].path.length()
+									&& svgArray[filled[n]].path[0].@stroke.length()==0 
+									&& (
+										oppositeFill.is(validContours[filled[n]].fill) 
+										//|| (oppositeFill.style=='noFill' && fill.style=='noFill')
+										|| insideOut
+									)
 								){
 									var cutID=String(svgArray[filled[n]].path[0]['@id']);
+									var rev=( sameDir && !insideOut ) || ( insideOut && !sameDir);
 									s=this._getContour(contours[i],{
 										colorTransform:settings.colorTransform,
-										reversed:Boolean(
-											contours[i].orientation==validContours[filled[n]].orientation
-										)
+										reversed: rev
 									});
 									if(s){
-										found=true;
-										var pStr=String(s.path[0]['@d']).trim();
-										if(pStr[pStr.length-1]!=='z'){
-											pStr+='z';
+										var so=this._getContour(contours[i],{
+											colorTransform:settings.colorTransform,
+											reversed: !rev
+										});
+										for(var p=0;p<s.path.length() && p<so.path.length();p++){
+											var pStr=String(s.path[p]['@d']).trim();
+											if(pStr[pStr.length-1]!=='z'){
+												pStr+='z';
+											}
+											var pA=/^[^Zz]*[Zz]?/.exec(pStr)[0];
+											var pAO=null;
+											var pStrO=String(so.path[p]['@d']).trim();
+											if(pStrO[pStrO.length-1]!=='z'){
+												pStrO+='z';
+											}
+											pAO=/^[^Zz]*[Zz]?/.exec(pStrO)[0];
+											var fs=String(svgArray[filled[n]].path[0]['@d']).match(/^[^Zz]*[Zz]?/)[0];
+											if(fs!==pAO && fs!==pA){
+												svgArray[filled[n]].path[0]['@d']+=pA;
+											}
 										}
-										svgArray[filled[n]].path[0]['@d']+=/^[^Zz]*[Zz]?/.exec(pStr)[0];
 										break;
 									}
 								}
 							}
-							fl.trace(found);
-							if(contours[i].fill.style=='noFill'){
+							if(
+								fill.style=='noFill' || (
+									insideOut && oppositeFill.style=='noFill'
+								)
+							){
 								ii=0;
-								for each(n in svgArray[svgArray.length-1].*){
+								var sa=svgArray[svgArray.length-1].copy();
+								for each(var n in sa.*){
 									if(n['@stroke'].length()==0){
 										delete svgArray[svgArray.length-1].path[ii];
 									}
 									ii+=1;
 								}
+								delete sa;
 							}
 						}
 						if(contours[i].fill.style!='noFill'){
@@ -2155,7 +2185,9 @@
 				paths.push('<path  '+idString+xform+'fill="'+fillString+'" fill-opacity="'+opacityString+'" d="'+cdata+'"/>\n');
 			}
 			var hasStroke=false;
-			if(controlPoints.length>0 && !settings.reversed){//Create a contour for each length of contiguous edges w/ the same stroke attributes. Skipped for settings.reversed, which is only used for creating hollows.
+			if(controlPoints.length>0 && !settings.reversed){
+				//Create a contour for each length of contiguous edges w/ the same stroke attributes. 
+				//Skipped for settings.reversed, which is only used for creating hollows.
 				var cp=new ext.Array([]);
 				var stroke=null;
 				var firstEdge=controlPoints[0][0].edge;

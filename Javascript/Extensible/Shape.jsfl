@@ -42,7 +42,13 @@
 		},
 		get contours(){
 			if(!this.$){return;}
-			if(this.cache['contours']){return this.cache.contours;}
+			if(this.cache['contours']){
+				return this.cache.contours;
+			}else{
+				return this.getContours();
+			}
+		},
+		getContours:function(){
 			var contours=new ext.Array();
 			for(var i=0;i<this.$.contours.length;i++){
 				var c=new ext.Contour(this.$.contours[i],{shape:this});
@@ -52,12 +58,15 @@
 						matched=true;
 						if(c.interior){
 							c.oppositeFill=contours[n].fill;
+							//contours[n].oppositeFill=c.fill;
 						}
 						contours[n]=c;
 						break;
 					}
 				}
-				if(!matched){contours.push(c);}
+				if(!matched){
+					contours.push(c);
+				}
 			}
 			this.cache.contours=contours;
 			return contours;

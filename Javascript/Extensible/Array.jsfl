@@ -185,10 +185,11 @@
 		 * @see Array.filter
 		 */
 		filter:function(){
-			var filtered=new this.type(this);
+			return new this.type(Array.prototype.filter.apply(this,arguments));
+			/*var filtered=new this.type(this);
 			var a=Array.prototype.filter.apply(this,arguments);
 			filtered.clear(a);
-			return(filtered);
+			return(filtered);*/
 		},
 		/**
 		 * @parameter {Boolean} recursive If true, reverses child Arrays.
