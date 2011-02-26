@@ -655,10 +655,10 @@
 				this.timer.stop();
 			}else{ // increase the delay with each failure
 				//MMExecute('fl.trace("'+success+'")');
-				//if(this.timer.delay>120){
+				if(this.timer.delay>120){
 					this.cancel(e);
-				//}
-				//this.timer.delay+=20;
+				}
+				this.timer.delay+=20;
 			}
 		}
 		

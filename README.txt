@@ -12,7 +12,7 @@ built-in classes, extensible.
 
 Flash to SVG exports SVG images directly from Flash. After
 installing flash2svg.mxi, it can be accessed from 'Windows > Other Panels > SVG'.
-Currently only still images and sequences are supported. Animated output is in development.
+Currently only still images and sequences are supported.
 
 *In Place Cut, Copy, & Paste ( inPlaceClipboard.mxi )
 

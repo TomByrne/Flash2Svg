@@ -356,7 +356,7 @@
 			if(recursive){
 				for(var i=0;i<this.length;i++){
 					if(this[i] instanceof Array){
-						this[i].reverse(recursive);
+						this[i]=this[i].reverse(recursive);
 					}
 				}
 			}

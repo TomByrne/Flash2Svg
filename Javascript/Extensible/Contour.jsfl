@@ -4,11 +4,11 @@
 			this.$=contour;
 		}else if(contour instanceof this.type){
 			this.$=contour.$;
-			ext.Object.apply(this,contour);
+			ext.Object.apply(this,[contour,{shape:options.shape}]);
 		}else{
 			this.$=new Contour();
 		}
-		if(options.shape instanceof ext.Shape){
+		if(options && options.shape instanceof ext.Shape){
 			this.shape=options.shape;
 		}else if(options.shape instanceof Shape){
 			this.shape=new ext.Shape(options.shape);
@@ -114,15 +114,26 @@
 			}
 			var contours=this.shape.contours;
 			for(var i=0;i<contours.length;i++){
+				if(contours[i].edgeIDs.is(edgeIDs)){
+					this.cache.oppositeFill=contours[i].fill;
+					if(
+						!all 
+						//&& !contours[i].fill.style=='noFill'
+					){
+						return contours[i].fill;
+					}
+				}
 				if(all){
 					if(contours[i].edgeIDs.intersect(edgeIDs).length>0){
 						this.cache.oppositeFills.push(contours[i].fill);
 						opposites.push(contours[i].fill);
 					}
-				}else if(contours[i].edgeIDs.is(edgeIDs)){
-					this.cache.oppositeFill=contours[i].fill;
-					return contours[i].fill;
-				}
+				} 
+			}
+			if(all){
+				return opposites;
+			}else{
+				return this.cache.oppositeFill;
 			}
 		},
 		/**
@@ -250,11 +261,8 @@
 							points[prev].reverse();
 						}
 					}
-					if(controlPoints.length){ // safegaurd
-						var join=points[i].indexOf(controlPoints[0][0]);
-						if(join>-1 && join<deg){
-							break;
-						}						
+					if(controlPoints.length && controlPoints[0][0].is(points[i][0][0])){ // safegaurd
+						break;
 					}
 					if(i<points.length){
 						prevIsLine=(i>0 && !removeNum)?isLine:points[prev].isLine;			
@@ -321,9 +329,16 @@
 						}						
 					}
 				}
-				if(broken){// && !this.interior
-					var segments=new ext.Array([new ext.Array([controlPoints[0]])]);
-					for(i=1;i<controlPoints.length;i++){
+				if(
+					broken
+					&& !this.interior
+				){
+					var segments=new ext.Array([
+						new ext.Array([
+								controlPoints[0]
+						])
+					]);
+					for(var i=1;i<controlPoints.length;i++){
 						if(controlPoints[i-1].at(-1).is(controlPoints[i][0])){
 							segments[segments.length-1].push(controlPoints[i]);
 						}else{
@@ -361,35 +376,56 @@
 					}
 					while(segments.length>0){
 						var rev=false;
+						var start=controlPoints[0][0];
 						var end=controlPoints.at(-1).at(-1);
-						var dist=end.distanceTo(segments[0][0][0]);
+						var dist=99999999999999;//end.distanceTo(segments[0][0][0]);
 						var closest=0;
+						var pre=false;
 						for(i=0;i<segments.length;i++){
 							var qDist=end.distanceTo(segments[i][0][0]);
 							if(qDist<dist){
 								rev=false;
 								closest=i;
 								dist=qDist;
-							}else{
-								qDist=end.distanceTo(segments[i].at(-1).at(-1));
-								if(qDist<dist){
-									rev=true;
-									closest=i;
-									dist=qDist;
-								}
+								pre=false;
+							}
+							qDist=end.distanceTo(segments[i].at(-1).at(-1));
+							if(qDist<dist){
+								rev=true;
+								closest=i;
+								dist=qDist;
+								pre=false;
+							}
+							qDist=start.distanceTo(segments[i].at(-1).at(-1));
+							if(qDist<dist){
+								rev=false;
+								closest=i;
+								dist=qDist;
+								pre=true;
+							}
+							qDist=start.distanceTo(segments[i][0][0]);
+							if(qDist<dist){
+								rev=true;
+								closest=i;
+								dist=qDist;
+								pre=true;
 							}
 						}
 						if(rev){
 							segments[closest].reverse(true);
 						}
-						controlPoints.extend(segments.splice(closest,1)[0]);
+						if(pre){
+							controlPoints.prepend(segments.splice(closest,1)[0]);
+						}else{
+							controlPoints.extend(segments.splice(closest,1)[0]);
+						}
 					}
 				}
 				if( // When < 3 edges are present, re-ordering can reverse the contour, so double check.
 					controlPoints.length<3 && controlPoints.length>0 && 
 					[-1,1][Number(Boolean(controlPoints[0].isReversed))]!=this.orientation
 				){
-					controlPoints.reverse(true);	
+					controlPoints.reverse(true);
 				}
 				this.cache[cacheID]=controlPoints;
 				this.cache.edges=edges;
@@ -397,8 +433,8 @@
 			if(ext.log){
 				ext.log.pauseTimer(timer2);
 			}
-			if(settings.reversed!==false){
-				controlPoints.reverse(true);
+			if(settings.reversed){
+				controlPoints=(new ext.Array(controlPoints)).getReversed(true);
 			}
 			return controlPoints;
 		},

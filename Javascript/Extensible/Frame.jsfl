@@ -12,6 +12,9 @@
 		if(frame.startFrame){
 			this.cache.startFrame=frame.startFrame;
 		}
+		if(frame.duration){
+			this.cache.duration=frame.duration;
+		}
 		if(options && options.layer){
 			if(options.layer instanceof Layer){
 				this.cache.layer=new ext.Layer(options.layer,{timeline:options.timeline});
@@ -67,10 +70,10 @@
 			this.$.actionScript=s;
 		},
 		get duration(){
-			return this.$.duration;
+			return this.cache.duration!==undefined ? this.cache.duration : this.$.duration;
 		},
 		set duration(s){
-			this.$.duration=s;
+			this.cache.duration=s;
 		},
 		get elements(){
 			var options={};

@@ -1,1 +1,3 @@
-fl.runScript(fl.configURI+"Javascript/Extensible/init.jsfl");
+try{
+	fl.runScript(fl.configURI+'Javascript/Extensible/init.jsfl');
+}catch(e){}
