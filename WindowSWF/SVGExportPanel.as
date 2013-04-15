@@ -56,6 +56,7 @@
 					'extensible.dev.valueOf()'
 				].join('\n'))=='true'
 			);
+			//this.dev=true;
 			this.jsDir=MMExecute('extensible.dir.valueOf()');
 			// Display
 			stage.align=StageAlign.TOP_LEFT;
@@ -235,7 +236,8 @@
 			var verticalOffset:Number=0;
 			var bottom=0;
 			if(
-				this.controls.framesComboBox.selectedItem.label!='Current'
+				this.controls.framesComboBox.selectedItem.label!='Current' ||
+				this.controls.framesComboBox.selectedItem.label!='Animation'
 			){
 				verticalOffset+=30;
 				this.controls.startFrameNumericStepper.visible=true;

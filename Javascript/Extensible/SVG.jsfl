@@ -91,6 +91,8 @@
 				this.startFrame=0;
 				this.endFrame=1;
 			}
+		}else if(this.frames=='Animation'){
+			this.animated = true;
 		}
 		if(typeof(this.curveDegree)=='string'){
 			this.curveDegree=['','','Quadratic','Cubic'].indexOf(this.curveDegree);
@@ -719,8 +721,9 @@
 			}
 			var documents;
 			if(
-				this.timelines.length==1 &&
-				this.frames.length==1
+				(this.timelines.length==1 &&
+				this.frames.length==1) ||
+				this.animated
 			){
 				documents=new ext.Array([this.xml]);
 			}else{
@@ -819,7 +822,7 @@
 		 * @parameter {XML} defs
 		 */
 		expandUse:function( xml,recursive,defs ){
-			fl.trace(fl.getAppMemoryInfo(1));
+			//fl.trace(fl.getAppMemoryInfo(1));
 			defs=defs||xml.defs||this.xml.defs;
 			if(recursive==undefined){
 				recursive=true;
@@ -1370,6 +1373,34 @@
 				}
 				this._rootItem[timelineName][settings.frame]=id;
 			}
+
+			if(this.animated){
+				var frameTimeStart = String(Math.roundTo(settings.frame/timeline.frames.length,this.decimalPointPrecision));
+				var frameTimeEnd = String(Math.roundTo((settings.frame+1)/timeline.frames.length,this.decimalPointPrecision));
+				var totalTime = String(Math.roundTo(timeline.frames.length*(1/ext.doc.frameRate),this.decimalPointPrecision));
+
+				var animNode = <animate
+							      attributeName="display"
+							      begin="0s"
+							      repeatCount="indefinite" />;
+
+				if(settings.frame==0){
+					animNode.@values="inline;none;none";
+					animNode.@keyTimes = frameTimeStart+";"+frameTimeEnd+";1";
+
+				}else if(settings.frame==timeline.frames.length-1){
+					animNode.@values="none;none;inline";
+					animNode.@keyTimes = "0;"+frameTimeStart+";"+frameTimeEnd;
+
+				}else{
+					animNode.@values="none;inline;none;none";
+					animNode.@keyTimes = "0;"+frameTimeStart+";"+frameTimeEnd+";1";
+
+				}
+				animNode.@dur = totalTime+"s";
+			}
+
+
 			/*
 			 * Loop through the visible frames by layer &
 			 * either take note of the elements for linear
@@ -1461,6 +1492,10 @@
 								layerXML.appendChild(element);
 							};
 						}
+					}
+
+					if(this.animated){
+						layerXML.appendChild(animNode.copy());
 					}
 					/*
 					 * Masked layers are grouped together and inserted after
