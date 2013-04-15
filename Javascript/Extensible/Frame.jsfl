@@ -9,7 +9,7 @@
 		}
 		ext.Object.apply(this,[options]);
 		this.cache=new ext.Object({});
-		if(frame.startFrame){
+		if(frame.startFrame!=undefined){
 			this.cache.startFrame=frame.startFrame;
 		}
 		if(frame.duration){

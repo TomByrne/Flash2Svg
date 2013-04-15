@@ -1376,7 +1376,6 @@
 
 			if(this.animated){
 				var frameTimeStart = String(Math.roundTo(settings.frame/timeline.frames.length,this.decimalPointPrecision));
-				var frameTimeEnd = String(Math.roundTo((settings.frame+1)/timeline.frames.length,this.decimalPointPrecision));
 				var totalTime = String(Math.roundTo(timeline.frames.length*(1/ext.doc.frameRate),this.decimalPointPrecision));
 
 				var animNode = <animate
@@ -1386,15 +1385,12 @@
 
 				if(settings.frame==0){
 					animNode.@values="inline;none;none";
-					animNode.@keyTimes = frameTimeStart+";"+frameTimeEnd+";1";
 
 				}else if(settings.frame==timeline.frames.length-1){
 					animNode.@values="none;none;inline";
-					animNode.@keyTimes = "0;"+frameTimeStart+";"+frameTimeEnd;
 
 				}else{
 					animNode.@values="none;inline;none;none";
-					animNode.@keyTimes = "0;"+frameTimeStart+";"+frameTimeEnd+";1";
 
 				}
 				animNode.@dur = totalTime+"s";
@@ -1422,6 +1418,10 @@
 						this._symbols[settings.libraryItem.name][settings.frame][i]=id;
 					}else if(settings.isRoot){
 						this._rootItem[timelineName][settings.frame][i]=id;
+					}
+					if(this.animated && layer.frames[settings.frame].startFrame!=settings.frame){
+						// Skip frames that haven't changed since the last frame (when in animation mode).
+						continue;
 					}
 					/*
 					 * If the masking type is "Alpha" or "Clipping"
@@ -1495,7 +1495,26 @@
 					}
 
 					if(this.animated){
-						layerXML.appendChild(animNode.copy());
+						var frameEnd = settings.frame+1;
+						if(timeline.frames[settings.frame].tweenType=='none'){
+							while(frameEnd<timeline.frames.length && timeline.frames[frameEnd].startFrame==settings.frame){
+								frameEnd++;
+								// this will add in extra time for frames with non changing content (which won't be included as a real frame)
+							}
+						}
+						var frameTimeEnd = String(Math.roundTo(frameEnd/timeline.frames.length,this.decimalPointPrecision));
+						var layerAnimNode = animNode.copy();
+						if(settings.frame==0){
+							layerAnimNode.@keyTimes = frameTimeStart+";"+frameTimeEnd+";1";
+
+						}else if(settings.frame==timeline.frames.length-1){
+							layerAnimNode.@keyTimes = "0;"+frameTimeStart+";"+frameTimeEnd;
+
+						}else{
+							layerAnimNode.@keyTimes = "0;"+frameTimeStart+";"+frameTimeEnd+";1";
+
+						}
+						layerXML.appendChild(layerAnimNode);
 					}
 					/*
 					 * Masked layers are grouped together and inserted after
