@@ -1374,7 +1374,8 @@
 				this._rootItem[timelineName][settings.frame]=id;
 			}
 
-			if(this.animated){
+			var doAnim = this.animated && timeline.frames.length>1;
+			if(doAnim){
 				var frameTimeStart = String(Math.roundTo(settings.frame/timeline.frames.length,this.decimalPointPrecision));
 				var totalTime = String(Math.roundTo(timeline.frames.length*(1/ext.doc.frameRate),this.decimalPointPrecision));
 
@@ -1419,7 +1420,8 @@
 					}else if(settings.isRoot){
 						this._rootItem[timelineName][settings.frame][i]=id;
 					}
-					if(this.animated && layer.frames[settings.frame].startFrame!=settings.frame){
+					var frame = layer.frames[settings.frame]
+					if(this.animated && frame.startFrame!=settings.frame && layer.frames[frame.startFrame].tweenType=='none'){
 						// Skip frames that haven't changed since the last frame (when in animation mode).
 						continue;
 					}
@@ -1494,10 +1496,10 @@
 						}
 					}
 
-					if(this.animated){
+					if(doAnim){
 						var frameEnd = settings.frame+1;
-						if(timeline.frames[settings.frame].tweenType=='none'){
-							while(frameEnd<timeline.frames.length && timeline.frames[frameEnd].startFrame==settings.frame){
+						if(layer.frames[settings.frame].tweenType=='none'){
+							while(frameEnd<layer.frames.length && layer.frames[frameEnd].startFrame==settings.frame){
 								frameEnd++;
 								// this will add in extra time for frames with non changing content (which won't be included as a real frame)
 							}
