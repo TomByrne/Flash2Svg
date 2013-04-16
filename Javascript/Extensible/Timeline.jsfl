@@ -568,6 +568,40 @@
 			}
 			return f;	
 		},
+		hasTweensInRange:function(options){
+			var settings=new ext.Object({
+				startFrame:0,
+				endFrame:this.frames.length,
+				includeHiddenLayers:ext.includeHiddenLayers,
+				includeGuides:false
+			});
+			settings.extend(options);
+			var f=new ext.Array();
+			var layers=this.layers;
+			for(var l=0;l<layers.length;l++){
+				var layer = layers[l];
+				if(
+					( layer.visible || settings.includeHiddenLayers ) && (
+						( layer.layerType!='guide' && layer.layerType!="folder" ) || 
+						settings.includeGuides
+					)
+				){
+					var layerEnd = settings.endFrame;
+					if(layerEnd>layer.frameCount)layerEnd = layer.frameCount;
+
+					for(var i=settings.startFrame;i<layerEnd;i++){ // check for tweens
+						var frame = layer.frames[i];
+						if(
+							frame.tweenType!='none' &&
+							settings.frame!=frame.startFrame
+						){
+							return true;
+						}
+					}
+				}
+			}
+			return false;	
+		},
 		//getter properties
 		get elements(){
 			return this.getElements();

@@ -101,7 +101,7 @@
 		this._timer=undefined;
 		this._symbols={};
 		this._bitmaps={};
-		this._rootItem={};
+		//this._rootItem={};
 		this._tempFolder=ext.lib.uniqueName('temp'); // Library folder holding temporary symbols.
 		this._ids={}; // Used by uniqueID() for cross-checking IDs.
 		this._progressMax=0;
@@ -627,7 +627,7 @@
 					for(n=0;n<this.timelines[i].frames.length;n++){
 						this._progressMax+=this._getProgressIncrements(
 							this.timelines[i].timeline,
-							this.timelines[i].frames[n],
+							n,
 							true
 						);
 					}
@@ -652,29 +652,29 @@
 			this.xml['@xml:space']='preserve';
 			this.xml.appendChild(new XML('<defs/>'));
 			for(i=0;i<this.timelines.length;i++){
-				for(n=0;n<this.timelines[i].frames.length;n++){
+				var timeline = this.timelines[i];
+				//for(n=0;n<this.timelines[i].frames.length;n++){
 					var x=this._getTimeline(
-						this.timelines[i].timeline,
+						timeline.timeline,
 						{
-							matrix:this.timelines[i].matrix,
-							frame:this.timelines[i].frames[n],
+							matrix:timeline.matrix,
+							startFrame:0,
+							endFrame:timeline.frames.length,
 							selection:this.selection,
-							libraryItem:this.timelines[i].libraryItem,
+							libraryItem:timeline.libraryItem,
 							isRoot:true
 						}
 					);
-					if(
-						this.timelines[i].matrix.is(new ext.Matrix()) &&
+					/*if(timeline.matrix.is(new ext.Matrix()) &&
 						this.timelines.length==1 &&
-						(this.timelines[i].frames.length==1 || this.animated)
-					){ // skip unnecessary identity matrix
+						(timeline.frames.length==1 || this.animated)){ // skip unnecessary identity matrix
 						for each(var e in x.*){
 							this.xml.appendChild(e);
 						}
-					}else{
+					}else{*/
 						this.xml.appendChild(x);
-					}
-				}
+					//}
+				//}
 			}
 			if(ext.log){
 				ext.log.pauseTimer(timer);	
@@ -822,7 +822,6 @@
 		 * @parameter {XML} defs
 		 */
 		expandUse:function( xml,recursive,defs ){
-			//fl.trace(fl.getAppMemoryInfo(1));
 			defs=defs||xml.defs||this.xml.defs;
 			if(recursive==undefined){
 				recursive=true;
@@ -1070,6 +1069,7 @@
 		 */
 		_getProgressIncrements:function(element,frame,recursive){
 			if(typeof(frame)!='number'){frame=0;}
+
 			var BREAK_TWEEN_VALUE=10;
 			var BREAK_TEXT_VALUE=20;
 			var ELEMENT_VALUE=5;
@@ -1105,7 +1105,7 @@
 				timeline.cache.progressIncrements=[];	
 			}
 			if(timeline.cache.progressIncrements[frame]){
-				return timeline.cache.progressIncrements[settings.frame];
+				return timeline.cache.progressIncrements[frame];
 			}
 			var frames=timeline.getFrames({
 				position:frame,
@@ -1191,7 +1191,8 @@
 				var timer=ext.log.startTimer('extensible.SVG._getTimeline()');	
 			}
 			var settings=new ext.Object({
-				frame:0,
+				startFrame:0,
+				endFrame:timeline.frames.length,
 				selection:undefined,
 				id:undefined,
 				matrix:new ext.Matrix(),
@@ -1206,29 +1207,14 @@
 			/*
 			 * Check to see if the timeline has tweens that we need to resolve.
 			 */
-			var hasTweens=false;
-			var frames,tempName;
-			if(settings.libraryItem){ // it's a symbol
-				tempName=this._tempFolder+'/'+settings.libraryItem.name;
-			}
-			if(tempName && ext.lib.itemExists(tempName)){ // a temporary symbol has already been created
-				hasTweens=true;
-			}else{
-				frames=timeline.getFrames({ // get a list of currently visible frames
-					position:settings.frame,
+			var hasTweens=timeline.hasTweensInRange({ // get a list of currently visible frames
+					startFrame:settings.startFrame,
+					endFrame:settings.endFrame,
 					includeHiddenLayers:this.includeHiddenLayers,
 					includeGuides:this.includeGuides
 				});
-				for(var i=0;i<frames.length;i++){ // check for tweens
-					if(
-						frames[i].tweenType!='none' &&
-						settings.frame!=frames[i].startFrame
-					){
-						hasTweens=true;
-						break;
-					}
-				}
-			}
+			
+			var layers=timeline.getLayers();
 			/*
 			 * Create temporary timelines where tweens exist & convert to
 			 * keyframes.
@@ -1237,312 +1223,299 @@
 			if(hasTweens){
 				if(settings.libraryItem==undefined){
 					originalScene=timeline.name;
+					//ext.doc.editScene();
 					ext.doc.duplicateScene();
 					timelines=ext.doc.timelines;
 					timeline=new ext.Timeline(timelines[timelines.length-1]);
 				}else{
-					if(ext.lib.itemExists(tempName)){
-						ext.lib.selectItem(tempName);
-					}else{
-						if(!ext.lib.itemExists(tempName.dir)){
-							ext.lib.addNewItem('folder',tempName.dir);
-						}
-						ext.lib.selectItem(settings.libraryItem.name);
-						ext.lib.duplicateItem();
-						ext.lib.moveToFolder(tempName.dir);
-						ext.lib.renameItem(tempName.basename);
+					var tempName=this._tempFolder+'/'+settings.libraryItem.name;
+					if(!ext.lib.itemExists(tempName.dir)){
+						ext.lib.addNewItem('folder',tempName.dir);
 					}
+					ext.lib.selectItem(settings.libraryItem.name);
+					ext.lib.duplicateItem();
+					ext.lib.moveToFolder(tempName.dir);
+					ext.lib.renameItem(tempName.basename);
+					
 					timeline=new ext.Timeline(ext.lib.getSelectedItems()[0].timeline);
 				}
-				var layers=timeline.getLayers();
-				var ranges=new ext.Array();
+				layers = timeline.getLayers();
 				for(var i=0;i<layers.length;i++){
-					var range=new ext.Array();
-					var l=layers[i];
-					if(l.frameCount>settings.frame){
-						var f=l.frames[settings.frame];
-						if(f.tweenType!='none'){
-							var start=f.startFrame;
-							var end=start+f.duration;
-							for(
-								var i=0;
-								i<l.frameCount &&
-								end<l.frameCount &&
-								l.frames[end].tweenType!='none';
-								i++
-							){
-								var pEnd = end + l.frames[end].duration;
-								if (l.frames[pEnd]){
-									end=pEnd;
-								}else{
-									break;
-								}
-							}
-							range.push(start);
-							range.push(end);						
+					var layer=layers[i];
+					var layerEnd = settings.endFrame;
+					if(layerEnd>layer.frameCount)layerEnd = layer.frameCount;
+
+					timeline.setSelectedLayers(i);
+
+					for(var n=settings.startFrame; n<layerEnd; ++n){
+						var frame=layer.frames[n];
+						if(frame.tweenType!='none' || (n==settings.startFrame && frame.startFrame!=n && layer.frames[frame.startFrame].tweenType=='none')){
+							var start=frame.startFrame;
+							var end=start+frame.duration;
+							timeline.$.convertToKeyframes(start, end);
 						}
 					}
-					ranges.push(range);
 				}
-				var success=false;
-				success=timeline.convertToKeyframes(ranges);
 			}
 			/*
-			 * Retrieve elements in the current frames.
+			 * Retrieve elements in the current frames, get bounding box
 			 */
 			if(!settings.selection){
+				var frames = [];
+				for(var i=0;i<layers.length;i++){
+					var layer=layers[i];
+					var layerEnd = settings.endFrame;
+					if(layerEnd>layer.frameCount)layerEnd = layer.frameCount;
+
+					for(var n=settings.startFrame; n<layerEnd; ++n){
+						var frame=layer.frames[n];
+						frames.push(frame);
+
+					}
+				}
 				var options={
 					includeHiddenLayers:this.includeHiddenLayers,
-					includeGuides:this.includeGuides
+					includeGuides:this.includeGuides,
+					frames:frames
 				};
-				if(hasTweens){
-					options.frame=settings.frame;
-				}else{
-					options.frames=frames;
-				}
-				settings.selection=timeline.getElements(options);
+				var items =timeline.getElements(options);
+				var boundingBox=items.boundingBox;
+			}else{
+				var boundingBox=settings.selection.boundingBox;
 			}
+
 			/*
 			 * Group elements by layer.
 			 */
-			var selection=settings.selection.byFrame({stacked:true});
+			//var selection=settings.selection.byFrame({stacked:true});
 			var xml,instanceXML,id;
 			var transformString=this._getMatrix(settings.matrix);
 			var timelineName=timeline.name;
+
 			/*
 			 * If the timeline is a symbol ( has a libraryItem ), 
 			 * we either create a symbol definition or use the existings one.
 			 */
-			if(settings.libraryItem){
-				var symbolIDString=settings.libraryItem.name;
-				if(settings.frame!=0){
-					symbolIDString+='/'+String(settings.frame);
-				}
-				if(settings.color){
-					symbolIDString+='/'+settings.color.idString;
-				}
-				var isNew,instanceID;
-				if(
-					this._symbols[settings.libraryItem.name] &&
-					this._symbols[settings.libraryItem.name][settings.frame]
-				){
-					isNew=false;
-					id=this._symbols[settings.libraryItem.name][settings.frame].id;
-				}else{
-					isNew=true;
-					id=this._uniqueID(symbolIDString);
-					if(!this._symbols[settings.libraryItem.name]){
-						this._symbols[settings.libraryItem.name]=new ext.Array();	
-					}
-					this._symbols[settings.libraryItem.name][settings.frame]=new ext.Array();
-					this._symbols[settings.libraryItem.name][settings.frame].id=id;
-					//this._symbols[symbolIDString]=id;
-				}				
-				var instanceID=this._uniqueID(id);	
-				xml=new XML('<use xlink-href="#'+id+'" id="'+instanceID+'" />');
-				if(isNew){
-					instanceXML=xml;
-					instanceXML['@width']=0;
-					instanceXML['@height']=0;
-					instanceXML['@x']=0;
-					instanceXML['@y']=0;
-					instanceXML['@transform']=transformString;
-					instanceXML['@overflow']="visible";
-					xml=new XML('<symbol/>');
-					xml['@id']=id;
-				}else{
-					var vb=String(this.xml.defs.symbol.(@id==id)[0]['@viewBox']).split(' ');
-					xml['@width']=vb[2];
-					xml['@height']=vb[3];
-					xml['@x']=vb[0];
-					xml['@y']=vb[1];
-					xml['@transform']=transformString;
-					xml['@overflow']="visible";
-					selection.clear();
-				}
-			}else{
-				id=this._uniqueID(timelineName+'/'+settings.frame);
+			if(!settings.libraryItem){
+				/*id=this._uniqueID(timelineName);
 				xml=new XML('<g id="'+id+'" />');
 				if(settings.matrix && !settings.matrix.is(new ext.Matrix())){
 					xml['@transform']=transformString;
-				}
+				}*/
 			}
-			if(settings.isRoot){
-				if(!this._rootItem[timelineName]){
-					this._rootItem[timelineName]=new ext.Array();
-				}
-				this._rootItem[timelineName][settings.frame]=id;
+			var symbolIDString = timeline.name;
+			if(settings.color){
+				symbolIDString+='/'+settings.color.idString; //should factor this out and use a transform
 			}
-
-			var doAnim = this.animated && timeline.frames.length>1;
-			if(doAnim){
-				var frameTimeStart = String(Math.roundTo(settings.frame/timeline.frames.length,this.decimalPointPrecision));
-				var totalTime = String(Math.roundTo(timeline.frames.length*(1/ext.doc.frameRate),this.decimalPointPrecision));
-
-				var animNode = <animate
-							      attributeName="display"
-							      begin="0s"
-							      repeatCount="indefinite" />;
-
-				if(settings.frame==0){
-					animNode.@values="inline;none;none";
-
-				}else if(settings.frame==timeline.frames.length-1){
-					animNode.@values="none;none;inline";
-
-				}else{
-					animNode.@values="none;inline;none;none";
-
+			var isNew,instanceID;
+			if(
+				this._symbols[timeline.name]
+			){
+				isNew=false;
+				id=this._symbols[timeline.name];
+			}else{
+				isNew=true;
+				id=this._uniqueID(symbolIDString);
+				if(!this._symbols[timeline.name]){
+					this._symbols[timeline.name]=id;
 				}
-				animNode.@dur = totalTime+"s";
-			}
+			}		
+			var instanceID=this._uniqueID(id);	
+			xml=new XML('<use xlink-href="#'+id+'" id="'+instanceID+'" />');
+			if(isNew){
+				instanceXML=xml;
+				instanceXML['@width']=0;
+				instanceXML['@height']=0;
+				instanceXML['@x']=0;
+				instanceXML['@y']=0;
+				instanceXML['@transform']=transformString;
+				instanceXML['@overflow']="visible";
+
+				xml=new XML('<symbol/>');
+				xml['@id']=id;
 
 
-			/*
-			 * Loop through the visible frames by layer &
-			 * either take note of the elements for linear
-			 * processing ( enables use of a progress bar ), 
-			 * or process them immediately ( for debugging purposes ).
-			 */
-			var masked=new ext.Array();
-			var boundingBox=settings.selection.boundingBox;
-			for(var i=0;i<selection.length;i++){
-				if(selection[i] && selection[i].length>0){
-					var layer=selection[i][0].layer;
+
+				/*
+				 * Loop through the visible frames by layer &
+				 * either take note of the elements for linear
+				 * processing ( enables use of a progress bar ), 
+				 * or process them immediately ( for debugging purposes ).
+				 */
+				var masked=new ext.Array();
+				for(var i=0;i<layers.length;i++){
+					var layer=layers[i];
+					var layerEnd = settings.endFrame;
+					if(layerEnd>layer.frameCount)layerEnd = layer.frameCount;
+
+					var doAnim = this.animated && layer.frameCount>1;
+					if(doAnim){
+						var totFrames = (settings.endFrame-settings.startFrame);
+						var totalTime = String(Math.roundTo(totFrames*(1/ext.doc.frameRate),this.decimalPointPrecision));
+
+						var animNode = <animate
+									      attributeName="display"
+									      begin="0s"
+									      repeatCount="indefinite" />;
+
+						animNode.@dur = totalTime+"s";
+					}
+
 					var lVisible=layer.visible;
 					var lLocked=layer.locked;
 					if(!lVisible){layer.visible=true;}
 					if(lLocked){layer.locked=false;}
-					var layerXML;
+
 					var id=this._uniqueID(layer.name);
-					if(settings.libraryItem){
-						this._symbols[settings.libraryItem.name][settings.frame][i]=id;
-					}else if(settings.isRoot){
-						this._rootItem[timelineName][settings.frame][i]=id;
-					}
-					var frame = layer.frames[settings.frame]
-					if(this.animated && frame.startFrame!=settings.frame && layer.frames[frame.startFrame].tweenType=='none'){
-						// Skip frames that haven't changed since the last frame (when in animation mode).
-						continue;
-					}
-					/*
-					 * If the masking type is "Alpha" or "Clipping"
-					 * we need to manipulate the color of the mask to ensure
-					 * the proper behavior
-					 */
-					var filtered;
-					var isMasked=false;
+
+
+					var colorX=null;
+					var isMask = false;
+					var isMasked = false;
 					if(layer.layerType=='mask'){
-						var colorX=null;
+						isMask = true;
 						if(this.maskingType=='Alpha'){
 							colorX=new ext.Color('#FFFFFF00');
 						}else if(this.maskingType=='Clipping'){
 							colorX=new ext.Color('#FFFFFF00');
 							colorX.percent[3]=999999999999999;						
 						};
-						layerXML=<mask id={id}/>;
-						if(colorX){
-							filtered=<g id={this._uniqueID('g')} />;
-							layerXML.appendChild(filtered);
-							var f=this._getFilters(
-								null,{
-									color:colorX,
-									boundingBox:boundingBox
-								}
-							);
-							if(f){
-								filtered.@filter="url(#"+f+")";
-							}
-						}
-					}else if(
-						layer.layerType=='masked' && (
-							layer.parentLayer && 
-							(layer.parentLayer.visible || this.includeHiddenLayers) &&
-							(layer.parentLayer.layerType!='guide' || this.includeGuides)
-						)
-					){
-						isMasked=true;
-						layerXML=new XML('<g id="'+id+'" />');
-					}else{
-						layerXML=new XML('<g id="'+id+'" />');
+					}else if(layer.layerType=='masked' && (
+								layer.parentLayer && 
+								(layer.parentLayer.visible || this.includeHiddenLayers) &&
+								(layer.parentLayer.layerType!='guide' || this.includeGuides))){
+						isMasked = true; 
 					}
-					var layerID=id;
-					for(var n=0;n<selection[i].length;n++){
-						var elementID=this._uniqueID('element');
-						var element=new XML('<g id="'+elementID+'"></g>');
-						if(this._linearProcessing){
-							this.qData.push([
-								elementID,
-								selection[i][n],
-								{
-									frame:settings.frame
-								}
-							]);
-						}else{
-							var element=this._getElement(
-								selection[i][n],{ // 
-									frame:settings.frame
-								}
-							);
+					for(var n=settings.startFrame; n<layerEnd; ++n){
+						var frame = new ext.Frame(layer.$.frames[n]);
+
+						var frameXML;
+						if(this.animated && frame.startFrame!=n && layer.frames[frame.startFrame].tweenType=='none'){
+							// Skip frames that haven't changed since the last frame (when in animation mode).
+							continue;
 						}
-						if(element){
-							if(
-								layer.layerType=='mask' && colorX
-							){
-								filtered.appendChild(element);
+						/*
+						 * If the masking type is "Alpha" or "Clipping"
+						 * we need to manipulate the color of the mask to ensure
+						 * the proper behavior
+						 */
+						var filtered;
+						if(isMask){
+							frameXML=<mask id={id}/>;
+							if(colorX){
+								filtered=<g id={this._uniqueID('g')} />;
+								frameXML.appendChild(filtered);
+								var f=this._getFilters(
+									null,{
+										color:colorX,
+										boundingBox:boundingBox
+									}
+								);
+								if(f){
+									filtered.@filter="url(#"+f+")";
+								}
+							}
+						}else if(isMasked){
+							frameXML=new XML('<g id="'+id+'" />');
+						}else{
+							frameXML=new XML('<g id="'+id+'" />');
+						}
+
+						var items = this._getItemsByFrame(frame, settings.selection);
+						for(var j=0; j<items.length; ++j){
+							var element = items[j];
+							var elementID=this._uniqueID('element');
+							if(this._linearProcessing){
+								var elementXML=new XML('<g id="'+elementID+'"></g>');
+								this.qData.push([
+									elementID,
+									element,
+									{
+										frame:n
+									}
+								]);
 							}else{
-								layerXML.appendChild(element);
-							};
-						}
-					}
+								var elementXML=this._getElement(
+									element,{ // 
+										frame:n
+									}
+								);
 
-					if(doAnim){
-						var frameEnd = settings.frame+1;
-						if(layer.frames[settings.frame].tweenType=='none'){
-							while(frameEnd<layer.frames.length && layer.frames[frameEnd].startFrame==settings.frame){
-								frameEnd++;
-								// this will add in extra time for frames with non changing content (which won't be included as a real frame)
+							}
+							if(elementXML){
+								if(layer.layerType=='mask' && colorX){
+									filtered.appendChild(elementXML);
+								}else{
+									frameXML.appendChild(elementXML);
+								};
 							}
 						}
-						var frameTimeEnd = String(Math.roundTo(frameEnd/timeline.frames.length,this.decimalPointPrecision));
-						var layerAnimNode = animNode.copy();
-						if(settings.frame==0){
-							layerAnimNode.@keyTimes = frameTimeStart+";"+frameTimeEnd+";1";
 
-						}else if(settings.frame==timeline.frames.length-1){
-							layerAnimNode.@keyTimes = "0;"+frameTimeStart+";"+frameTimeEnd;
-
-						}else{
-							layerAnimNode.@keyTimes = "0;"+frameTimeStart+";"+frameTimeEnd+";1";
-
-						}
-						layerXML.appendChild(layerAnimNode);
-					}
-					/*
-					 * Masked layers are grouped together and inserted after
-					 * the mask.
-					 */
-					if(isMasked){  // 
-						masked.push(layerXML);
-					}else if(layerXML){
-						xml.appendChild(layerXML);
-						if(layer.layerType=='mask'){
-							var mg=<g id={this._uniqueID('masked')} mask={"url(#"+id+")"}/>;
-							for(var m=0;m<masked.length;m++){
-								mg.appendChild(masked[m]);
+						if(doAnim){
+							var frameEnd = n+1;
+							if(layer.frames[n].tweenType=='none'){
+								while(frameEnd<layer.frames.length && layer.frames[frameEnd].startFrame==n){
+									frameEnd++;
+									// this will add in extra time for frames with non changing content (which won't be included as a real frame)
+								}
 							}
-							xml.appendChild(mg);
-							masked.clear();
+							var frameTimeStart = String(Math.roundTo(n/totFrames,this.decimalPointPrecision));
+							var frameTimeEnd = String(Math.roundTo(frameEnd/totFrames,this.decimalPointPrecision));
+
+							if(frameTimeStart!=0 || frameTimeEnd!=1){ // don't bother if element is always there
+								var frameAnimNode = animNode.copy();
+								if(n==settings.startFrame){
+									frameAnimNode.@keyTimes = frameTimeStart+";"+frameTimeEnd+";1";
+									frameAnimNode.@values="inline;none;none";
+
+								}else if(n==settings.endFrame-1){
+									frameAnimNode.@keyTimes = "0;"+frameTimeStart+";"+frameTimeEnd;
+									frameAnimNode.@values="none;inline;none";
+
+								}else{
+									frameAnimNode.@keyTimes = "0;"+frameTimeStart+";"+frameTimeEnd+";1";
+									frameAnimNode.@values="none;inline;none;none";
+
+								}
+
+								frameXML.appendChild(frameAnimNode);
+							}
+						}
+
+						/*
+						 * Masked layers are grouped together and inserted after
+						 * the mask.
+						 */
+						if(isMasked){  // 
+							masked.unshift(frameXML);
+						}else if(frameXML){
+							xml.prependChild(frameXML);
+							if(layer.layerType=='mask'){
+								var mg=<g id={this._uniqueID('masked')} mask={"url(#"+id+")"}/>;
+								for(var m=0;m<masked.length;m++){
+									mg.appendChild(masked[m]);
+								}
+								xml.appendChild(mg);
+								masked.clear();
+							}
 						}
 					}
-					if(layer.visible!=lVisible){layer.visible=lVisible;}
-					if(layer.locked!=lLocked){layer.locked=lLocked;}
+					if(layer.visible!=lVisible) layer.visible=lVisible;
+					if(layer.locked!=lLocked) layer.locked=lLocked;
 				}
+			}else{
+				var vb=String(this.xml.defs.symbol.(@id==id)[0]['@viewBox']).split(' ');
+				xml['@width']=vb[2];
+				xml['@height']=vb[3];
+				xml['@x']=vb[0];
+				xml['@y']=vb[1];
+				xml['@transform']=transformString;
+				xml['@overflow']="visible";
 			}
 			/*
 			 *  If this is a temporary scene, delete it and return to the original.
 			 */
-			if(originalScene!==undefined){
+			if(originalScene!=undefined){
 				var timelines=ext.timelines;
 				ext.doc.deleteScene();
 				for(i=0;i<ext.timelines.length;i++){
@@ -1550,6 +1523,11 @@
 						ext.doc.editScene(i);
 						break;	
 					}
+				}
+			}
+			if(tempName!=undefined){
+				if(ext.lib.itemExists(tempName)){
+					ext.lib.deleteItem(tempName);	
 				}
 			}
 			var result;
@@ -1560,7 +1538,7 @@
 					settings.libraryItem
 				){
 					boundingBox=settings.libraryItem.scalingGridRect;
-				}else{
+				}else if(settings.selection){
 					boundingBox=settings.selection.boundingBox;
 				}				
 				instanceXML['@width']=String(boundingBox.right-boundingBox.left);
@@ -1584,6 +1562,23 @@
 			return result;
 		},
 		/**
+		 * Retrieves the a list of items, masked by another list if specified
+		 */
+		_getItemsByFrame:function(frame,maskList){
+			if(maskList){
+				var ret = [];
+				for(var i=0; i<frame.elements.length; i++){
+					var element = frame.elements[i];
+					if(maskList.indexOf(element)!=-1){
+						ret.push(element);
+					}
+				}
+				return ret;
+			}else{
+				return frame.elements;
+			}
+		},
+		/**
 		 * Retrieves the svg data for a symbol instance.
 		 * @parameter {extensible.SymbolInstance} instance
 		 * @parameter {Object} options
@@ -1594,7 +1589,8 @@
 				var timer=ext.log.startTimer('extensible.SVG._getSymbolInstance()');	
 			}
 			var settings=new ext.Object({
-				frame:0,
+				startFrame:0,
+				endFrame:1,
 				matrix:new ext.Matrix(),
 				colorTransform:null,
 				libraryItem:instance.libraryItem
@@ -1602,7 +1598,7 @@
 			settings.extend(options);
 			settings.matrix=instance.matrix.concat(settings.matrix);
 			var timeline=instance.timeline;
-			settings.frame=instance.getCurrentFrame(settings.frame);
+
 			var xml=this._getTimeline(instance.timeline,settings);
 			var filterID=this._getFilters(instance,options);
 			if(filterID && this.xml.defs.filter.(@id==filterID).length()){
@@ -2067,7 +2063,6 @@
 									//+Number(validContours[filled[n]].getControlPoints( {curveDegree:this.curveDegree} ).isReversed)
 									<0
 								);
-								//fl.trace(sameDir);
 								if(
 									svgArray[filled[n]].path.length()  
 									//&& svgArray[filled[n]].path.fill.length()
