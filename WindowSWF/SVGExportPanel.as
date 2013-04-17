@@ -115,6 +115,10 @@
 				Event.CHANGE,
 				setOptionsToCustom
 			);
+			this.controls.flattenMotionCheckBox.addEventListener(
+				Event.CHANGE,
+				setOptionsToCustom
+			);
 			this.controls.fillGapsCheckBox.addEventListener(
 				Event.CHANGE,
 				setOptionsToCustom
@@ -250,6 +254,8 @@
 				this.controls.startFrameTextField.visible=false;
 				this.controls.endFrameTextField.visible=false;			
 			}
+			this.controls.flattenMotionCheckBox.visible=(this.controls.framesComboBox.selectedItem.label=='Animation');	
+
 			if(
 				this.controls.sourceComboBox.selectedItem.label!='Current Timeline'
 			){
@@ -527,7 +533,7 @@
 		{
 			var controlList=[
 				'maskingType','curveDegree','expandSymbols','applyTransformations','decimalPointPrecision',
-				'fillGaps','knockoutBackgroundColor','convertTextToOutlines','convertPatternsToSymbols'
+				'fillGaps','flattenMotion','knockoutBackgroundColor','convertTextToOutlines','convertPatternsToSymbols'
 			];
 			if(includeFileSpecificSettings){
 				controlList.push(

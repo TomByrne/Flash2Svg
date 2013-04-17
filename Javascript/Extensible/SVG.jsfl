@@ -18,6 +18,8 @@
 	 * @parameter {Boolean} exportSelectedLibraryItems If true, selected library items are exported rather than the stage view.
 	 */
 	function SVG(options){
+		fl.outputPanel.clear();
+
 		this.DEFAULT_GRADIENT_LENGTH=819.2; // Pre-transformation length of ALL linear gradients in flash.
 		this.DEFAULT_GRADIENT_RADIUS=810.7; // Pre-transformation radius of ALL radial gradients in flash.
 		this.DEFAULT_BITMAP_SCALE=1/20;
@@ -32,6 +34,7 @@
 			convertPatternsToSymbols:true,
 			applyTransformations:true,
 			applyColorEffects:true,
+			flattenMotion:true,
 			curveDegree:3,
 			maskingType:'Clipping',
 			frames:new ext.Array(),
@@ -108,7 +111,7 @@
 		this._progress=0;
 		this._minProgressIncrement=1; // Is later set to this._progressMax/this.MAX_INLINE_CALL_COUNT in order to prevent recursion
 		this._origSelection=new ext.Selection([]);
-		this._linearProcessing=true;// If true, a timeline is processed one level deep in it's entirety before progressing to descendants.
+		this._linearProcessing=false;// If true, a timeline is processed one level deep in it's entirety before progressing to descendants.
 		if(this.startFrame!==undefined){
 			if(
 				this.endFrame==undefined ||
@@ -624,9 +627,10 @@
 			var i,n;
 			if(this.swfPanel){
 				for(i=0;i<this.timelines.length;i++){
-					for(n=0;n<this.timelines[i].frames.length;n++){
+					var timeline = this.timelines[i];
+					for(n=0;n<timeline.frames.length;n++){
 						this._progressMax+=this._getProgressIncrements(
-							this.timelines[i].timeline,
+							timeline.timeline,
 							n,
 							true
 						);
@@ -653,27 +657,26 @@
 			this.xml.appendChild(new XML('<defs/>'));
 			for(i=0;i<this.timelines.length;i++){
 				var timeline = this.timelines[i];
-				//for(n=0;n<this.timelines[i].frames.length;n++){
-					var x=this._getTimeline(
-						timeline.timeline,
-						{
-							matrix:timeline.matrix,
-							startFrame:0,
-							endFrame:timeline.frames.length,
-							selection:this.selection,
-							libraryItem:timeline.libraryItem,
-							isRoot:true
-						}
-					);
-					/*if(timeline.matrix.is(new ext.Matrix()) &&
-						this.timelines.length==1 &&
-						(timeline.frames.length==1 || this.animated)){ // skip unnecessary identity matrix
-						for each(var e in x.*){
-							this.xml.appendChild(e);
-						}
-					}else{*/
-						this.xml.appendChild(x);
-					//}
+				var x=this._getTimeline(
+					timeline.timeline,
+					{
+						matrix:timeline.matrix,
+						startFrame:0,
+						endFrame:timeline.frames.length,
+						selection:this.selection,
+						libraryItem:timeline.libraryItem,
+						isRoot:true,
+						flattenMotion:this.flattenMotion
+					}
+				);
+				/*if(timeline.matrix.is(new ext.Matrix()) &&
+					this.timelines.length==1 &&
+					(timeline.frames.length==1 || this.animated)){ // skip unnecessary identity matrix
+					for each(var e in x.*){
+						this.xml.appendChild(e);
+					}
+				}else{*/
+					this.xml.appendChild(x);
 				//}
 			}
 			if(ext.log){
@@ -1207,12 +1210,16 @@
 			/*
 			 * Check to see if the timeline has tweens that we need to resolve.
 			 */
-			var hasTweens=timeline.hasTweensInRange({ // get a list of currently visible frames
-					startFrame:settings.startFrame,
-					endFrame:settings.endFrame,
-					includeHiddenLayers:this.includeHiddenLayers,
-					includeGuides:this.includeGuides
-				});
+			 if(settings.flattenMotion){
+				var hasTweens=timeline.hasTweensInRange({ // get a list of currently visible frames
+						startFrame:settings.startFrame,
+						endFrame:settings.endFrame,
+						includeHiddenLayers:this.includeHiddenLayers,
+						includeGuides:this.includeGuides
+					});
+			 }else{
+			 	hasTweens = false;
+			 }
 			
 			var layers=timeline.getLayers();
 			/*
@@ -1223,10 +1230,13 @@
 			if(hasTweens){
 				if(settings.libraryItem==undefined){
 					originalScene=timeline.name;
-					//ext.doc.editScene();
+
+					ext.doc.editScene(ext.doc.timelines.indexOf(timeline.$));
 					ext.doc.duplicateScene();
+					//ext.doc.editScene(ext.doc.timelines.indexOf(timeline.$)+1); // edit new scene (after duplication current scene changes to last scene)
+
 					timelines=ext.doc.timelines;
-					timeline=new ext.Timeline(timelines[timelines.length-1]);
+					timeline=new ext.Timeline(timelines[ext.doc.timelines.indexOf(timeline.$)+1]);
 				}else{
 					var tempName=this._tempFolder+'/'+settings.libraryItem.name;
 					if(!ext.lib.itemExists(tempName.dir)){
@@ -1245,11 +1255,12 @@
 					var layerEnd = settings.endFrame;
 					if(layerEnd>layer.frameCount)layerEnd = layer.frameCount;
 
-					timeline.setSelectedLayers(i);
+					timeline.setSelectedLayers(timeline.layers.indexOf(layer));
 
 					for(var n=settings.startFrame; n<layerEnd; ++n){
 						var frame=layer.frames[n];
-						if(frame.tweenType!='none' || (n==settings.startFrame && frame.startFrame!=n && layer.frames[frame.startFrame].tweenType=='none')){
+						if(settings.flattenMotion &&
+							(frame.tweenType!='none' || (n==settings.startFrame && frame.startFrame!=n && layer.frames[frame.startFrame].tweenType=='none'))){
 							var start=frame.startFrame;
 							var end=start+frame.duration;
 							timeline.$.convertToKeyframes(start, end);
@@ -1334,7 +1345,19 @@
 				xml=new XML('<symbol/>');
 				xml['@id']=id;
 
+				if(this.animated){
+					var totFrames = (settings.endFrame-settings.startFrame);
+					var totalTime = String(Math.roundTo(totFrames*(1/ext.doc.frameRate),this.decimalPointPrecision));
 
+					var animNode = <animate
+								      attributeName="display"
+								      begin="0s"
+								      repeatCount="indefinite" />;
+
+					animNode.@dur = totalTime+"s";
+				}
+
+				var animatedFrames = [];
 
 				/*
 				 * Loop through the visible frames by layer &
@@ -1349,17 +1372,6 @@
 					if(layerEnd>layer.frameCount)layerEnd = layer.frameCount;
 
 					var doAnim = this.animated && layer.frameCount>1;
-					if(doAnim){
-						var totFrames = (settings.endFrame-settings.startFrame);
-						var totalTime = String(Math.roundTo(totFrames*(1/ext.doc.frameRate),this.decimalPointPrecision));
-
-						var animNode = <animate
-									      attributeName="display"
-									      begin="0s"
-									      repeatCount="indefinite" />;
-
-						animNode.@dur = totalTime+"s";
-					}
 
 					var lVisible=layer.visible;
 					var lLocked=layer.locked;
@@ -1388,10 +1400,12 @@
 					}
 					for(var n=settings.startFrame; n<layerEnd; ++n){
 						var frame = new ext.Frame(layer.$.frames[n]);
+						var tweenType = frame.tweenType;
 
 						var frameXML;
-						if(this.animated && frame.startFrame!=n && layer.frames[frame.startFrame].tweenType=='none'){
-							// Skip frames that haven't changed since the last frame (when in animation mode).
+						var startType = layer.frames[frame.startFrame].tweenType;
+						if(this.animated && (animatedFrames[i+"-"+n] || (frame.startFrame!=n && (startType=='none' || (!settings.flattenMotion && startType=="motion"))))){
+							// Skip frames that haven't changed or are motion tweens (when in animation mode).
 							continue;
 						}
 						/*
@@ -1422,6 +1436,7 @@
 						}
 
 						var items = this._getItemsByFrame(frame, settings.selection);
+						var doMotionTween = (doAnim && !settings.flattenMotion && tweenType=='motion' && items.length==1);
 						for(var j=0; j<items.length; ++j){
 							var element = items[j];
 							var elementID=this._uniqueID('element');
@@ -1440,7 +1455,6 @@
 										frame:n
 									}
 								);
-
 							}
 							if(elementXML){
 								if(layer.layerType=='mask' && colorX){
@@ -1453,7 +1467,49 @@
 
 						if(doAnim){
 							var frameEnd = n+1;
-							if(layer.frames[n].tweenType=='none'){
+							
+							if(doMotionTween){
+
+								var xList = [element.x];
+								var yList = [element.y];
+								var scxList = [element.scaleX];
+								var scyList = [element.scaleY];
+								var skxList = [element.skewX];
+								var skyList = [element.skewY];
+
+								var timeList = [Math.roundTo(n/totFrames,this.decimalPointPrecision)];
+								while(frameEnd<layer.frames.length){
+									frameEnd++;
+									var nextFrame = layer.frames[frameEnd];
+									if(nextFrame){
+										if(nextFrame.startFrame==frameEnd){
+											// keyframe
+											if(nextFrame.elements.length!=1)break; // tweening to incompatible frame
+
+											var nextElement = nextFrame.elements[0];
+											
+											xList.push(Math.roundTo(nextElement.x,this.decimalPointPrecision));
+											yList.push(Math.roundTo(nextElement.y,this.decimalPointPrecision));
+											scxList.push(Math.roundTo(nextElement.scaleX,this.decimalPointPrecision));
+											scyList.push(Math.roundTo(nextElement.scaleY,this.decimalPointPrecision));
+											skxList.push(Math.roundTo(nextElement.skewX,this.decimalPointPrecision));
+											skyList.push(Math.roundTo(nextElement.skewY,this.decimalPointPrecision));
+											timeList.push(Math.roundTo(frameEnd/totFrames,this.decimalPointPrecision));
+
+											animatedFrames[i+"-"+frameEnd] = true;
+											if(nextFrame.tweenType!="motion" || nextElement.libraryItem!=element.libraryItem)break;
+										}
+									}
+								}
+
+								this._addAnimationNode(elementXML, "translate", [xList,yList], timeList, totalTime);
+								this._addAnimationNode(elementXML, "scale", [scxList,scyList], timeList, totalTime);
+								this._addAnimationNode(elementXML, "skewX", [skxList], timeList, totalTime);
+								this._addAnimationNode(elementXML, "skewY", [skyList], timeList, totalTime);
+
+								delete elementXML.@transform;
+
+							}else if(tweenType=='none'){
 								while(frameEnd<layer.frames.length && layer.frames[frameEnd].startFrame==n){
 									frameEnd++;
 									// this will add in extra time for frames with non changing content (which won't be included as a real frame)
@@ -1463,22 +1519,22 @@
 							var frameTimeEnd = String(Math.roundTo(frameEnd/totFrames,this.decimalPointPrecision));
 
 							if(frameTimeStart!=0 || frameTimeEnd!=1){ // don't bother if element is always there
-								var frameAnimNode = animNode.copy();
+								var fAnimNode = animNode.copy();
 								if(n==settings.startFrame){
-									frameAnimNode.@keyTimes = frameTimeStart+";"+frameTimeEnd+";1";
-									frameAnimNode.@values="inline;none;none";
+									fAnimNode.@keyTimes = frameTimeStart+";"+frameTimeEnd+";1";
+									fAnimNode.@values="inline;none;none";
 
 								}else if(n==settings.endFrame-1){
-									frameAnimNode.@keyTimes = "0;"+frameTimeStart+";"+frameTimeEnd;
-									frameAnimNode.@values="none;inline;none";
+									fAnimNode.@keyTimes = "0;"+frameTimeStart+";"+frameTimeEnd;
+									fAnimNode.@values="none;inline;none";
 
 								}else{
-									frameAnimNode.@keyTimes = "0;"+frameTimeStart+";"+frameTimeEnd+";1";
-									frameAnimNode.@values="none;inline;none;none";
+									fAnimNode.@keyTimes = "0;"+frameTimeStart+";"+frameTimeEnd+";1";
+									fAnimNode.@values="none;inline;none;none";
 
 								}
 
-								frameXML.appendChild(frameAnimNode);
+								frameXML.appendChild(fAnimNode);
 							}
 						}
 
@@ -1560,6 +1616,53 @@
 				ext.log.pauseTimer(timer);	
 			}
 			return result;
+		},
+		_addAnimationNode:function(toNode, type, valueLists, times, totalTime){
+
+			var getValue = function(valueLists, i){
+				var ret = valueLists[0][i].toString();
+				for(var j=1; j<valueLists.length; ++j){
+					ret += ","+valueLists[j][i];
+				}
+				return ret;
+			}
+
+
+			var lastVal = getValue(valueLists, 0);
+			var lastTime = times[0];
+
+			if(lastTime>0){
+				var validV = [lastVal,lastVal];
+				var validT = [0,lastTime];
+			}else{
+				var validV = [lastVal];
+				var validT = [lastTime];
+			}
+			var found = false;
+			for(var i=1; i<times.length; ++i){
+				var newVal = getValue(valueLists, i);
+				lastTime = times[i];
+				lastVal = newVal;
+				validV.push(newVal);
+				validT.push(lastTime);
+				found = true;
+			}
+			if(lastTime<1){
+				validV.push(lastVal);
+				validT.push(1);
+			}
+
+			var animNode = <animateTransform
+						      attributeName="transform" additive="sum"
+						      begin="0s"
+						      repeatCount="indefinite" />;
+			animNode.@type = type;
+
+			animNode.@dur = totalTime+"s";
+			animNode.@keyTimes = validT.join(";");
+			animNode.@values = validV.join(";");
+
+			toNode.appendChild(animNode);
 		},
 		/**
 		 * Retrieves the a list of items, masked by another list if specified
