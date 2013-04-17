@@ -240,8 +240,7 @@
 			var verticalOffset:Number=0;
 			var bottom=0;
 			if(
-				this.controls.framesComboBox.selectedItem.label!='Current' ||
-				this.controls.framesComboBox.selectedItem.label!='Animation'
+				this.controls.framesComboBox.selectedItem.label!='Current'
 			){
 				verticalOffset+=30;
 				this.controls.startFrameNumericStepper.visible=true;

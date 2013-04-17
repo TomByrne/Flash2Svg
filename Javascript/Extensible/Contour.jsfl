@@ -278,14 +278,14 @@
 								points[i][0].is(points[prev][prevdegree])
 							)
 						);
-						var overlapped=(
-							points[i].is(points[next]) || 
+						var overlapped=(points.length>1 && 
+							(points[i].is(points[next]) || 
 							(
 								isLine && 
 								nextIsLine && 
 								points[i][deg].is(points[next][nextdegree]) &&
 								points[i][0].is(points[next][0])
-							)
+							))
 						);
 						var removeLast=false;
 						if( // ... ! important
@@ -326,7 +326,7 @@
 							)
 						){
 							broken=true;
-						}						
+						}				
 					}
 				}
 				if(

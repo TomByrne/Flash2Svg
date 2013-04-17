@@ -572,6 +572,8 @@
 			var settings=new ext.Object({
 				startFrame:0,
 				endFrame:this.frames.length,
+				includeShapeTweens:true,
+				includeMotionTweens:true,
 				includeHiddenLayers:ext.includeHiddenLayers,
 				includeGuides:false
 			});
@@ -592,7 +594,10 @@
 					for(var i=settings.startFrame;i<layerEnd;i++){ // check for tweens
 						var frame = layer.frames[i];
 						if(
-							frame.tweenType!='none' &&
+							(
+								(settings.includeShapeTweens && frame.tweenType=='shape') ||
+								(settings.includeMotionTweens && frame.tweenType=='motion')
+							)&&
 							settings.frame!=frame.startFrame
 						){
 							return true;

@@ -111,7 +111,7 @@
 		this._progress=0;
 		this._minProgressIncrement=1; // Is later set to this._progressMax/this.MAX_INLINE_CALL_COUNT in order to prevent recursion
 		this._origSelection=new ext.Selection([]);
-		this._linearProcessing=false;// If true, a timeline is processed one level deep in it's entirety before progressing to descendants.
+		this._delayedProcessing=true;// If true, a timeline is processed one level deep in it's entirety before progressing to descendants.
 		if(this.startFrame!==undefined){
 			if(
 				this.endFrame==undefined ||
@@ -661,9 +661,9 @@
 					timeline.timeline,
 					{
 						matrix:timeline.matrix,
-						startFrame:0,
-						endFrame:timeline.frames.length,
-						selection:this.selection,
+						startFrame:this.startFrame,
+						endFrame:this.endFrame,
+						//selection:this.selection,
 						libraryItem:timeline.libraryItem,
 						isRoot:true,
 						flattenMotion:this.flattenMotion
@@ -738,21 +738,26 @@
 					throw new Error('Problem creating folder.');
 				}
 			}
+
+
 			var writeSuccess=true;
 			for(var i=0;i<documents.length;i++){
+				var document = documents[i];
+
+
 				if(this.expandSymbols && this.expandSymbols!='None'){ // expand symbol instances
 					if(this.expandSymbols=='Nested'){
-						this.expandUse(documents[i],'nested',documents[i].defs);
+						this.expandUse(document,'nested',document.defs);
 					}else{
-						this.expandUse(documents[i]);
+						this.expandUse(document);
 					}
 				}
 				if(this.applyTransformations){
-					this.applyMatrices(documents[i]);
+					this.applyMatrices(document);
 				}
-				this._applyColorEffects(documents[i],documents[i].defs);
-				this.deleteUnusedReferences(documents[i]);
-				documents[i]['@xmlns']="http://www.w3.org/2000/svg";
+				this._applyColorEffects(document,document.defs);
+				this.deleteUnusedReferences(document);
+				document['@xmlns']="http://www.w3.org/2000/svg";
 				if(this.file){
 					var outputString=(
 						this.docString+
@@ -1029,16 +1034,26 @@
 				){
 					var args=this.qData.shift();
 					var id=args.shift();
-					// e4x filters caused memory errors on larger files
-					// so we use a regular expression...
 					var elementXML=this._getElement(args[0],args[1]);
 					if(elementXML){
-						this.xml=new XML(
-							this.xml.toXMLString().replace(
-								new RegExp('<g.*? id="'+id+'".*?\/>'),
-								elementXML.toXMLString()
-							)
-						);
+						
+						var list = this.xml..g.(@id==id);
+						if(list.length()==1){
+							var node = list[0];
+							var parent = node.parent();
+							for(var i=0; i<node.attributes().length(); i++){
+								var attr = node.attributes()[i];
+								elementXML.@[attr.name()] = attr.toXMLString();
+							}
+							for(var i=0; i<node.children().length(); i++){
+								var child = node.children()[i];
+								elementXML.appendChild(child);
+							}
+							parent.insertChildBefore(node, elementXML);
+							delete parent.children()[node.childIndex()];
+						}else{
+							ext.warn("Error: mulitple items with the same id found");
+						}
 					}
 					
 					if(!this.swfPanel){ break; }				
@@ -1210,16 +1225,13 @@
 			/*
 			 * Check to see if the timeline has tweens that we need to resolve.
 			 */
-			 if(settings.flattenMotion){
-				var hasTweens=timeline.hasTweensInRange({ // get a list of currently visible frames
-						startFrame:settings.startFrame,
-						endFrame:settings.endFrame,
-						includeHiddenLayers:this.includeHiddenLayers,
-						includeGuides:this.includeGuides
-					});
-			 }else{
-			 	hasTweens = false;
-			 }
+			 var hasTweens=timeline.hasTweensInRange({ // get a list of currently visible frames
+					startFrame:settings.startFrame,
+					endFrame:settings.endFrame,
+					includeHiddenLayers:this.includeHiddenLayers,
+					includeGuides:this.includeGuides,
+					includeMotionTweens:settings.flattenMotion
+				});
 			
 			var layers=timeline.getLayers();
 			/*
@@ -1259,8 +1271,10 @@
 
 					for(var n=settings.startFrame; n<layerEnd; ++n){
 						var frame=layer.frames[n];
-						if(settings.flattenMotion &&
-							(frame.tweenType!='none' || (n==settings.startFrame && frame.startFrame!=n && layer.frames[frame.startFrame].tweenType=='none'))){
+						if(frame.tweenType=='shape' ||
+							(settings.flattenMotion && frame.tweenType=="motion") ||
+							(n==settings.startFrame && frame.startFrame!=n && layer.frames[frame.startFrame].tweenType=='none')){ // this backtracks from the first frame if our range starts mid-tween
+
 							var start=frame.startFrame;
 							var end=start+frame.duration;
 							timeline.$.convertToKeyframes(start, end);
@@ -1440,7 +1454,7 @@
 						for(var j=0; j<items.length; ++j){
 							var element = items[j];
 							var elementID=this._uniqueID('element');
-							if(this._linearProcessing){
+							if(this._delayedProcessing){
 								var elementXML=new XML('<g id="'+elementID+'"></g>');
 								this.qData.push([
 									elementID,
@@ -1507,7 +1521,7 @@
 								this._addAnimationNode(elementXML, "skewX", [skxList], timeList, totalTime);
 								this._addAnimationNode(elementXML, "skewY", [skyList], timeList, totalTime);
 
-								delete elementXML.@transform;
+								elementXML.@transform = ''; // empty this instead of deleting (so that delayed processing elements also get cleare after this)
 
 							}else if(tweenType=='none'){
 								while(frameEnd<layer.frames.length && layer.frames[frameEnd].startFrame==n){
@@ -1517,6 +1531,7 @@
 							}
 							var frameTimeStart = String(Math.roundTo(n/totFrames,this.decimalPointPrecision));
 							var frameTimeEnd = String(Math.roundTo(frameEnd/totFrames,this.decimalPointPrecision));
+							if(frameTimeEnd>1)frameTimeEnd = 1;
 
 							if(frameTimeStart!=0 || frameTimeEnd!=1){ // don't bother if element is always there
 								var fAnimNode = animNode.copy();
@@ -1642,6 +1657,7 @@
 			for(var i=1; i<times.length; ++i){
 				var newVal = getValue(valueLists, i);
 				lastTime = times[i];
+				if(lastTime>1)lastTime = 1;
 				lastVal = newVal;
 				validV.push(newVal);
 				validT.push(lastTime);
@@ -2135,7 +2151,6 @@
 			var tobeCut=null;
 			var ii;
 			var validContours=new ext.Array([]);
-			
 			for(i=0;i<contours.length;i++){
 				var s=this._getContour(contours[i],{
 					colorTransform:settings.colorTransform,
