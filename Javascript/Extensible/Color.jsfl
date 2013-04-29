@@ -194,7 +194,7 @@
 		transform:function(color){
 			color=new this.type(color);
 			for(var i=0;i<4;i++){
-				color.amount[i]=(
+				/*color.amount[i]=(
 					(
 						color.percent[i]?
 						color.amount[i]:
@@ -205,7 +205,16 @@
 						this.amount[i]
 					)
 				);
-				color.percent[i]*=(this.percent[i]/100);
+				fl.trace(i+" "+this.amount[i]);
+				color.percent[i]*=(this.percent[i]/100);*/
+
+				if(this.amount[i]){
+					color.amount[i] = (
+							color.amount[i] * (color.percent[i]/100) * (this.percent[i]/100)
+						) + this.amount[i];
+				}else{
+					color.percent[i] *= (this.percent[i]/100);
+				}
 			}
 			return color;
 		},
