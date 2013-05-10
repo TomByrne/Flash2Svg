@@ -26,6 +26,7 @@ package{
 		private var expandDiffs:Array;
 		private var rightDiffs:Array;
 		private var vStack:Array;
+		private var enable:Array;
 
 		private var width:Number;
 		private var height:Number;
@@ -50,7 +51,8 @@ package{
 
 			rightControls = [   layout.fileRow.button,
 								layout.customFramesRow,
-								layout.presetRow.deleteButton];
+								layout.presetRow.deleteButton,
+								layout.presetRow.saveButton];
 
 			vStack = [	layout.sourceRow,
 						layout.clippingRow,
@@ -69,12 +71,39 @@ package{
 						layout.convertPatternsToSymbolsCheckBox,
 						layout.flattenMotionCheckBox];
 
+			enable = [layout.fileRow.input,
+						layout.sourceRow.input,
+						layout.framesRow.input,
+						layout.outputRow.input,
+						//layout.exportButton,
+						layout.progressBar,
+						layout.presetRow.comboBox,
+						layout.decimalRow.input,
+						layout.masksRow.input,
+						layout.curvesRow.input,
+						layout.expandRow.input,
+						layout.applyTransformationsCheckBox,
+						layout.convertPatternsToSymbolsCheckBox,
+						layout.fileRow.button,
+						layout.customFramesRow,
+						layout.presetRow.deleteButton,
+						layout.presetRow.saveButton,
+						layout.applyTransformationsCheckBox,
+						layout.convertPatternsToSymbolsCheckBox,
+						layout.flattenMotionCheckBox];
+
 		}
 
 		public function setSize(w:Number, h:Number):void{
 			width = w;
 			height = h;
 			update();
+		}
+
+		public function setEnabled(enabled:Boolean):void{
+			for each(var control:* in enable){
+				control.enabled = enabled;
+			}
 		}
 		public function update():void{
 			var w:Number = width;

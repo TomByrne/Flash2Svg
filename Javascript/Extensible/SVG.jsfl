@@ -11,7 +11,7 @@
 	 * @parameter {Boolean} options.expandSymbols If true, symbols are converted to graphic elements for compatibility w/ Illustrator & Webkit browsers.
 	 * @parameter {Boolean} applyTransformations If true, matrices are concatenated and applied to child elements for broader compatibility.
 	 * @parameter {Number} curveDegree Determines whether curves are created as Quadratic (2) or Cubic (3) beziers - Quadratic is faster.
-	 * @parameter {String} maskingType Determines how masks are applied: 'Alpha','Clipping',or 'Luminance'. Clipping mimicks the way flash displays masks.
+	 * @parameter {String} maskingType Determines how masks are applied: 'alpha','clipping',or 'luminance'. Clipping mimicks the way flash displays masks.
 	 * @parameter {Boolean} convertTextToOutlines If true, text is converted to outlines.
 	 * @parameter {String} swfPanelName The name of the swfPanel UI.
 	 * @parameter {Boolean} exportSelectedLibraryItems If true, selected library items are exported rather than the stage view.
@@ -29,13 +29,13 @@
 		var settings=new ext.Object({
 			file:undefined,
 			decimalPointPrecision:3,
-			expandSymbols:'None', // 'Nested', 'All', 'None'
+			expandSymbols:'none', // 'Nested', 'All', 'None'
 			convertPatternsToSymbols:true,
 			applyTransformations:true,
 			applyColorEffects:true,
 			flattenMotion:true,
 			curveDegree:3,
-			maskingType:'Clipping',
+			maskingType:'clipping',
 			frames:new ext.Array(), // 'custom', 'all', 'current'
 			startFrame:undefined,
 			endFrame:undefined,
@@ -61,23 +61,17 @@
 			clipToScalingGrid:false, // only relevant when source=='Selected Library Items'
 			clipToBoundingBox:false // only relevant when source=='Selected Library Items'
 		});
-		if(
-			options instanceof XML ||
-			typeof(options)=='string'
-		){
+
+		if(options instanceof XML || typeof(options)=='string'){
 			ext.Task.apply(this,[settings]);
-			this.settingsXML=this.loadSettings(options);
+			this.loadSettings(options);
 		}else{
 			settings.extend(options);
 			ext.Task.apply(this,[settings]);
 		}
-		if(
-			!options && 
-			ext.doc.documentHasData(this.DOCUMENT_DATA)
+		if(!options && ext.doc.documentHasData(this.DOCUMENT_DATA)
 		){
-			this.settingsXML=this.loadSettings(
-				ext.doc.getDataFromDocument(this.DOCUMENT_DATA)
-			);
+			this.settingsXML=this.loadSettings(ext.doc.getDataFromDocument(this.DOCUMENT_DATA));
 		}
 		if(
 			this.file &&
@@ -760,8 +754,8 @@
 				var document = documents[i];
 
 
-				if(this.expandSymbols && this.expandSymbols!='None'){ // expand symbol instances
-					if(this.expandSymbols=='Nested'){
+				if(this.expandSymbols && this.expandSymbols!='none'){ // expand symbol instances
+					if(this.expandSymbols=='nested'){
 						this.expandUse(document,'nested',document.defs);
 					}else{
 						this.expandUse(document);
@@ -1331,7 +1325,6 @@
 			var xml,instanceXML,id;
 			var transformString=this._getMatrix(settings.matrix);
 			var timelineName=timeline.name;
-
 			/*
 			 * If the timeline is a symbol ( has a libraryItem ), 
 			 * we either create a symbol definition or use the existings one.
@@ -1386,7 +1379,7 @@
 					animNode.@dur = totalTime+"s";
 				}
 
-				var animatedFrames = [];
+				var animatedFrames = {};
 
 				/*
 				 * Loop through the visible frames by layer &
@@ -1422,9 +1415,9 @@
 					if(layer.layerType=='mask'){
 						maskId = id;
 						isMask = true;
-						if(this.maskingType=='Alpha'){
+						if(this.maskingType=='alpha'){
 							colorX=new ext.Color('#FFFFFF00');
-						}else if(this.maskingType=='Clipping'){
+						}else if(this.maskingType=='clipping'){
 							colorX=new ext.Color('#FFFFFF00');
 							colorX.percent[3]=999999999999999;						
 						};
@@ -1473,6 +1466,7 @@
 
 						var items = this._getItemsByFrame(frame, settings.selection);
 						var doMotionTween = (doAnim && !settings.flattenMotion  && items.length==1 && frame.tweenType!="shape" && items[0].$.elementType=="instance");
+					
 						for(var j=0; j<items.length; ++j){
 							var element = items[j];
 							element.timeline = timeline;
@@ -1501,7 +1495,6 @@
 								};
 							}
 						}
-
 						if(doAnim){
 							var frameEnd = n+1;
 
@@ -1558,15 +1551,24 @@
 												rot += 360;
 												skewX += 360;
 												skewY += 360;
-												fl.trace("hmm: "+rot);
 											}
 											while(Math.abs(rot-lastRot)>Math.abs(rot-360-lastRot)){
 												rot -= 360;
 												skewX -= 360;
 												skewY -= 360;
-												fl.trace("rot: "+rot);
 											}
 
+											// if there is a rotation tween of up to 45 degrees, we add extra bounds to accomodate it.
+											var rotDif = Math.abs(lastRot - rot)/180*Math.PI;
+											if(rotDif>Math.PI/4)rotDif = Math.PI/4;
+											var swingLeft = nextElement.matrix.tx+(nextElement.left-nextElement.matrix.tx)*Math.cos(rotDif)+(nextElement.top-nextElement.matrix.ty)*Math.sin(rotDif);
+											var swingTop = nextElement.matrix.ty+(nextElement.top-nextElement.matrix.ty)*Math.cos(rotDif)+(nextElement.left-nextElement.matrix.tx)*Math.sin(rotDif);
+											var swingRight = nextElement.matrix.tx+(nextElement.right-nextElement.matrix.tx)*Math.cos(rotDif)+(nextElement.bottom-nextElement.matrix.ty)*Math.sin(rotDif);
+											var swingBottom = nextElement.matrix.ty+(nextElement.bottom-nextElement.matrix.ty)*Math.cos(rotDif)+(nextElement.right-nextElement.matrix.tx)*Math.sin(rotDif);
+											if(boundingBox.left>swingLeft)boundingBox.left = swingLeft;
+											if(boundingBox.top>swingTop)boundingBox.top = swingTop;
+											if(boundingBox.right<swingRight)boundingBox.right = swingRight;
+											if(boundingBox.bottom<swingBottom)boundingBox.bottom = swingBottom;
 											
 											xList.push(Math.roundTo(nextElement.matrix.tx, this.decimalPointPrecision));
 											yList.push(Math.roundTo(nextElement.matrix.ty, this.decimalPointPrecision));
@@ -1590,13 +1592,13 @@
 								}
 
 								this._addAnimationNode(elementXML, "translate", [xList, yList], timeList, totalTime, splineList);
-								this._addAnimationNode(elementXML, "scale", [scxList, scyList], timeList, totalTime, splineList);
+								this._addAnimationNode(elementXML, "scale", [scxList, scyList], timeList, totalTime, splineList, 1);
 								if(hasSkewX && hasSkewY){
-									for(var i=0; i<skxList.length; i++){
-										skxList[i] -= rotList[i];
+									for(var h=0; h<skxList.length; h++){
+										skxList[h] -= rotList[h];
 									}
-									for(var i=0; i<skyList.length; i++){
-										skyList[i] -= rotList[i];
+									for(var h=0; h<skyList.length; h++){
+										skyList[h] -= rotList[h];
 									}
 									this._addAnimationNode(elementXML, "rotate", [rotList, trxList, tryList], timeList, totalTime, splineList);
 								}
@@ -1687,9 +1689,9 @@
 					settings.libraryItem
 				){
 					boundingBox=settings.libraryItem.scalingGridRect;
-				}else if(settings.selection){
+				}/*else if(settings.selection){
 					boundingBox=settings.selection.boundingBox;
-				}				
+				}	*/			
 				instanceXML['@width']=String(boundingBox.right-boundingBox.left);
 				instanceXML['@height']=String(boundingBox.bottom-boundingBox.top);
 				instanceXML['@x']=String(boundingBox.left);
@@ -1723,7 +1725,9 @@
 			xml.appendChild(mg);
 			masked.clear();
 		},
-		_addAnimationNode:function(toNode, type, valueLists, times, totalTime, splineList){
+		_addAnimationNode:function(toNode, type, valueLists, times, totalTime, splineList, defaultValue){
+
+			if(defaultValue==null)defaultValue = 0;
 
 			var getValue = function(valueLists, i){
 				var ret = valueLists[0][i].toString();
@@ -1736,7 +1740,7 @@
 			for(var i=0; i<valueLists.length; ++i){
 				var list = valueLists[i];
 				for(var j=0; j<list.length; ++j){
-					if(list[j]!=0){
+					if(list[j]!=defaultValue){
 						found = true;
 						break;
 					}
@@ -1843,17 +1847,17 @@
 			if(ext.log){
 				var timer=ext.log.startTimer('extensible.SVG._getSymbolInstance()');	
 			}
+			var timeline=instance.timeline;
 			var settings=new ext.Object({
 				startFrame:0,
-				endFrame:1,
-				matrix:new ext.Matrix(),
-				colorTransform:null,
+				endFrame: timeline.frames.length,
+				matrix: new ext.Matrix(),
+				colorTransform: null,
 				libraryItem:instance.libraryItem
 			});
 			settings.extend(options);
-			settings.matrix=instance.matrix.concat(settings.matrix);
-			var timeline=instance.timeline;
-			var xml=this._getTimeline(instance.timeline,settings);
+			settings.matrix = instance.matrix.concat(settings.matrix);
+			var xml = this._getTimeline(instance.timeline,settings);
 			var filterID=this._getFilters(instance,options);
 			if(filterID && this.xml.defs.filter.(@id==filterID).length()){
 				xml['@filter']='url(#'+filterID+')';

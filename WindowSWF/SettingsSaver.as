@@ -2,8 +2,15 @@ package{
 
 	import adobe.utils.MMEndCommand;
 	import adobe.utils.MMExecute;
+	import flash.external.ExternalInterface;
+	import flash.events.*;
 
-	public class SettingsSaver {
+	public class SettingsSaver extends EventDispatcher {
+
+		// event
+		public static const EVENT_STATE_CHANGED:String = "stateChanged";
+		public static const EVENT_GROUPS_CHANGED:String = "groupsChanged";
+
 
 		public static const STATE_UNLOADED:String = "unloaded";
 		public static const STATE_LOADING:String = "loading";
@@ -21,6 +28,9 @@ package{
 		public function get settingsGroups():Vector.<SettingGroup>{
 			return _settingsGroups;
 		}
+		public function get state():String{
+			return _state;
+		}
 
 
 		private var _currentSettings:SettingGroup;
@@ -30,15 +40,17 @@ package{
 		private var _settingsFolder:String;
 		private var _overwriteHandler:Function;
 		private var _autoSave:Boolean;
+		private var _documentSaveName:String;
 
 		private var _state:String = STATE_UNLOADED;
 
-		public function SettingsSaver(settingsFolder:String, autoSave:Boolean=false, overwriteHandler:Function=null){
-			_currentSettings = new SettingGroup();
-
+		public function SettingsSaver(settingsFolder:String, autoSave:Boolean=false, overwriteHandler:Function=null, documentSaveName:String=null, swfPanelName:String=null){
+			_currentSettings = new SettingGroup(null, true);
 			_settingsDefs = new Vector.<SettingDefinition>();
 
 			_settingsGroups = new Vector.<SettingGroup>();
+
+			_documentSaveName = documentSaveName;
 
 			_settingsFolder = settingsFolder;
 			_overwriteHandler = overwriteHandler;
@@ -65,10 +77,61 @@ package{
 			}else{
 				MMExecute('FLfile.createFolder("'+settingsFolder+'")')
 			}
+
+			if(_documentSaveName){
+				if(!swfPanelName){
+					throw new Error("swfPanelName must be provided to save settings to document");
+				}
+				// Document change...
+				ExternalInterface.addCallback('documentChanged_'+documentSaveName,documentChanged);
+				MMExecute([
+					'fl.addEventListener(',
+					'	"documentChanged",',
+					'	function(){',
+					'		extensible.swfPanel("'+swfPanelName+'").call("documentChanged_'+documentSaveName+'");',
+					'	}',
+					');'
+				].join('\n'));
+
+				doDocumentChanged();
+			}
+
+		}
+
+		private function documentChanged():void{
+			DelayedCall.call(doDocumentChanged, 0.1); // flash calls the handler multiple times, this will collate them
+		}
+
+		public function doDocumentChanged():void{
+			if(MMExecute('extensible.doc')!='null' &&
+				MMExecute('extensible.doc.documentHasData("'+_documentSaveName+'")')=='true'
+			){
+				var xml=new XML(MMExecute('extensible.doc.getDataFromDocument("'+_documentSaveName+'")'));
+				updateSettingGroup(_currentSettings, deserialise(xml), true);
+			}
+		}
+
+		public function setToFirst(allowUserCreated:Boolean):void{
+			var group:SettingGroup;
+			if(allowUserCreated){
+				group = _settingsGroups[0];
+			}else{
+				for each(var g:SettingGroup in _settingsGroups){
+					if(!g.userCreated){
+						group = g;
+						break;
+					}
+				}
+			}
+			if(group)setSettingTitle(group.title, true);
+		}
+
+		public function getXml():XML{
+			return serialise(_currentSettings);
 		}
 
 		private function deserialise(xml:XML):SettingGroup{
-			var ret = new SettingGroup(xml.@title);
+			var ret = new SettingGroup(xml.@title, xml.@userCreated=='true');
 			for each(var child in xml.children()){
 				var value:* = child.text();
 				if(value=="false"){
@@ -83,37 +146,34 @@ package{
 			return ret;
 		}
 
-		private function serialise(group:SettingGroup):XML{
+		private function serialise(group:SettingGroup, includeNonFile:Boolean=true):XML{
 			var ret:XML = new XML("<settings></settings>");
 			ret.@title = group.title;
+			ret.@userCreated = group.userCreated;
 			for each(var settingDef:SettingDefinition in _settingsDefs){
 				var value = group.getSetting(settingDef.settingName);
-				if(value!=null){
+				if(value!=null && (includeNonFile || settingDef.diskSave)){
 					ret.appendChild(new XML("<"+settingDef.settingName+">"+value+"</"+settingDef.settingName+">"));
 				}
 			}
-
 			return ret;
 		}
 
-		private function setState(state:String):void{
-			if(_state==state)return;
+		private function setState(state:String, overrideCheck:Boolean=false):void{
+			if(!overrideCheck && _state==state)return;
 
 			_state = state;
-			// dispatch event
+			dispatchEvent(new Event(EVENT_STATE_CHANGED));
 		}
 		public function setSettingTitle(title:String, loadSettings:Boolean):void{
 			_currentSettings.title = title;
 			var existing:SettingGroup;
+
 			if(loadSettings && (existing = getSettingGroup(settingTitle))){
-				for each(var settingDef:SettingDefinition in _settingsDefs){
-					var value:* = existing.getSetting(settingDef.settingName);
-					_currentSettings.setSetting(settingDef.settingName, value);
-					settingDef.object[settingDef.prop] = value;
-				}
-				setState(STATE_LOADED);
+				updateSettingGroup(_currentSettings, existing, true);
+				setState(STATE_LOADED, true);
 			}else{
-				checkState();
+				checkState(true);
 			}
 		}
 
@@ -124,43 +184,75 @@ package{
 			return true;
 		}
 
-		public function addSetting(object:Object, prop:String, settingName:String, defValue:*):void{
-			var setting:SettingDefinition = new SettingDefinition(object, prop, settingName, defValue);
+		public function addSetting(object:Object, prop:String, settingName:String, defValue:*, diskSave:Boolean=true, getter:Function=null, setter:Function=null, event:String=null):void{
+			var setting:SettingDefinition = new SettingDefinition(object, prop, settingName, defValue, diskSave, getter, setter);
 			_settingsDefs.push(setting);
 			updateSetting(object, prop);
+
+			if(event){
+				(object as EventDispatcher).addEventListener( event, makeUpdateHandler(object, prop));
+			}
 		}
 
 		public function updateSetting(object:Object, prop:String, doSave:Boolean=false):void{
 			var def:SettingDefinition = getSettingDef(object, prop);
-			var value:* = object[prop];
+			var value:*;
+			if(def.getter!=null){
+				value = def.getter(object,prop);
+			}else{
+				value = object[prop];
+			}
+			
 			_currentSettings.setSetting(def.settingName, value);
 			checkState();
 
-			checkAutoSave();
+			DelayedCall.call(checkAutoSave, 0.5); // this collates rapid input (keystrokes, etc)
 		}
 
 		public function checkAutoSave():void{
-			if(_autoSave && (_state==STATE_UNSAVED || _state==STATE_MODIFIED)){
-				save();
+			if(_state==STATE_UNSAVED || _state==STATE_MODIFIED){
+				if(_autoSave){
+					save();
+
+				}
+				if(_documentSaveName){
+
+					MMExecute([
+						'extensible.doc.addDataToDocument(',
+						'	"'+_documentSaveName+'",',
+						'	"string",',
+						'	decodeURIComponent("'+encodeURIComponent(getXml().toXMLString())+'")',
+						')'
+					].join('\n'));
+				}
 			}
 		}
 
-		private function checkState():void{
+		private function checkState(overrideCheck:Boolean=false):void{
 			var existing:SettingGroup = getSettingGroup(settingTitle);
 			if(!existing){
-				setState(STATE_UNSAVED);
+				setState(STATE_UNSAVED, overrideCheck);
 			}else if(areSame(existing, _currentSettings)){
-				setState(STATE_LOADED);
+				setState(STATE_LOADED, overrideCheck);
 			}else{
-				setState(STATE_MODIFIED);
+				setState(STATE_MODIFIED, overrideCheck);
 			}
 		}
 
 		public function save():void{
 			if(!settingTitle)return;
 
+			if(_state==STATE_MODIFIED && _overwriteHandler!=null){
+				_overwriteHandler(doSave);
+			}else{
+				doSave();
+			}
+		}
+
+		private function doSave():void{
+
 			var filePath:String = _settingsFolder+settingTitle+".xml";
-			var xml:XML = serialise(_currentSettings);
+			var xml:XML = serialise(_currentSettings, false);
 			var output=(
 				'decodeURIComponent("'+encodeURIComponent(filePath)+'"),'+
 				'decodeURIComponent("'+encodeURIComponent(xml.toXMLString())+'")'
@@ -168,14 +260,40 @@ package{
 			MMExecute('FLfile.write('+output+');');
 
 			var existing:SettingGroup = getSettingGroup(settingTitle);
-			updateSettingGroup(existing, _currentSettings);
+			if(!existing){
+				existing = new SettingGroup(settingTitle, true);
+				_settingsGroups.push(existing);
+				dispatchEvent(new Event(EVENT_GROUPS_CHANGED));
+			}
+			updateSettingGroup(existing, _currentSettings, false);
 
 			setState(STATE_LOADED);
 		}
 
-		public function updateSettingGroup(update:SettingGroup, withGroup:SettingGroup):void{
+			private function updateSettingGroup(update:SettingGroup, withGroup:SettingGroup, updateObjects:Boolean):void{
 			for each(var settingDef in _settingsDefs){
-				update.setSetting(settingDef.settingName, withGroup.getSetting(settingDef.settingName));
+				var value:* = withGroup.getSetting(settingDef.settingName);
+				if(value==null){
+					value = settingDef.defValue;
+				}
+
+				update.setSetting(settingDef.settingName, value);
+				if(updateObjects){
+
+					if(settingDef.setter!=null){
+						settingDef.setter(settingDef.object, settingDef.prop, value);
+					}else{
+						settingDef.object[settingDef.prop] = value;
+					}
+				}
+			}
+		}
+
+		public function makeUpdateHandler(object:Object, prop:String):Function{
+			var obj:Object = object;
+			var p:String = prop;
+			return function(e:Event):void{
+				updateSetting(obj, p);
 			}
 		}
 
@@ -184,6 +302,7 @@ package{
 			MMExecute('FLfile.remove("'+filePath+'")');
 
 			setState(STATE_UNSAVED);
+			dispatchEvent(new Event(EVENT_GROUPS_CHANGED));
 		}
 
 		public function getSettingGroup(title:String):SettingGroup{
@@ -211,11 +330,17 @@ class SettingDefinition{
 	public var prop:String;
 	public var settingName:String;
 	public var defValue:*;
+	public var diskSave:Boolean;
+	public var getter:Function;
+	public var setter:Function;
 
-	public function SettingDefinition(object:Object, prop:String, settingName:String, defValue:*){
+	public function SettingDefinition(object:Object, prop:String, settingName:String, defValue:*, diskSave:Boolean, getter:Function, setter:Function){
 		this.object = object;
 		this.prop = prop;
 		this.defValue = defValue;
 		this.settingName = settingName;
+		this.diskSave = diskSave;
+		this.getter = getter;
+		this.setter = setter;
 	}
 }
