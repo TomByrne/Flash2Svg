@@ -111,7 +111,7 @@ package{
 			_exportSettings.addSetting(controlsLayout.fileRow.input, "text", "file", null, false, fileGetter, fileSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.sourceRow.input, "selectedIndex", "source", "current", false, comboGetter, comboSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.framesRow.input, "selectedIndex", "frames", "all", false, comboGetter, comboSetter, Event.CHANGE);
-			_exportSettings.addSetting(controlsLayout.outputRow.input, "selectedIndex", "output", "all", false, comboGetter, comboSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.outputRow.input, "selectedIndex", "output", "animation", false, comboGetter, comboSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.clippingRow.clipToScalingGridRadioButton, "selected", "clipToScalingGrid", false, false, radioGetter, radioSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.clippingRow.clipToBoundingBoxRadioButton, "selected", "clipToBoundingBox", true, false, radioGetter, radioSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.customFramesRow.startFrameNumericStepper, "value", "startFrame", 0, false, null, null, Event.CHANGE);
@@ -207,6 +207,7 @@ package{
 
 			doDocumentChanged();
 
+			_exportSettings.init();
 		}
 
 		private function documentChanged():void{
@@ -224,6 +225,7 @@ package{
 					_genericName = this.controlsLayout.fileRow.input.text=MMExecute('extensible.doc.name.stripExtension()')+'.svg';
 				}
 			}
+			checkFileInput();
 		}
 
 
@@ -391,7 +393,6 @@ package{
 			//Save options
 			var xml = _exportSettings.getXml();
 			if(_usingGeneric){
-				Fl.trace(xml.file.text());
 				xml.appendChild(new XML("<file>"+_genericName+"</file>"));
 			}
 			xml['swfPanelName']='SVG';

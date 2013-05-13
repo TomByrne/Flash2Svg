@@ -93,9 +93,16 @@ package{
 					');'
 				].join('\n'));
 
-				doDocumentChanged();
+				//documentChanged();
 			}
 
+		}
+		public function init():void{
+			// Should be called after all settings are added
+
+			if(_documentSaveName){
+				doDocumentChanged();
+			}
 		}
 
 		private function documentChanged():void{
@@ -270,7 +277,7 @@ package{
 			setState(STATE_LOADED);
 		}
 
-			private function updateSettingGroup(update:SettingGroup, withGroup:SettingGroup, updateObjects:Boolean):void{
+		private function updateSettingGroup(update:SettingGroup, withGroup:SettingGroup, updateObjects:Boolean):void{
 			for each(var settingDef in _settingsDefs){
 				var value:* = withGroup.getSetting(settingDef.settingName);
 				if(value==null){
