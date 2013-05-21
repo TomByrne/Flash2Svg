@@ -306,7 +306,6 @@
 							this.layers[selectionList[n]].frameCount<selectionList[n+1]
 						){
 							success=true;
-							fl.trace(this.layers[selectionList[n]].frameCount);
 							continue;
 						}
 						success=false;
@@ -425,7 +424,8 @@
 		getLayers:function(options){
 			var settings=new ext.Object({
 				includeHiddenLayers:ext.includeHiddenLayers,
-				includeGuides:false
+				includeGuides:false,
+				includeFolders:false
 			});
 			settings.extend(options);
 			var inputLayers=this.$.layers;
@@ -433,7 +433,8 @@
 			for(var i=0;i<inputLayers.length;i++){
 				if(
 					(inputLayers[i].visible || settings.includeHiddenLayers) && 
-					(inputLayers[i].layerType!='guide' || settings.includeGuides)
+					(inputLayers[i].layerType!='guide' || settings.includeGuides) && 
+					(inputLayers[i].layerType!='folder' || settings.includeFolders)
 				){
 					layers.push(new ext.Layer(inputLayers[i],{timeline:this}));
 				}
@@ -443,6 +444,7 @@
 		get layers(){
 			return this.getLayers({
 				includeHiddenLayers:true,
+				includeFolders:true,
 				includeGuides:true
 			});
 		},

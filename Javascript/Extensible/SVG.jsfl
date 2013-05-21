@@ -61,7 +61,6 @@
 			clipToScalingGrid:false, // only relevant when source=='Selected Library Items'
 			clipToBoundingBox:false // only relevant when source=='Selected Library Items'
 		});
-
 		if(options instanceof XML || typeof(options)=='string'){
 			ext.Task.apply(this,[settings]);
 			this.loadSettings(options);
@@ -738,8 +737,13 @@
 				this.animated
 			){
 				documents=new ext.Array([this.xml]);
+
+				if(this.file && fileExists){
+					success=FLfile.remove(this.file);
+				}
 			}else{
 				documents=this._splitXML(this.xml);
+
 				if(this.file && !fileExists){
 					success=FLfile.createFolder(this.file);
 				}
@@ -1352,7 +1356,7 @@
 				if(!this._symbols[timeline.name]){
 					this._symbols[timeline.name]=id;
 				}
-			}		
+			}	
 			var instanceID=this._uniqueID(id);	
 			xml=new XML('<use xlink-href="#'+id+'" id="'+instanceID+'" />');
 			if(isNew){
@@ -1391,6 +1395,8 @@
 				var maskId = null;
 				for(var i=0;i<layers.length;i++){
 					var layer=layers[i];
+					
+
 					var layerEnd = settings.endFrame;
 					if(layerEnd>layer.frameCount)layerEnd = layer.frameCount;
 
