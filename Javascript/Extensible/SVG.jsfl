@@ -30,6 +30,7 @@
 			file:undefined,
 			decimalPointPrecision:3,
 			expandSymbols:'none', // 'Nested', 'All', 'None'
+			rendering:'auto', // 'auto', 'optimizeSpeed', 'optimizeQuality', 'inherit'
 			convertPatternsToSymbols:true,
 			applyTransformations:true,
 			applyColorEffects:true,
@@ -42,7 +43,7 @@
 			animated:false,
 			timelines:new ext.Array([]),
 			backgroundColor:ext.doc.backgroundColor,
-			knockoutBackgroundColor:false,
+			includeBackground:false,
 			includeHiddenLayers:ext.includeHiddenLayers,
 			convertTextToOutlines:true,
 			includeGuides:false,
@@ -121,6 +122,7 @@
 		this._minProgressIncrement=1; // Is later set to this._progressMax/this.MAX_INLINE_CALL_COUNT in order to prevent recursion
 		this._origSelection=new ext.Selection([]);
 		this._delayedProcessing=true;// If true, a timeline is processed one level deep in it's entirety before progressing to descendants.
+
 		if(this.startFrame!=undefined){
 			if(
 				this.endFrame==undefined ||
@@ -143,7 +145,8 @@
 				matrix:ext.viewMatrix,
 				frames:new ext.Array([]),
 				width:ext.doc.width,
-				height:ext.doc.height
+				height:ext.doc.height,
+				libraryItem:ext.timeline.libraryItem
 			};
 			if(this.frames.length){
 				timeline.frames.extend(this.frames);
@@ -198,7 +201,6 @@
 		 */
 		applyMatrices:function(xml,defs,strokeX){
 			strokeX=strokeX||new ext.Matrix();
-			xml=xml!==undefined?xml:this.xml;
 			if(typeof xml=='string'){
 				xml=new XML(xml);
 			}
@@ -412,14 +414,6 @@
 			if(name=='mask' && xml..use.length()>0){
 				this.expandUse( xml,true,defs );
 			}
-			defs=(
-				defs instanceof XML ?
-				defs:(
-					xml.defs instanceof XML ?
-					xml.defs:
-					this.xml.defs
-				)
-			);
 			var filter,newFilter;
 			var color=colorX;
 			if(xml.hasOwnProperty('@filter')){
@@ -648,26 +642,29 @@
 			}
 			this._origSelection=ext.sel;
 			ext.doc.selectNone(); // selection slows performance & can cause crashes
-			this.xml=new XML('<svg xmlns:xlink="http://www.w3.org/1999/xlink"/>');
-			this.xml['@id']=this.id;
-			this.xml['@image-rendering']='optimizeSpeed';
-			this.xml['@baseProfile']=this.baseProfile;
-			this.xml['@version']=this.version;
-			this.xml['@style']="background-color:"+this.backgroundColor;
-			this.xml['@x']=String(this.x)+'px';
-			this.xml['@y']=String(this.y)+'px';
-			this.xml['@width']=String(this.width)+'px';
-			this.xml['@height']=String(this.height)+'px';
-			var vb=String(this.x)+' '+String(this.y)+' '+String(this.width)+' '+String(this.height);
-			this.xml['@viewBox']=vb;
-			this.xml['@enable-background']='new '+vb;
-			this.xml['@xml:space']='preserve';
-			this.xml.appendChild(new XML('<defs/>'));
+			this.doms = [];
 			for(i=0;i<this.timelines.length;i++){
+
+				var xml=new XML('<svg xmlns:xlink="http://www.w3.org/1999/xlink"/>');
+				xml['@id']=this.id;
+				xml['@image-rendering']=this.rendering;
+				xml['@baseProfile']=this.baseProfile;
+				xml['@version']=this.version;
+				if(this.includeBackground){
+					xml['@style']="background-color:"+this.backgroundColor;
+				}
+				xml['@x']=String(this.x)+'px';
+				xml['@y']=String(this.y)+'px';
+				xml['@width']=String(this.width)+'px';
+				xml['@height']=String(this.height)+'px';
+				xml['@xml:space']='preserve';
+				xml.appendChild(new XML('<defs/>'));
+
 				var timeline = this.timelines[i];
 				var x=this._getTimeline(
 					timeline.timeline,
 					{
+						dom:xml,
 						matrix:timeline.matrix,
 						startFrame:this.startFrame,
 						endFrame:this.endFrame,
@@ -677,15 +674,9 @@
 						flattenMotion:this.flattenMotion
 					}
 				);
-				/*if(timeline.matrix.is(new ext.Matrix()) &&
-					this.timelines.length==1 &&
-					(timeline.frames.length==1 || this.animated)){ // skip unnecessary identity matrix
-					for each(var e in x.*){
-						this.xml.appendChild(e);
-					}
-				}else{*/
-					this.xml.appendChild(x);
-				//}
+				xml.appendChild(x);
+
+				this.doms[i] = xml;
 			}
 			if(ext.log){
 				ext.log.pauseTimer(timer);	
@@ -730,89 +721,93 @@
 				FLfile.remove(this.file);
 				fileExists=false;
 			}
-			var documents;
-			if(
-				(this.timelines.length==1 &&
-				this.frames.length==1) ||
-				this.animated
-			){
-				documents=new ext.Array([this.xml]);
-
-				if(this.file && fileExists){
-					success=FLfile.remove(this.file);
-				}
-			}else{
-				documents=this._splitXML(this.xml);
-
-				if(this.file && !fileExists){
-					success=FLfile.createFolder(this.file);
-				}
-				if(!success){
-					throw new Error('Problem creating folder.');
-				}
-			}
-
-
 			var writeSuccess=true;
-			for(var i=0;i<documents.length;i++){
-				var document = documents[i];
 
+			for(var k=0; k<this.timelines.length;k++){
+				var timeline = this.timelines[k];
+				var dom = this.doms[k];
+				if(this.frames.length==1 || this.animated){
+					documents = [dom];
 
-				if(this.expandSymbols && this.expandSymbols!='none'){ // expand symbol instances
-					if(this.expandSymbols=='nested'){
-						this.expandUse(document,'nested',document.defs);
-					}else{
-						this.expandUse(document);
+					if(this.file && fileExists){
+						success = FLfile.remove(this.file);
+					}
+				}else{
+					documents = this._splitXML(dom);
+
+					if(this.file && !fileExists){
+						if(!FLfile.createFolder(this.file))
+							throw new Error('Problem creating folder.');
 					}
 				}
-				if(this.applyTransformations){
-					this.applyMatrices(document);
-				}
-				this._applyColorEffects(document,document.defs);
-				this.deleteUnusedReferences(document);
-				document['@xmlns']="http://www.w3.org/2000/svg";
-				if(this.file){
-					var outputString=(
-						this.docString+
-						documents[i].toXMLString().replace(
-							/(<[^>]*?)xlink-(.*?)="/g,
-							'$1xlink:$2="'
-						)
-					);
-					if(documents.length==1){
-						success=FLfile.write(this.file,outputString);
-					}else{
-						var rPath=decodeURIComponent(
-							String(
-								documents[i].@id
-							).replace(
-								this.MODULO_STAND_IN,
-								'%',
-								'g'
+				for(var i=0;i<documents.length;i++){
+					var document = documents[i];
+
+					if(this.expandSymbols && this.expandSymbols!='none'){ // expand symbol instances
+						if(this.expandSymbols=='nested'){
+							this.expandUse(document,'nested',document.defs);
+						}else{
+							this.expandUse(document);
+						}
+					}
+					if(this.applyTransformations){
+						this.applyMatrices(document);
+					}
+					this._applyColorEffects(document,document.defs);
+					this.deleteUnusedReferences(document);
+					document['@xmlns']="http://www.w3.org/2000/svg";
+
+					if(!document['@viewBox']){
+						document['@viewBox']=String(this.x)+' '+String(this.y)+' '+String(this.width)+' '+String(this.height);
+					}
+
+					if(this.includeBackground){
+						document['@enable-background']='new '+document['@viewBox'];
+					}
+
+					if(this.file){
+						var outputString=(
+							this.docString+
+							document.toXMLString().replace(
+								/(<[^>]*?)xlink-(.*?)="/g,
+								'$1xlink:$2="'
 							)
 						);
-						var rPathArray=rPath.split('/');
-						for(var n=0;n<rPathArray.length;n++){
-							rPathArray[n]=rPathArray[n].safeFileName();
-						}
-						rPath=rPathArray.join('/');
-						if(rPathArray.length>1){
-							var rDir=rPath.dir;
-							if(!FLfile.exists(rDir)){
-								FLfile.createFolder(this.file+'/'+rDir);
+						if(documents.length==1){
+							success=FLfile.write(this.file,outputString);
+						}else{
+							var rPath=decodeURIComponent(
+								String(
+									documents[i].@id
+								).replace(
+									this.MODULO_STAND_IN,
+									'%',
+									'g'
+								)
+							);
+							var rPathArray=rPath.split('/');
+							for(var n=0;n<rPathArray.length;n++){
+								rPathArray[n]=rPathArray[n].safeFileName();
 							}
+							rPath=rPathArray.join('/');
+							if(rPathArray.length>1){
+								var rDir=rPath.dir;
+								if(!FLfile.exists(rDir)){
+									FLfile.createFolder(this.file+'/'+rDir);
+								}
+							}
+							var outputPath=(
+								this.file+'/'+
+								rPath+'.svg'
+							);
+							success=FLfile.write(
+								outputPath,
+								outputString
+							);
 						}
-						var outputPath=(
-							this.file+'/'+
-							rPath+'.svg'
-						);
-						success=FLfile.write(
-							outputPath,
-							outputString
-						);
-					}
-					if(!success){
-						ext.warn('Problem writing '+outputPath||this.file);
+						if(!success){
+							ext.warn('Problem writing '+outputPath||this.file);
+						}
 					}
 				}
 			}
@@ -843,7 +838,7 @@
 		 * @parameter {XML} defs
 		 */
 		expandUse:function( xml,recursive,defs ){
-			defs=defs||xml.defs||this.xml.defs;
+			defs = defs||xml.defs;
 			if(recursive==undefined){
 				recursive=true;
 			}
@@ -934,7 +929,6 @@
 		 * @parameter {XML} xml
 		 */
 		deleteUnusedReferences:function(xml){
-			xml=xml||this.xml;
 			if(!xml.defs || xml.defs.length()==0){
 				return xml;	
 			}
@@ -1046,11 +1040,11 @@
 					&& ( !this.swfPanel || this._progress<progressGoal )
 				){
 					var args=this.qData.shift();
-					var id=args.shift();
-					var elementXML=this._getElement(args[0],args[1]);
+					var id = args.id;
+					var elementXML=this._getElement(args.element,args.settings);
 					if(elementXML){
 						
-						var list = this.xml..g.(@id==id);
+						var list = args.dom..g.(@id==id);
 						if(list.length()==1){
 							var node = list[0];
 							var parent = node.parent();
@@ -1235,6 +1229,7 @@
 			if(typeof(settings.color)=='string'){
 				settings.color=new ext.Color(settings.color);
 			}
+			var dom = settings.dom;
 			/*
 			 * Check to see if the timeline has tweens that we need to resolve.
 			 */
@@ -1280,7 +1275,7 @@
 					var layerEnd = settings.endFrame;
 					if(layerEnd>layer.frameCount)layerEnd = layer.frameCount;
 
-					timeline.setSelectedLayers(timeline.layers.indexOf(layer));
+					timeline.setSelectedLayers(layer.index);
 					for(var n=settings.startFrame; n<layerEnd; ++n){
 						var frame=layer.frames[n];
 						if(frame.tweenType=='shape' ||
@@ -1333,13 +1328,13 @@
 			 * If the timeline is a symbol ( has a libraryItem ), 
 			 * we either create a symbol definition or use the existings one.
 			 */
-			if(!settings.libraryItem){
-				/*id=this._uniqueID(timelineName);
-				xml=new XML('<g id="'+id+'" />');
-				if(settings.matrix && !settings.matrix.is(new ext.Matrix())){
-					xml['@transform']=transformString;
-				}*/
-			}
+			// if(!settings.libraryItem){
+			// 	id=this._uniqueID(timelineName);
+			// 	xml=new XML('<g id="'+id+'" />');
+			// 	if(settings.matrix && !settings.matrix.is(new ext.Matrix())){
+			// 		xml['@transform']=transformString;
+			// 	}
+			// }
 			var symbolIDString = timeline.name;
 			if(settings.color){
 				symbolIDString+='/'+settings.color.idString; //should factor this out and use a transform
@@ -1395,7 +1390,7 @@
 				var maskId = null;
 				for(var i=0;i<layers.length;i++){
 					var layer=layers[i];
-					
+
 
 					var layerEnd = settings.endFrame;
 					if(layerEnd>layer.frameCount)layerEnd = layer.frameCount;
@@ -1458,7 +1453,7 @@
 									null,{
 										color:colorX,
 										boundingBox:boundingBox
-									}
+									}, dom.defs
 								);
 								if(f){
 									filtered.@filter="url(#"+f+")";
@@ -1479,17 +1474,20 @@
 							var elementID=this._uniqueID('element');
 							if(this._delayedProcessing){
 								var elementXML=new XML('<g id="'+elementID+'"></g>');
-								this.qData.push([
-									elementID,
-									element,
-									{
-										frame:n
+								this.qData.push({
+									dom:dom,
+									id:elementID,
+									element:element,
+									settings:{
+										frame:n,
+										dom:dom
 									}
-								]);
+								});
 							}else{
 								var elementXML=this._getElement(
-									element,{ // 
-										frame:n
+									element,{
+										frame:n,
+										dom:dom
 									}
 								);
 							}
@@ -1661,7 +1659,7 @@
 					this._doMask(xml, masked, maskId);
 				}
 			}else{
-				var vb=String(this.xml.defs.symbol.(@id==id)[0]['@viewBox']).split(' ');
+				var vb=String(dom.defs.symbol.(@id==id)[0]['@viewBox']).split(' ');
 				xml['@width']=vb[2];
 				xml['@height']=vb[3];
 				xml['@x']=vb[0];
@@ -1689,26 +1687,25 @@
 			}
 			var result;
 			if(instanceXML){ // set the viewBox
-				if(
-					settings.isRoot && 
-					this.clipToScalingGrid &&
-					settings.libraryItem
-				){
+				if(settings.isRoot && this.clipToScalingGrid && settings.libraryItem){
 					boundingBox=settings.libraryItem.scalingGridRect;
-				}/*else if(settings.selection){
-					boundingBox=settings.selection.boundingBox;
-				}	*/			
-				instanceXML['@width']=String(boundingBox.right-boundingBox.left);
-				instanceXML['@height']=String(boundingBox.bottom-boundingBox.top);
-				instanceXML['@x']=String(boundingBox.left);
-				instanceXML['@y']=String(boundingBox.top);
+				}
+				instanceXML['@width']=String(Math.ceil(boundingBox.right-boundingBox.left));
+				instanceXML['@height']=String(Math.ceil(boundingBox.bottom-boundingBox.top));
+				instanceXML['@x']=String(Math.floor(boundingBox.left));
+				instanceXML['@y']=String(Math.floor(boundingBox.top));
 				xml['@viewBox']=(
 					String(boundingBox.left)+' '+
 					String(boundingBox.top)+' '+
 					String(boundingBox.right-boundingBox.left)+' '+
 					String(boundingBox.bottom-boundingBox.top)
 				);
-				this.xml.defs.appendChild(xml);
+				if(settings.isRoot && settings.libraryItem){
+					dom.@viewBox = xml.@viewBox;
+					dom.@width = instanceXML.@width;
+					dom.@height = instanceXML.@height;
+				}
+				dom.defs.appendChild(xml);
 				result=instanceXML;
 			}else{
 				result=xml;
@@ -1862,10 +1859,11 @@
 				libraryItem:instance.libraryItem
 			});
 			settings.extend(options);
+			var dom = settings.dom;
 			settings.matrix = instance.matrix.concat(settings.matrix);
 			var xml = this._getTimeline(instance.timeline,settings);
-			var filterID=this._getFilters(instance,options);
-			if(filterID && this.xml.defs.filter.(@id==filterID).length()){
+			var filterID=this._getFilters(instance, options, dom.defs);
+			if(filterID && dom.defs.filter.(@id==filterID).length()){
 				xml['@filter']='url(#'+filterID+')';
 			}
 			if(ext.log){
@@ -1874,7 +1872,6 @@
 			return xml;
 		},
 		_getFilters:function(element,options,defs){
-			defs=defs||this.xml.defs;
 			var settings=new ext.Object({
 				frame:0,
 				color:undefined,
@@ -1960,9 +1957,9 @@
 							if(f.brightness!=0){
 								var brightness=f.brightness/100;
 								var feComponentTransfer_brightness=<feComponentTransfer id={this._uniqueID('feComponentTransfer_brightness')} />;
-								var feFuncR=<feFuncR id={this._uniqueID('feFuncR')} />;
-								var feFuncG=<feFuncG id={this._uniqueID('feFuncG')} />;
-								var feFuncB=<feFuncB id={this._uniqueID('feFuncB')} />;
+								var feFuncR=<feFuncR id={this._uniqueID('feFuncR')} ></feFuncR>;
+								var feFuncG=<feFuncG id={this._uniqueID('feFuncG')} ></feFuncG>;
+								var feFuncB=<feFuncB id={this._uniqueID('feFuncB')} ></feFuncB>;
 								feFuncR.@type=feFuncG.@type=feFuncB.@type="linear";
 								feFuncR.@slope=feFuncG.@slope=feFuncB.@slope=(
 									(
@@ -1984,9 +1981,9 @@
 							if(f.contrast!=0){
 								var contrast=f.contrast/100;
 								var feComponentTransfer_contrast=<feComponentTransfer id={this._uniqueID('feComponentTransfer_contrast')} />;
-								var feFuncR=<feFuncR id={this._uniqueID('feFuncR')} />;
-								var feFuncG=<feFuncG id={this._uniqueID('feFuncG')} />;
-								var feFuncB=<feFuncB id={this._uniqueID('feFuncB')} />;
+								var feFuncR=<feFuncR id={this._uniqueID('feFuncR')} ></feFuncR>;
+								var feFuncG=<feFuncG id={this._uniqueID('feFuncG')} ></feFuncG>;
+								var feFuncB=<feFuncB id={this._uniqueID('feFuncB')} ></feFuncB>;
 								feFuncR.@type=feFuncG.@type=feFuncB.@type="linear";
 								feFuncR.@slope=feFuncG.@slope=feFuncB.@slope=(
 									(
@@ -2116,10 +2113,10 @@
 							var feComponentTransfer=<feComponentTransfer id={this._uniqueID('feComponentTransfer')} />;
 							feComponentTransfer['@in']=src;
 							feComponentTransfer.@result=src='colorEffect_amount';
-							var feFuncR=<feFuncR id={this._uniqueID('feFuncR')} />;
-							var feFuncG=<feFuncG id={this._uniqueID('feFuncG')} />;
-							var feFuncB=<feFuncB id={this._uniqueID('feFuncB')} />;
-							var feFuncA=<feFuncA id={this._uniqueID('feFuncA')} />;
+							var feFuncR=<feFuncR id={this._uniqueID('feFuncR')} ></feFuncR>;
+							var feFuncG=<feFuncG id={this._uniqueID('feFuncG')} ></feFuncG>;
+							var feFuncB=<feFuncB id={this._uniqueID('feFuncB')} ></feFuncB>;
+							var feFuncA=<feFuncA id={this._uniqueID('feFuncA')} ></feFuncA>;
 							feFuncR.@type=feFuncG.@type=feFuncB.@type=feFuncA.@type="linear";
 							feFuncR.@slope=feFuncG.@slope=feFuncB.@slope=feFuncA.@slope=1;
 							feFuncR.@intercept=color.amount[0]/255;
@@ -2221,6 +2218,8 @@
 				frame:null
 			});
 			settings.extend(options);
+			var dom = settings.dom;
+
 			var matrix=shape.matrix;
 			var descendantMatrix=new ext.Matrix();
 			var pathMatrix=null;
@@ -2252,14 +2251,16 @@
 			}else if(shape.isGroup){
 				id=this._uniqueID('group');
 				descendantMatrix=matrix.invert();
-				var c=shape.center;
+				/*var c=shape.center;
 				var tr=shape.getTransformationPoint();
 				var osb=shape.objectSpaceBounds;
+				
 				osb.left=Math.min(osb.left,c.x-tr.x);
 				osb.right=Math.max(osb.right,c.x-tr.x);
 				osb.top=Math.min(osb.top,c.y-tr.y);
-				osb.bottom=Math.max(osb.bottom,c.y-tr.y);
-				pathMatrix=new ext.Matrix({
+				osb.bottom=Math.max(osb.bottom,c.y-tr.y);*/
+
+				/*pathMatrix=new ext.Matrix({
 					tx:(
 						osb.left+
 						osb.right
@@ -2269,8 +2270,12 @@
 						osb.bottom
 					)/2.0
 				});
+				pathMatrix=new ext.Matrix({
+					tx:0,
+					ty:0
+				});
 				pathMatrix=pathMatrix.invert();
-				matrix=matrix.concat(settings.matrix);
+				matrix=matrix.concat(settings.matrix);*/
 			}else{
 				id=this._uniqueID('shape');
 				matrix.tx=shape.left;
@@ -2299,7 +2304,8 @@
 			for(i=0;i<contours.length;i++){
 				var s=this._getContour(contours[i],{
 					colorTransform:settings.colorTransform,
-					matrix:pathMatrix
+					matrix:pathMatrix,
+					dom:dom
 				});
 				if(s){
 					validContours.push(contours[i]);
@@ -2345,7 +2351,8 @@
 										s=this._getContour(contours[i],{
 											colorTransform:settings.colorTransform,
 											reversed: true,
-											matrix:pathMatrix
+											matrix:pathMatrix,
+											dom:dom
 										});
 									}else{
 										s=svgArray.at(-1);
@@ -2354,7 +2361,8 @@
 										var so=this._getContour(contours[i],{
 											colorTransform:settings.colorTransform,
 											reversed: !rev,
-											matrix: pathMatrix
+											matrix: pathMatrix,
+											dom:dom
 										});										
 										if(so.path.length()){
 											var f=String(svgArray[filled[n]].path[0]['@d']);
@@ -2497,6 +2505,8 @@
 				colorTransform:null
 			});
 			settings.extend(options);
+			var dom = settings.dom;
+
 			var controlPoints=contour.getControlPoints({
 				curveDegree:this.curveDegree,
 				reversed:settings.reversed
@@ -2524,7 +2534,7 @@
 						fillString=String(fill['@solid-color']);
 						opacityString=String(fill['@solid-opacity']);
 					}else{
-						this.xml.defs.appendChild(fill)
+						dom.defs.appendChild(fill)
 						fillString='url(#'+String(fill['@id'])+')';
 					}
 				}
@@ -2560,7 +2570,7 @@
 									idString+
 									xform+
 									'fill="none" '+
-									this._getStroke(stroke,{shape:contour.shape})+
+									this._getStroke(stroke,{shape:contour.shape,dom:dom})+
 									'd="'+this._getCurve(cp,contour.orientation)+'" '+
 									'/>\n'
 								);
@@ -2577,7 +2587,7 @@
 								idString+
 								xform+
 								'fill="none" '+
-								this._getStroke(stroke)+
+								this._getStroke(stroke,{dom:dom})+
 								'd="'+this._getCurve(cp,contour.orientation)+'" '+
 								'/>\n'
 							);
@@ -2616,7 +2626,7 @@
 							idString+
 							xform+
 							'fill="none" '+
-							this._getStroke(stroke)+
+							this._getStroke(stroke,{dom:dom})+
 							'd="'+this._getCurve(cp,(contour.orientation && paths.length<2))+'" '+
 							'/>\n'
 						);
@@ -2845,7 +2855,7 @@
 		/**
 		 * Returns stroke attribute string.
 		 * If the stroke has a shapeFill, a paint server for the specified fill
-		 * is inserted under this.xml.defs.
+		 * is inserted under dom.defs.
 		 * @param {extensible.Fill} fillObj
 		 * @param {Object} options Options object, passed on to _getFill() if 
 		 * a shapeFill is present.
@@ -2856,6 +2866,7 @@
 			if(ext.log){
 				var timer=ext.log.startTimer('extensible.SVG._getStroke()');	
 			}
+			var dom = options.dom;
 			var svg=[];
 			var fillString,opacityString;
 			if(stroke.shapeFill && stroke.shapeFill!='noFill'){
@@ -2868,7 +2879,7 @@
 						fillString=String(fill['@solid-color']);
 						opacityString=String(fill['@solid-opacity']);
 					}else{
-						this.xml.defs.appendChild(fill)
+						dom.defs.appendChild(fill)
 						fillString='url(#'+String(fill['@id'])+')';
 					}
 				}
@@ -2932,9 +2943,10 @@
 				timeline.setSelectedLayers(layer.index);
 				timeline.copyFrames(frame.startFrame);
 
-				var currentTimeline=ext.timeline;
+				var currentTimeline = ext.timeline;
 				currentTimeline.setSelectedLayers(currentTimeline.layerCount-1);
-				var tempLayerIndex=currentTimeline.addNewLayer('temp','normal',false);
+				
+				var tempLayerIndex = currentTimeline.addNewLayer('temp','normal',false);
 				currentTimeline.setSelectedLayers(tempLayerIndex);
 				currentTimeline.pasteFrames(0);
 				currentTimeline.layers[tempLayerIndex].locked = false; // pasting frames can lock layer
@@ -3064,8 +3076,10 @@
 					){
 						xml['@'+attrs[i]]=dimensions[i];
 					}
-					xml['@enable-background']='new '+String(symbol.@viewBox);
-					this.expandUse(element,false,this.xml.defs);
+					if(this.includeBackground){
+						xml['@enable-background']='new '+String(symbol.@viewBox);
+					}
+					this.expandUse(element,false,inputXML.defs);
 					xml.@id=id;
 				}else{
 					xml.@id=element.@id;	
@@ -3104,10 +3118,10 @@
 				this._ids[base]=increment;
 				return id;
 			}
-		},
+		}/*,
 		toString:function(){
 			return this.docString+this.xml.toXMLString().replace(/(\<[^\>]*?)xlink\-(.*?)=/g,'$1xlink:$2=');
-		}
+		}*/
 	};
 	ext.extend({SVG:SVG});
 })(extensible);

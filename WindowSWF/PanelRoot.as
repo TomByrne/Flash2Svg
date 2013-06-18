@@ -121,9 +121,12 @@ package{
 			_exportSettings.addSetting(controlsLayout.decimalRow.input, "value", "decimalPointPrecision", 3, true, null, null, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.curvesRow.input, "selectedIndex", "curveDegree", 2, true, comboGetter, comboSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.expandRow.input, "selectedIndex", "expandSymbols", "none", true, comboGetter, comboSetter, Event.CHANGE);
+			//_exportSettings.addSetting(controlsLayout.beginRow.input, "selectedIndex", "beginAnimation", "0", true, comboGetter, comboSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.renderingRow.input, "selectedIndex", "rendering", "auto", true, comboGetter, comboSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.applyTransformationsCheckBox, "selected", "applyTransformations", true, true, radioGetter, radioSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.convertPatternsToSymbolsCheckBox, "selected", "convertPatternsToSymbols", true, true, radioGetter, radioSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.flattenMotionCheckBox, "selected", "flattenMotion", false, true, radioGetter, radioSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.includeBackgroundCheckBox, "selected", "includeBackground", false, true, radioGetter, radioSetter, Event.CHANGE);
 
 			exportGroupsChanged();
 
@@ -191,7 +194,7 @@ package{
 			this.timer.repeatCount=2999;
 
 			// For some reasons, this only works after a delay...
-			setTimeout(finSetup,500);
+			//setTimeout(finSetup,500);
 
 
 			// Document change...
@@ -205,7 +208,7 @@ package{
 				');'
 			].join('\n'));
 
-			doDocumentChanged();
+			documentChanged();
 
 			_exportSettings.init();
 		}
@@ -226,6 +229,7 @@ package{
 				}
 			}
 			checkFileInput();
+			finSetup();
 		}
 
 
@@ -366,7 +370,9 @@ package{
 			controlsLogic.update();
 		}
 		private function onOutputChanged(e:Event=null):void{
-			this.controlsLayout.flattenMotionCheckBox.visible=(this.controlsLayout.outputRow.input.selectedItem && this.controlsLayout.outputRow.input.selectedItem.showFlattenMotion);
+			var isAnim:Boolean = (this.controlsLayout.outputRow.input.selectedItem && this.controlsLayout.outputRow.input.selectedItem.showFlattenMotion);
+			//this.controlsLayout.beginRow.visible = isAnim;
+			this.controlsLayout.flattenMotionCheckBox.visible = isAnim;
 			controlsLogic.update();
 		}
 		

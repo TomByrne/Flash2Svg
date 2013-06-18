@@ -46,8 +46,11 @@ package{
 								layout.masksRow.input,
 								layout.curvesRow.input,
 								layout.expandRow.input,
+								layout.renderingRow.input,
 								layout.applyTransformationsCheckBox,
-								layout.convertPatternsToSymbolsCheckBox];
+								layout.convertPatternsToSymbolsCheckBox,
+								layout.flattenMotionCheckBox,
+								layout.includeBackgroundCheckBox];
 
 			rightControls = [   layout.fileRow.button,
 								layout.customFramesRow,
@@ -67,9 +70,11 @@ package{
 						layout.masksRow,
 						layout.curvesRow,
 						layout.expandRow,
+						layout.renderingRow,
 						layout.applyTransformationsCheckBox,
 						layout.convertPatternsToSymbolsCheckBox,
-						layout.flattenMotionCheckBox];
+						layout.flattenMotionCheckBox,
+						layout.includeBackgroundCheckBox];
 
 			enable = [layout.fileRow.input,
 						layout.sourceRow.input,
@@ -82,15 +87,15 @@ package{
 						layout.masksRow.input,
 						layout.curvesRow.input,
 						layout.expandRow.input,
-						layout.applyTransformationsCheckBox,
-						layout.convertPatternsToSymbolsCheckBox,
+						layout.renderingRow.input,
 						layout.fileRow.button,
 						layout.customFramesRow,
 						layout.presetRow.deleteButton,
 						layout.presetRow.saveButton,
 						layout.applyTransformationsCheckBox,
 						layout.convertPatternsToSymbolsCheckBox,
-						layout.flattenMotionCheckBox];
+						layout.flattenMotionCheckBox,
+						layout.includeBackgroundCheckBox];
 
 		}
 
@@ -108,13 +113,17 @@ package{
 		public function update():void{
 			var w:Number = width;
 			var h:Number = height;
+
+			if(isNaN(width) || isNaN(height)){
+				return;
+			}
+
 			var i:int;
 
 			var display:DisplayObject;
 			var comp:UIComponent
 			if(!expandDiffs){
 				// init measurements
-
 
 				expandDiffs = [];
 				for(i=0; i<expandControls.length; ++i){
