@@ -616,6 +616,7 @@
 		 * @see extensible.Task
 		 */
 		begin:function(){
+			this.qData = [];
 			fl.showIdleMessage(false);
 			if(this.que && this.que.isPaused){
 				this.que.resumeCmd='begin';
@@ -1466,8 +1467,8 @@
 						}
 
 						var items = this._getItemsByFrame(frame, settings.selection);
-						var doMotionTween = (doAnim && !settings.flattenMotion  && items.length==1 && frame.tweenType!="shape" && items[0].$.elementType=="instance");
-					
+						var doCollateFrames = (doAnim && !settings.flattenMotion  && items.length==1 && tweenType!="shape" && items[0].$.elementType=="instance");
+						
 						for(var j=0; j<items.length; ++j){
 							var element = items[j];
 							element.timeline = timeline;
@@ -1508,7 +1509,7 @@
 								return (normSkew<90 || normSkew>270)?-skew:skew;
 							}
 							
-							if(doMotionTween){
+							if(doCollateFrames){
 
 								var transPoint = element.getTransformationPoint();
 
@@ -1526,6 +1527,7 @@
 
 								var timeList = [Math.roundTo(n/totFrames,this.decimalPointPrecision)];
 								var splineList = [this._getSplineData(frame)];
+								var tweensFound = (frame.tweenType!="none");
 
 								var lastRot = rot;
 
@@ -1586,6 +1588,7 @@
 
 											timeList.push(Math.roundTo(frameEnd/totFrames, this.decimalPointPrecision));
 											splineList.push(this._getSplineData(nextFrame));
+											if(frame.tweenType!="none")tweensFound = true;
 
 											animatedFrames[i+"-"+frameEnd] = true;
 											if(nextFrame.elements.length>1 || nextElement.libraryItem!=element.libraryItem)break;
@@ -1594,9 +1597,8 @@
 										}
 									}
 								}
-
-								this._addAnimationNode(elementXML, "translate", [xList, yList], timeList, totalTime, splineList);
-								this._addAnimationNode(elementXML, "scale", [scxList, scyList], timeList, totalTime, splineList, 1);
+								this._addAnimationNode(elementXML, "translate", [xList, yList], timeList, totalTime, splineList, tweensFound);
+								this._addAnimationNode(elementXML, "scale", [scxList, scyList], timeList, totalTime, splineList, tweensFound, 1);
 								if(hasSkewX && hasSkewY){
 									for(var h=0; h<skxList.length; h++){
 										skxList[h] -= rotList[h];
@@ -1604,10 +1606,10 @@
 									for(var h=0; h<skyList.length; h++){
 										skyList[h] -= rotList[h];
 									}
-									this._addAnimationNode(elementXML, "rotate", [rotList, trxList, tryList], timeList, totalTime, splineList);
+									this._addAnimationNode(elementXML, "rotate", [rotList, trxList, tryList], timeList, totalTime, tweensFound, splineList);
 								}
-								if(hasSkewX)this._addAnimationNode(elementXML, "skewX", [skxList], timeList, totalTime, splineList);
-								if(hasSkewY)this._addAnimationNode(elementXML, "skewY", [skyList], timeList, totalTime, splineList);
+								if(hasSkewX)this._addAnimationNode(elementXML, "skewX", [skxList], timeList, totalTime, tweensFound, splineList);
+								if(hasSkewY)this._addAnimationNode(elementXML, "skewY", [skyList], timeList, totalTime, tweensFound, splineList);
 
 								elementXML.@transform = ''; // empty this instead of deleting (so that delayed processing elements also get cleare after this)
 
@@ -1728,7 +1730,7 @@
 			xml.appendChild(mg);
 			masked.clear();
 		},
-		_addAnimationNode:function(toNode, type, valueLists, times, totalTime, splineList, defaultValue){
+		_addAnimationNode:function(toNode, type, valueLists, times, totalTime, splineList, tweensFound, defaultValue){
 
 			if(defaultValue==null)defaultValue = 0;
 
@@ -1800,8 +1802,12 @@
 			animNode.@keyTimes = validT.join(";");
 			animNode.@values = validV.join(";");
 
-			animNode.@keySplines = validS.join(";");
-			animNode.@calcMode="spline";
+			if(tweensFound){
+				animNode.@keySplines = validS.join(";");
+				animNode.@calcMode="spline";
+			}else{
+				animNode.@calcMode="discrete";
+			}
 
 			toNode.appendChild(animNode);
 		},
@@ -1815,6 +1821,10 @@
 			if(frame.hasCustomEase)ext.warn('Custom easing is not yet supported (at frame '+frame.startFrame+")");
 			if(!frame.useSingleEaseCurve) ext.warn('Per property custom easing is not supported (at frame '+frame.startFrame+")");
 			if(frame.motionTweenRotateTimes!=0) ext.warn('Auto-rotate tweens are not yet supported (at frame '+frame.startFrame+")");
+
+			if(frame.tweenType=="none"){
+				return '0 0 1 0';
+			}
 			
 			var fract = (frame.tweenEasing/100) * 0.8; // this number determines the severness of easing (should match flash IDE, between 0-1)
 			if(frame.tweenEasing<0){
