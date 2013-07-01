@@ -113,6 +113,7 @@
 		this.swfPanel=ext.swfPanel(this.swfPanelName); // the swfPanel
 		this._timer=undefined;
 		this._symbols={};
+		this._symbolBounds={};
 		this._bitmaps={};
 		//this._rootItem={};
 		this._tempFolder=ext.lib.uniqueName('temp'); // Library folder holding temporary symbols.
@@ -239,7 +240,7 @@
 				var childName=String(child.localName());
 				var cid=child.hasOwnProperty('@id')?String(child['@id']):'';
 				var cmx=undefined;
-				var tr=child['@transform'];
+				var tr= String(child['@transform']);
 				var nmx;
 				var nmxString;
 				if(tr){
@@ -255,11 +256,17 @@
 						nmxString=mxa[0];
 						nmx=matrix;
 					}
-					child['@transform']=tr;
+					if(tr==this.IDENTITY_MATRIX){
+						delete child['@transform'];
+					}else{
+						child['@transform']=tr;
+					}
 				}else{
 					nmx=matrix;
 					nmxString=mxa[0];
-					child['@transform']=nmxString;
+					if(nmxString!=this.IDENTITY_MATRIX){
+						child['@transform']=nmxString;
+					}
 				}				
 				if(child.hasOwnProperty('@filter') && child.localName()!='g'){
 					this._transformFilter(nmx,child,defs);
@@ -394,9 +401,17 @@
 							}
 						}
 					}
-					if(child.hasOwnProperty('@stroke-width')){
+					if(child.hasOwnProperty('@stroke')){
+						var strokeW = child['@stroke-width'];
+						if(strokeW==null)strokeW = 1;
+						else strokeW = Number(strokeW);
+
 						var strokeScale=cmx?nmx.concat(strokeX.concat(cmx.invert())):nmx.concat(strokeX);
-						child['@stroke-width']=Math.roundTo(Number(child['@stroke-width'])*((strokeScale.scaleX+strokeScale.scaleY)/2),this.decimalPointPrecision);
+						var scaleMult = ((strokeScale.scaleX+strokeScale.scaleY)/2);
+						if(scaleMult!=1){
+							child['@stroke-width'] = Math.roundTo(strokeW*scaleMult,this.decimalPointPrecision);
+							fl.trace("scale stroke: "+child['@stroke-width']+" "+strokeW+" "+scaleMult);
+						}
 					}
 					
 				}
@@ -774,6 +789,17 @@
 								'$1xlink:$2="'
 							)
 						);
+
+						// shorten colour values (e.g. #FF3300 > #F30)
+						outputString = outputString.replace(
+								/#([0-9A-F])\1([0-9A-F])\2([0-9A-F])\3/gi,
+								'#$1$2$3'
+							);
+
+						// turn hairline strokes to thickness 0.1
+						outputString = outputString.replace(' stroke="0"',' stroke="0.1"' );
+						outputString = outputString.replace(" stroke='0'"," stroke='0.1'" );
+
 						if(documents.length==1){
 							success=FLfile.write(this.file,outputString);
 						}else{
@@ -1030,11 +1056,7 @@
 			}
 			if(this.qData.length>0){
 				if(this.swfPanel){
-					var progressGoal=(
-						this._progress+this._minProgressIncrement<this._progressMax?
-						this._progress+this._minProgressIncrement
-						:this._progressMax
-					);
+					var progressGoal = this._progress+this._minProgressIncrement;
 				}
 				while(
 					this.qData.length
@@ -1224,99 +1246,14 @@
 				matrix:new ext.Matrix(),
 				libraryItem:undefined,
 				color:undefined,
-				isRoot:false
+				isRoot:false,
+				timeOffset:0
 			});
 			settings.extend(options);
 			if(typeof(settings.color)=='string'){
 				settings.color=new ext.Color(settings.color);
 			}
 			var dom = settings.dom;
-			/*
-			 * Check to see if the timeline has tweens that we need to resolve.
-			 */
-			 var hasTweens=timeline.hasTweensInRange({ // get a list of currently visible frames
-					startFrame:settings.startFrame,
-					endFrame:settings.endFrame,
-					includeHiddenLayers:this.includeHiddenLayers,
-					includeGuides:this.includeGuides,
-					includeMotionTweens:settings.flattenMotion
-				});
-			
-			var layers=timeline.getLayers();
-			/*
-			 * Create temporary timelines where tweens exist & convert to
-			 * keyframes.
-			 */
-			var originalScene,timelines;
-			if(hasTweens){
-				if(settings.libraryItem==undefined){
-					originalScene=timeline.name;
-
-					ext.doc.editScene(ext.doc.timelines.indexOf(timeline.$));
-					ext.doc.duplicateScene();
-					//ext.doc.editScene(ext.doc.timelines.indexOf(timeline.$)+1); // edit new scene (after duplication current scene changes to last scene)
-
-					timelines=ext.doc.timelines;
-					timeline=new ext.Timeline(timelines[ext.doc.timelines.indexOf(timeline.$)+1]);
-				}else{
-					var tempName=this._tempFolder+'/'+settings.libraryItem.name;
-					if(!ext.lib.itemExists(tempName.dir)){
-						ext.lib.addNewItem('folder',tempName.dir);
-					}
-					ext.lib.selectItem(settings.libraryItem.name);
-					ext.lib.duplicateItem();
-					ext.lib.moveToFolder(tempName.dir);
-					ext.lib.renameItem(tempName.basename);
-					
-					timeline=new ext.Timeline(ext.lib.getSelectedItems()[0].timeline);
-				}
-				layers = timeline.getLayers();
-				for(var i=0;i<layers.length;i++){
-					var layer=layers[i];
-					var layerEnd = settings.endFrame;
-					if(layerEnd>layer.frameCount)layerEnd = layer.frameCount;
-
-					timeline.setSelectedLayers(layer.index);
-					for(var n=settings.startFrame; n<layerEnd; ++n){
-						var frame=layer.frames[n];
-						if(frame.tweenType=='shape' ||
-							(settings.flattenMotion && frame.tweenType=="motion") ||
-							(n==settings.startFrame && frame.startFrame!=n && layer.frames[frame.startFrame].tweenType!='none') || // this backtracks from the first frame if our range starts mid-tween
-							(n==layerEnd-1 && frame.startFrame!=n && layer.frames[frame.startFrame].tweenType!='none')){  // this breaks apart tweens which fall over the end of our range
-
-							var start=frame.startFrame;
-							var end=start+frame.duration;
-							timeline.$.convertToKeyframes(start, end);
-						}
-					}
-				}
-			}
-			/*
-			 * Retrieve elements in the current frames, get bounding box
-			 */
-			if(!settings.selection){
-				var frames = [];
-				for(var i=0;i<layers.length;i++){
-					var layer=layers[i];
-					var layerEnd = settings.endFrame;
-					if(layerEnd>layer.frameCount)layerEnd = layer.frameCount;
-
-					for(var n=settings.startFrame; n<layerEnd; ++n){
-						var frame=layer.frames[n];
-						frames.push(frame);
-
-					}
-				}
-				var options={
-					includeHiddenLayers:this.includeHiddenLayers,
-					includeGuides:this.includeGuides,
-					frames:frames
-				};
-				var items =timeline.getElements(options);
-				var boundingBox=items.boundingBox;
-			}else{
-				var boundingBox=settings.selection.boundingBox;
-			}
 
 			/*
 			 * Group elements by layer.
@@ -1336,47 +1273,161 @@
 			// 		xml['@transform']=transformString;
 			// 	}
 			// }
+
+			// due to the way SMIL works, animations cannot practically be nested
+			var useLibrary = (settings.frameCount==null || settings.frameCount<2 || this.output!="animation");
+			if(!useLibrary){
+				if(settings.endFrame > settings.startFrame+settings.frameCount){
+					settings.endFrame = settings.startFrame+settings.frameCount;
+				}
+			}
+
 			var symbolIDString = timeline.name;
 			if(settings.color){
-				symbolIDString+='/'+settings.color.idString; //should factor this out and use a transform
+				symbolIDString += '_'+settings.color.idString; //should factor this out and use a transform
 			}
-			var isNew,instanceID;
+			fl.trace("getTimeline: "+timeline.name+" "+settings.frameCount);
+			if(settings.frameCount==1){
+				symbolIDString += '--'+settings.startFrame;
+				settings.endFrame = settings.startFrame+settings.frameCount;
+			}
+			var isNew,instanceID,boundingBox;
 			if(
-				this._symbols[timeline.name]
+				this._symbols[symbolIDString] && useLibrary
 			){
 				isNew=false;
-				id=this._symbols[timeline.name];
+				id = this._symbols[symbolIDString];
+				boundingBox = this._symbolBounds[symbolIDString];
 			}else{
 				isNew=true;
-				id=this._uniqueID(symbolIDString);
-				if(!this._symbols[timeline.name]){
-					this._symbols[timeline.name]=id;
+				id = this._uniqueID(symbolIDString);
+				if(!this._symbols[symbolIDString] && useLibrary){
+					this._symbols[symbolIDString]=id;
+				}
+				var layers = timeline.getLayers();
+
+				/*
+				 * Check to see if the timeline has tweens that we need to resolve.
+				 */
+				 var hasTweens=timeline.hasTweensInRange({ // get a list of currently visible frames
+						startFrame:settings.startFrame,
+						endFrame:settings.endFrame,
+						includeHiddenLayers:this.includeHiddenLayers,
+						includeGuides:this.includeGuides,
+						includeMotionTweens:settings.flattenMotion
+					});
+				/*
+				 * Create temporary timelines where tweens exist & convert to
+				 * keyframes.
+				 */
+				var originalScene,timelines;
+				if(hasTweens){
+					if(settings.libraryItem==undefined){
+						originalScene=timeline.name;
+
+						ext.doc.editScene(ext.doc.timelines.indexOf(timeline.$));
+						ext.doc.duplicateScene();
+						//ext.doc.editScene(ext.doc.timelines.indexOf(timeline.$)+1); // edit new scene (after duplication current scene changes to last scene)
+
+						timelines=ext.doc.timelines;
+						timeline=new ext.Timeline(timelines[ext.doc.timelines.indexOf(timeline.$)+1]);
+					}else{
+						var tempName=this._tempFolder+'/'+settings.libraryItem.name;
+						if(!ext.lib.itemExists(tempName.dir)){
+							ext.lib.addNewItem('folder',tempName.dir);
+						}
+						ext.lib.selectItem(settings.libraryItem.name);
+						ext.lib.duplicateItem();
+						ext.lib.moveToFolder(tempName.dir);
+						ext.lib.renameItem(tempName.basename);
+						
+						timeline=new ext.Timeline(ext.lib.getSelectedItems()[0].timeline);
+					}
+					layers = timeline.getLayers();
+					for(var i=0;i<layers.length;i++){
+						var layer=layers[i];
+						var layerEnd = settings.endFrame;
+						if(layerEnd>layer.frameCount)layerEnd = layer.frameCount;
+
+						timeline.setSelectedLayers(layer.index);
+						for(var n=settings.startFrame; n<layerEnd; ++n){
+							var frame=layer.frames[n];
+							if(frame.tweenType=='shape' ||
+								(settings.flattenMotion && frame.tweenType=="motion") ||
+								(n==settings.startFrame && frame.startFrame!=n && layer.frames[frame.startFrame].tweenType!='none') || // this backtracks from the first frame if our range starts mid-tween
+								(n==layerEnd-1 && frame.startFrame!=n && layer.frames[frame.startFrame].tweenType!='none')){  // this breaks apart tweens which fall over the end of our range
+
+								var start=frame.startFrame;
+								var end=start+frame.duration;
+								timeline.$.convertToKeyframes(start, end);
+							}
+						}
+					}
+				}
+				/*
+				 * Retrieve elements in the current frames, get bounding box
+				 */
+				if(!settings.selection){
+					var frames = [];
+					for(var i=0;i<layers.length;i++){
+						var layer=layers[i];
+						var layerEnd = settings.endFrame;
+						if(layerEnd>layer.frameCount)layerEnd = layer.frameCount;
+
+						for(var n=settings.startFrame; n<layerEnd; ++n){
+							var frame=layer.frames[n];
+							frames.push(frame);
+						}
+					}
+					var options={
+						includeHiddenLayers:this.includeHiddenLayers,
+						includeGuides:this.includeGuides,
+						frames:frames
+					};
+					var items =timeline.getElements(options);
+					boundingBox = items.boundingBox;
+				}else{
+					boundingBox = settings.selection.boundingBox;
+				}
+				if(useLibrary){
+					this._symbolBounds[symbolIDString] = boundingBox;
 				}
 			}	
 			var instanceID=this._uniqueID(id);	
 			xml=new XML('<use xlink-href="#'+id+'" id="'+instanceID+'" />');
 			if(isNew){
-				instanceXML=xml;
-				instanceXML['@width']=0;
-				instanceXML['@height']=0;
-				instanceXML['@x']=0;
-				instanceXML['@y']=0;
-				instanceXML['@transform']=transformString;
-				instanceXML['@overflow']="visible";
-
-				xml=new XML('<symbol/>');
+				if(useLibrary){
+					instanceXML=xml;
+					instanceXML['@width']=0;
+					instanceXML['@height']=0;
+					instanceXML['@x']=0;
+					instanceXML['@y']=0;
+					instanceXML['@overflow']="visible";
+				}
+				if(useLibrary){
+					xml=new XML('<symbol/>');
+				}else{
+					xml=new XML('<g/>');
+				}
 				xml['@id']=id;
 
 				if(this.animated){
 					var totFrames = (settings.endFrame-settings.startFrame);
-					var totalTime = String(Math.roundTo(totFrames*(1/ext.doc.frameRate),this.decimalPointPrecision));
 
 					var animNode = <animate
 								      attributeName="display"
-								      begin="0s"
 								      repeatCount="indefinite" />;
 
-					animNode.@dur = totalTime+"s";
+					animNode.@begin = Math.roundTo(settings.timeOffset, this.decimalPointPrecision)+"s";
+
+
+					var animDur;
+					if(settings.totalDuration!=null){
+						animDur = settings.totalDuration;
+					}else{
+						animDur = String(Math.roundTo(totFrames*(1/ext.doc.frameRate),this.decimalPointPrecision));
+					}
+					animNode.@dur = animDur+"s";
 				}
 
 				var animatedFrames = {};
@@ -1403,7 +1454,8 @@
 					if(!lVisible){layer.visible=true;}
 					if(lLocked){layer.locked=false;}
 
-					var id=this._uniqueID(layer.name);
+					//var layerId = this._uniqueID(layer.name);
+					var layerId = id
 
 					if(masked.length && layer.layerType!='masked'){
 						// masked layers have ended group
@@ -1415,7 +1467,7 @@
 					var isMask = false;
 					var isMasked = false;
 					if(layer.layerType=='mask'){
-						maskId = id;
+						maskId = layerId;
 						isMask = true;
 						if(this.maskingType=='alpha'){
 							colorX=new ext.Color('#FFFFFF00');
@@ -1439,6 +1491,12 @@
 							// Skip frames that haven't changed or are motion tweens (when in animation mode).
 							continue;
 						}
+
+						if(layers.length==1){
+							var layerFrameId = id+"_"+n;
+						}else{
+							var layerFrameId = id+"_"+i+"_"+n;
+						}
 						/*
 						 * If the masking type is "Alpha" or "Clipping"
 						 * we need to manipulate the color of the mask to ensure
@@ -1446,7 +1504,7 @@
 						 */
 						var filtered;
 						if(isMask){
-							frameXML=<mask id={id}/>;
+							frameXML=<mask id={layerFrameId}/>;
 							if(colorX){
 								filtered=<g id={this._uniqueID('g')} />;
 								frameXML.appendChild(filtered);
@@ -1461,9 +1519,9 @@
 								}
 							}
 						}else if(isMasked){
-							frameXML=new XML('<g id="'+id+'" />');
+							frameXML=new XML('<g id="'+layerFrameId+'" />');
 						}else{
-							frameXML=new XML('<g id="'+id+'" />');
+							frameXML=new XML('<g id="'+layerFrameId+'" />');
 						}
 
 						var items = this._getItemsByFrame(frame, settings.selection);
@@ -1473,23 +1531,24 @@
 							var element = items[j];
 							element.timeline = timeline;
 							var elementID=this._uniqueID('element');
+							var elemSettings = {
+										frame:n,
+										dom:dom,
+										timeOffset:settings.timeOffset+n*(1/ext.doc.frameRate),
+										frameCount:frame.duration,
+										totalDuration:animDur
+									};
 							if(this._delayedProcessing){
 								var elementXML=new XML('<g id="'+elementID+'"></g>');
 								this.qData.push({
 									dom:dom,
 									id:elementID,
 									element:element,
-									settings:{
-										frame:n,
-										dom:dom
-									}
+									settings:elemSettings
 								});
 							}else{
 								var elementXML=this._getElement(
-									element,{
-										frame:n,
-										dom:dom
-									}
+									element,elemSettings
 								);
 							}
 							if(elementXML){
@@ -1525,7 +1584,7 @@
 								var trxList = [Math.roundTo(transPoint.x,this.decimalPointPrecision)];
 								var tryList = [Math.roundTo(transPoint.y,this.decimalPointPrecision)];
 
-								var timeList = [Math.roundTo(n/totFrames,this.decimalPointPrecision)];
+								var timeList = [Math.roundTo(((n/totFrames)*(1/ext.doc.frameRate))/animDur,this.decimalPointPrecision)];
 								var splineList = [this._getSplineData(frame)];
 								var tweensFound = (frame.tweenType!="none");
 
@@ -1540,7 +1599,8 @@
 									if(nextFrame){
 										if(nextFrame.startFrame==frameEnd){
 											// keyframe
-											if(nextFrame.elements.length!=1)break; // tweening to incompatible frame
+											if(nextFrame.elements.length!=1 || nextFrame.elements[0].libraryItem!=frame.elements[0].libraryItem)
+												break; // tweening to incompatible frame
 
 											var nextElement = nextFrame.elements[0];
 
@@ -1586,7 +1646,7 @@
 											trxList.push(Math.roundTo(transPoint.x,this.decimalPointPrecision));
 											tryList.push(Math.roundTo(transPoint.y,this.decimalPointPrecision));
 
-											timeList.push(Math.roundTo(frameEnd/totFrames, this.decimalPointPrecision));
+											timeList.push(Math.roundTo(((frameEnd/totFrames)*(1/ext.doc.frameRate))/animDur, this.decimalPointPrecision));
 											splineList.push(this._getSplineData(nextFrame));
 											if(frame.tweenType!="none")tweensFound = true;
 
@@ -1597,8 +1657,8 @@
 										}
 									}
 								}
-								this._addAnimationNode(elementXML, "translate", [xList, yList], timeList, totalTime, splineList, tweensFound);
-								this._addAnimationNode(elementXML, "scale", [scxList, scyList], timeList, totalTime, splineList, tweensFound, 1);
+								this._addAnimationNode(elementXML, "translate", [xList, yList], timeList, animDur, splineList, tweensFound, null, settings.timeOffset);
+								this._addAnimationNode(elementXML, "scale", [scxList, scyList], timeList, animDur, splineList, tweensFound, 1, settings.timeOffset);
 								if(hasSkewX && hasSkewY){
 									for(var h=0; h<skxList.length; h++){
 										skxList[h] -= rotList[h];
@@ -1606,12 +1666,12 @@
 									for(var h=0; h<skyList.length; h++){
 										skyList[h] -= rotList[h];
 									}
-									this._addAnimationNode(elementXML, "rotate", [rotList, trxList, tryList], timeList, totalTime, tweensFound, splineList);
+									this._addAnimationNode(elementXML, "rotate", [rotList, trxList, tryList], timeList, animDur, splineList, tweensFound, null, settings.timeOffset);
 								}
-								if(hasSkewX)this._addAnimationNode(elementXML, "skewX", [skxList], timeList, totalTime, tweensFound, splineList);
-								if(hasSkewY)this._addAnimationNode(elementXML, "skewY", [skyList], timeList, totalTime, tweensFound, splineList);
+								if(hasSkewX)this._addAnimationNode(elementXML, "skewX", [skxList], timeList, animDur, splineList, tweensFound, null, settings.timeOffset);
+								if(hasSkewY)this._addAnimationNode(elementXML, "skewY", [skyList], timeList, animDur, splineList, tweensFound, null, settings.timeOffset);
 
-								elementXML.@transform = ''; // empty this instead of deleting (so that delayed processing elements also get cleare after this)
+								elementXML.@transform = ''; // empty this instead of deleting (so that delayed processing elements also get cleared after this)
 
 							}else if(tweenType=='none'){
 								while(frameEnd<layer.frames.length && layer.frames[frameEnd].startFrame==n){
@@ -1666,7 +1726,6 @@
 				xml['@height']=vb[3];
 				xml['@x']=vb[0];
 				xml['@y']=vb[1];
-				xml['@transform']=transformString;
 				xml['@overflow']="visible";
 			}
 			/*
@@ -1692,26 +1751,31 @@
 				if(settings.isRoot && this.clipToScalingGrid && settings.libraryItem){
 					boundingBox=settings.libraryItem.scalingGridRect;
 				}
-				instanceXML['@width']=String(Math.ceil(boundingBox.right-boundingBox.left));
-				instanceXML['@height']=String(Math.ceil(boundingBox.bottom-boundingBox.top));
-				instanceXML['@x']=String(Math.floor(boundingBox.left));
-				instanceXML['@y']=String(Math.floor(boundingBox.top));
-				xml['@viewBox']=(
-					String(boundingBox.left)+' '+
-					String(boundingBox.top)+' '+
-					String(boundingBox.right-boundingBox.left)+' '+
-					String(boundingBox.bottom-boundingBox.top)
-				);
-				if(settings.isRoot && settings.libraryItem){
-					dom.@viewBox = xml.@viewBox;
-					dom.@width = instanceXML.@width;
-					dom.@height = instanceXML.@height;
-				}
 				dom.defs.appendChild(xml);
 				result=instanceXML;
 			}else{
 				result=xml;
 			}
+			var viewBox=(
+				String(boundingBox.left)+' '+
+				String(boundingBox.top)+' '+
+				String(boundingBox.right-boundingBox.left)+' '+
+				String(boundingBox.bottom-boundingBox.top)
+			);
+			if(useLibrary){
+				xml['@viewBox'] = viewBox;
+			}
+			result['@width']=String(Math.ceil(boundingBox.right-boundingBox.left));
+			result['@height']=String(Math.ceil(boundingBox.bottom-boundingBox.top));
+			result['@x']=String(Math.floor(boundingBox.left));
+			result['@y']=String(Math.floor(boundingBox.top));
+			result['@transform']=transformString;
+			if(settings.isRoot && settings.libraryItem){
+				dom.@viewBox = viewBox;
+				dom.@width = result.@width;
+				dom.@height = result.@height;
+			}
+
 			if(ext.log){
 				ext.log.pauseTimer(timer);	
 			}
@@ -1730,7 +1794,7 @@
 			xml.appendChild(mg);
 			masked.clear();
 		},
-		_addAnimationNode:function(toNode, type, valueLists, times, totalTime, splineList, tweensFound, defaultValue){
+		_addAnimationNode:function(toNode, type, valueLists, times, totalTime, splineList, tweensFound, defaultValue, timeOffset){
 
 			if(defaultValue==null)defaultValue = 0;
 
@@ -1794,8 +1858,9 @@
 
 			var animNode = <animateTransform
 						      attributeName="transform" additive="sum"
-						      begin="0s"
 						      repeatCount="indefinite" />;
+
+			animNode.@begin = Math.roundTo(timeOffset, this.decimalPointPrecision)+"s";
 			animNode.@type = type;
 
 			animNode.@dur = totalTime+"s";
@@ -1869,6 +1934,10 @@
 				libraryItem:instance.libraryItem
 			});
 			settings.extend(options);
+			if(instance.loop=="single frame"){
+				settings.frameCount = 1;
+			}
+			fl.trace("_getSymbolInstance: "+instance.loop+" "+settings.frameCount);
 			var dom = settings.dom;
 			settings.matrix = instance.matrix.concat(settings.matrix);
 			var xml = this._getTimeline(instance.timeline,settings);
@@ -2494,7 +2563,8 @@
 						{
 							colorTransform:settings.colorTransform,
 							matrix:descendantMatrix,
-							frame:settings.frame
+							frame:settings.frame,
+							dom:dom
 						}
 					);
 					if(e){svg.appendChild(e);}
@@ -2535,14 +2605,17 @@
 			if(contour.interior){//Construct a curve for the enclosed shape if present.
 				interior=true;
 				var fillString='none';
-				var opacityString='1';
+				var opacityString = "";
 				var fill=this._getFill(contour.fill,{
 					shape:contour.shape
 				});
 				if(fill){
 					if(fill.name()=='solidColor'){
 						fillString=String(fill['@solid-color']);
-						opacityString=String(fill['@solid-opacity']);
+						var fillOp = String(fill['@solid-opacity']);
+						if(fillOp && fillOp.length){
+							opacityString = ' fill-opacity="'+fillOp+'"';
+						}
 					}else{
 						dom.defs.appendChild(fill)
 						fillString='url(#'+String(fill['@id'])+')';
@@ -2552,7 +2625,7 @@
 				cdata=this._getCurve(controlPoints,contour.orientation);
 				id=this._uniqueID('path');
 				idString='id="'+id+'" ';
-				paths.push('<path  '+idString+xform+'fill="'+fillString+'" fill-opacity="'+opacityString+'" d="'+cdata+'"/>\n');
+				paths.push('<path  '+idString+xform+'fill="'+fillString + '"' + opacityString+' d="'+cdata+'"/>\n');
 			}
 			var hasStroke=false;
 			if(controlPoints.length>0 && !settings.reversed){
@@ -2855,7 +2928,7 @@
 					var color=new ext.Color(fillObj.color);
 					xml=new XML('<solidColor/>');
 					xml['@solid-color']=color.hex;
-					xml['@solid-opacity']=color.opacity;
+					if(color.opacity<1)xml['@solid-opacity']=color.opacity;
 					break;
 			}
 			xml['@id']=id;
@@ -2904,8 +2977,10 @@
 			if(opacityString){
 				svg.push('stroke-opacity="'+opacityString+'"');
 			}
+			if(stroke.thickness!=1){
+				svg.push('stroke-width="'+stroke.thickness+'"');
+			}
 			svg.push(
-				'stroke-width="'+stroke.thickness+'"',
 				'stroke-linecap="'+(stroke.capType=='none'?'round':stroke.capType)+'"',
 				'stroke-linejoin="'+stroke.joinType+'"'
 			);
