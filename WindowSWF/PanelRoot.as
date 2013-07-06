@@ -51,9 +51,6 @@ package{
 
 		private var _panelSettings:SettingsSaver;
 		private var _exportSettings:SettingsSaver;
-
-		private var _genericName:String;
-		private var _usingGeneric:Boolean;
 		
 		public function PanelRoot(){
 
@@ -102,13 +99,7 @@ package{
 			_exportSettings.addEventListener(SettingsSaver.EVENT_STATE_CHANGED, exportStateChanged);
 			_exportSettings.addEventListener(SettingsSaver.EVENT_GROUPS_CHANGED, exportGroupsChanged);
 
-
-			this.controlsLayout.fileRow.input.addEventListener(
-				Event.CHANGE,
-				checkFileInput
-			);
-
-			_exportSettings.addSetting(controlsLayout.fileRow.input, "text", "file", null, false, fileGetter, fileSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.fileRow.input, "text", "file", null, false, fileGetter, fileSetter, Event.CHANGE, false);
 			_exportSettings.addSetting(controlsLayout.sourceRow.input, "selectedIndex", "source", "current", false, comboGetter, comboSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.framesRow.input, "selectedIndex", "frames", "all", false, comboGetter, comboSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.outputRow.input, "selectedIndex", "output", "animation", false, comboGetter, comboSetter, Event.CHANGE);
@@ -121,7 +112,7 @@ package{
 			_exportSettings.addSetting(controlsLayout.decimalRow.input, "value", "decimalPointPrecision", 3, true, null, null, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.curvesRow.input, "selectedIndex", "curveDegree", 2, true, comboGetter, comboSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.expandRow.input, "selectedIndex", "expandSymbols", "none", true, comboGetter, comboSetter, Event.CHANGE);
-			//_exportSettings.addSetting(controlsLayout.beginRow.input, "selectedIndex", "beginAnimation", "0", true, comboGetter, comboSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.beginRow.input, "selectedIndex", "beginAnimation", "0s", true, comboGetter, comboSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.renderingRow.input, "selectedIndex", "rendering", "auto", true, comboGetter, comboSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.applyTransformationsCheckBox, "selected", "applyTransformations", true, true, radioGetter, radioSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.convertPatternsToSymbolsCheckBox, "selected", "convertPatternsToSymbols", true, true, radioGetter, radioSetter, Event.CHANGE);
@@ -203,10 +194,22 @@ package{
 				'fl.addEventListener(',
 				'	"documentChanged",',
 				'	function(){',
-				'		extensible.swfPanel("'+swfPanelName+'").call("documentChanged'+'");',
+				'		extensible.swfPanel("'+swfPanelName+'").call("documentChanged");',
 				'	}',
 				');'
 			].join('\n'));
+
+			// Layer change...
+			ExternalInterface.addCallback('layerChanged',documentChanged);
+			MMExecute([
+				'fl.addEventListener(',
+				'	"layerChanged",',
+				'	function(){',
+				'		extensible.swfPanel("'+swfPanelName+'").call("layerChanged");',
+				'	}',
+				');'
+			].join('\n'));
+
 
 			documentChanged();
 
@@ -220,15 +223,22 @@ package{
 		public function doDocumentChanged():void{
 			if(MMExecute('extensible.doc')=="null"){
 				controlsLogic.setEnabled(false);
+				//this.controlsLayout.fileRow.input.text = "";
+				_exportSettings.setDefaultForSetting("file",null);
 			}else{
 				controlsLogic.setEnabled(true);
+				var fileName;
 				if(MMExecute('extensible.doc.pathURI')!=='undefined'){
-					_genericName = this.controlsLayout.fileRow.input.text=MMExecute('extensible.doc.pathURI.relativeToDocument.stripExtension()')+'.svg';
+					fileName = MMExecute('extensible.doc.pathURI.relativeToDocument.stripExtension()');
 				}else{
-					_genericName = this.controlsLayout.fileRow.input.text=MMExecute('extensible.doc.name.stripExtension()')+'.svg';
+					fileName = MMExecute('extensible.doc.name.stripExtension()');
 				}
+				if(MMExecute('extensible.doc.getTimeline().libraryItem!=null')=='true' || MMExecute('extensible.doc.timelines.length>1')=='true'){
+					fileName += "_"+MMExecute('extensible.doc.getTimeline().name');
+				}
+				fileName += ".svg";
+				_exportSettings.setDefaultForSetting("file",fileName);
 			}
-			checkFileInput();
 			finSetup();
 		}
 
@@ -297,23 +307,11 @@ package{
 			}
 		}
 
-		private function checkFileInput(e:Event=null):void{
-			_usingGeneric = (!controlsLayout.fileRow.input.text || controlsLayout.fileRow.input.text==_genericName);
-		}
 		private function fileSetter(input:TextInput, prop:String, value:String):void{
-			_usingGeneric = (!value || value == _genericName);
-			if(_usingGeneric){
-				input.text = _genericName;
-			}else{
-				input.text = value;
-			}
+			input.text = value?value:'';
 		}
 		private function fileGetter(input:TextInput, prop:String):String{
-			if(_usingGeneric){
-				return null;
-			}else{
-				return input.text==""?null:input.text;
-			}
+			return input.text==""?null:input.text
 		}
 
 		private function radioSetter(input:*, prop:String, value:*):void{
@@ -371,7 +369,7 @@ package{
 		}
 		private function onOutputChanged(e:Event=null):void{
 			var isAnim:Boolean = (this.controlsLayout.outputRow.input.selectedItem && this.controlsLayout.outputRow.input.selectedItem.showFlattenMotion);
-			//this.controlsLayout.beginRow.visible = isAnim;
+			this.controlsLayout.beginRow.visible = isAnim;
 			this.controlsLayout.flattenMotionCheckBox.visible = isAnim;
 			controlsLogic.update();
 		}
@@ -394,13 +392,10 @@ package{
 			// Show indeterminate bar until progress starts...
 			this.controlsLayout.progressBar.indeterminate=true;
 			this.controlsLayout.progressBar.mode=ProgressBarMode.EVENT;
-			ExternalInterface.addCallback('setProgress',setProgress);
+			//ExternalInterface.addCallback('setProgress',setProgress);
 			ExternalInterface.addCallback('endProgress',endProgress);
 			//Save options
 			var xml = _exportSettings.getXml();
-			if(_usingGeneric){
-				xml.appendChild(new XML("<file>"+_genericName+"</file>"));
-			}
 			xml['swfPanelName']='SVG';
 			if(dev){
 				MMExecute([
@@ -429,9 +424,9 @@ package{
 			try{
 				killed=MMExecute('extensible.que.kill()');
 			}catch(e){}
-			if(!killed=='true'){ // If kill command does not return "true"
+			/*if(!killed=='true'){ // If kill command does not return "true"
 				this.controlsLayout.progressBar.setProgress(0,100);
-			}
+			}*/
 			Fl.trace("SVG Export Failed");
 		}
 		
@@ -454,7 +449,7 @@ package{
 			}
 		}
 		
-		public function setProgress(completed:Number,max:Number):Boolean
+		/*public function setProgress(completed:Number,max:Number):Boolean
 		{
 			this.controlsLayout.progressBar.indeterminate=false;
 			this.controlsLayout.progressBar.mode=ProgressBarMode.MANUAL;
@@ -471,7 +466,7 @@ package{
 			);
 			this.timer.start();
 			return true;
-		}
+		}*/
 		
 		public function endProgress():Boolean
 		{
@@ -488,14 +483,14 @@ package{
 				MouseEvent.CLICK,
 				exportSVG
 			);
-			ExternalInterface.addCallback('setProgress',null);
+			//ExternalInterface.addCallback('setProgress',null);
 			ExternalInterface.addCallback('endProgress',null);
 			if(this.timer){
 				this.timer.stop();
 			}
-			if(!this.isCanceled){
+			/*if(!this.isCanceled){
 				this.setProgress(100,100);
-			}
+			}*/
 			return true;
 		}
 	}

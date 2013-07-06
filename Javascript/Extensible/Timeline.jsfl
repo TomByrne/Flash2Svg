@@ -577,7 +577,8 @@
 				includeShapeTweens:true,
 				includeMotionTweens:true,
 				includeHiddenLayers:ext.includeHiddenLayers,
-				includeGuides:false
+				includeGuides:false,
+				includeGuidedTweens:false
 			});
 			settings.extend(options);
 			var f=new ext.Array();
@@ -598,7 +599,8 @@
 						if(
 							(
 								(settings.includeShapeTweens && frame.tweenType=='shape') ||
-								(settings.includeMotionTweens && frame.tweenType=='motion')
+								(settings.includeMotionTweens && frame.tweenType=='motion') ||
+								(settings.includeGuidedTweens && frame.tweenType=='motion' && layer.layerType=="guided")
 							)&&
 							settings.frame!=frame.startFrame
 						){

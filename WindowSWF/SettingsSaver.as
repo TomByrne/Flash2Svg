@@ -41,6 +41,7 @@ package{
 		private var _overwriteHandler:Function;
 		private var _autoSave:Boolean;
 		private var _documentSaveName:String;
+		private var _timelineId:Object;
 
 		private var _state:String = STATE_UNLOADED;
 
@@ -93,6 +94,17 @@ package{
 					');'
 				].join('\n'));
 
+				// Layer change...
+				ExternalInterface.addCallback('layerChanged_'+documentSaveName,layerChanged);
+				MMExecute([
+					'fl.addEventListener(',
+					'	"layerChanged",',
+					'	function(){',
+					'		extensible.swfPanel("'+swfPanelName+'").call("layerChanged_'+documentSaveName+'");',
+					'	}',
+					');'
+				].join('\n'));
+
 				//documentChanged();
 			}
 
@@ -105,17 +117,63 @@ package{
 			}
 		}
 
+		public function setDefaultForSetting(settingName:String, defaultVal:*):void{
+			var settingDef = getSettingDefByName(settingName);
+			var isDef = (_currentSettings.getSetting(settingName)==settingDef.defValue);
+			settingDef.defValue = defaultVal;
+			if(isDef){
+				_currentSettings.setSetting(settingName, defaultVal);
+
+				if(settingDef.setter!=null){
+					settingDef.setter(settingDef.object, settingDef.prop, defaultVal);
+				}else{
+					settingDef.object[settingDef.prop] = defaultVal;
+				}
+			}
+		}
+
 		private function documentChanged():void{
+			//DelayedCall.call(doDocumentChanged, 0.1); // flash calls the handler multiple times, this will collate them
+			layerChanged();
+		}
+
+		private function layerChanged():void{
 			DelayedCall.call(doDocumentChanged, 0.1); // flash calls the handler multiple times, this will collate them
 		}
 
 		public function doDocumentChanged():void{
-			if(MMExecute('extensible.doc')!='null' &&
-				MMExecute('extensible.doc.documentHasData("'+_documentSaveName+'")')=='true'
-			){
-				var xml=new XML(MMExecute('extensible.doc.getDataFromDocument("'+_documentSaveName+'")'));
-				updateSettingGroup(_currentSettings, deserialise(xml), true);
+			if(MMExecute('extensible.doc')!='null'){
+				var timelineId;
+				if(MMExecute('extensible.doc.getTimeline().libraryItem!=null')=='true'){
+					timelineId = "item: "+MMExecute('extensible.doc.getTimeline().libraryItem.name');
+				}else{
+					timelineId = "scene: "+MMExecute('fl.documents.indexOf(extensible.doc)')+"-"+MMExecute('extensible.doc.currentTimeline');
+				}
+				if(_timelineId!=timelineId){
+					_timelineId = timelineId;
+				}else{
+					return;
+				}
+
+
+				var xml;
+				if(MMExecute('extensible.doc.getTimeline().libraryItem!=null')=='true'){
+					if(MMExecute('extensible.doc.getTimeline().libraryItem.hasData("'+_documentSaveName+'")')=='true'){
+						xml = new XML(MMExecute('extensible.doc.getTimeline().libraryItem.getData("'+_documentSaveName+'")'));
+						updateSettingGroup(_currentSettings, deserialise(xml), true);
+					}else{
+						clearNonCarryOver(_currentSettings, true);
+					}
+				}else{
+					if(MMExecute('extensible.doc.documentHasData("'+_documentSaveName+"_"+MMExecute('extensible.doc.currentTimeline')+'")')=='true'){
+						xml = new XML(MMExecute('extensible.doc.getDataFromDocument("'+_documentSaveName+"_"+MMExecute('extensible.doc.currentTimeline')+'")'));
+						updateSettingGroup(_currentSettings, deserialise(xml), true);
+					}else{
+						clearNonCarryOver(_currentSettings, true);
+					}
+				}
 			}
+
 		}
 
 		public function setToFirst(allowUserCreated:Boolean):void{
@@ -133,8 +191,8 @@ package{
 			if(group)setSettingTitle(group.title, true);
 		}
 
-		public function getXml():XML{
-			return serialise(_currentSettings);
+		public function getXml(getAll:Boolean=true):XML{
+			return serialise(_currentSettings, true, getAll);
 		}
 
 		private function deserialise(xml:XML):SettingGroup{
@@ -153,13 +211,13 @@ package{
 			return ret;
 		}
 
-		private function serialise(group:SettingGroup, includeNonFile:Boolean=true):XML{
+		private function serialise(group:SettingGroup, includeNonFile:Boolean=true, getDefaultsAlso:Boolean=false):XML{
 			var ret:XML = new XML("<settings></settings>");
 			ret.@title = group.title;
 			ret.@userCreated = group.userCreated;
 			for each(var settingDef:SettingDefinition in _settingsDefs){
 				var value = group.getSetting(settingDef.settingName);
-				if(value!=null && (includeNonFile || settingDef.diskSave)){
+				if(value!=null && (getDefaultsAlso || value!=settingDef.defValue) && (includeNonFile || settingDef.diskSave)){
 					ret.appendChild(new XML("<"+settingDef.settingName+">"+value+"</"+settingDef.settingName+">"));
 				}
 			}
@@ -191,8 +249,8 @@ package{
 			return true;
 		}
 
-		public function addSetting(object:Object, prop:String, settingName:String, defValue:*, diskSave:Boolean=true, getter:Function=null, setter:Function=null, event:String=null):void{
-			var setting:SettingDefinition = new SettingDefinition(object, prop, settingName, defValue, diskSave, getter, setter);
+		public function addSetting(object:Object, prop:String, settingName:String, defValue:*, diskSave:Boolean=true, getter:Function=null, setter:Function=null, event:String=null, carryValue:Boolean=true):void{
+			var setting:SettingDefinition = new SettingDefinition(object, prop, settingName, defValue, diskSave, getter, setter, carryValue);
 			_settingsDefs.push(setting);
 			updateSetting(object, prop);
 
@@ -222,15 +280,25 @@ package{
 					save();
 
 				}
-				if(_documentSaveName){
+				if(_documentSaveName && MMExecute('extensible.doc!=null')=='true'){
 
-					MMExecute([
-						'extensible.doc.addDataToDocument(',
-						'	"'+_documentSaveName+'",',
-						'	"string",',
-						'	decodeURIComponent("'+encodeURIComponent(getXml().toXMLString())+'")',
-						')'
-					].join('\n'));
+					if(MMExecute('extensible.doc.getTimeline().libraryItem!=null')=='true'){
+						MMExecute([
+							'extensible.doc.getTimeline().libraryItem.addData(',
+							'	"'+_documentSaveName+'",',
+							'	"string",',
+							'	decodeURIComponent("'+encodeURIComponent(getXml(false).toXMLString())+'")',
+							')'
+						].join('\n'));
+					}else{
+						MMExecute([
+							'extensible.doc.addDataToDocument(',
+							'	"'+_documentSaveName+"_"+MMExecute('extensible.doc.currentTimeline')+'",',
+							'	"string",',
+							'	decodeURIComponent("'+encodeURIComponent(getXml(false).toXMLString())+'")',
+							')'
+						].join('\n'));
+					}
 				}
 			}
 		}
@@ -280,7 +348,10 @@ package{
 		private function updateSettingGroup(update:SettingGroup, withGroup:SettingGroup, updateObjects:Boolean):void{
 			for each(var settingDef in _settingsDefs){
 				var value:* = withGroup.getSetting(settingDef.settingName);
+
 				if(value==null){
+					if(settingDef.carryValue)continue;
+
 					value = settingDef.defValue;
 				}
 
@@ -291,6 +362,21 @@ package{
 						settingDef.setter(settingDef.object, settingDef.prop, value);
 					}else{
 						settingDef.object[settingDef.prop] = value;
+					}
+				}
+			}
+		}
+		private function clearNonCarryOver(update:SettingGroup, updateObjects:Boolean):void{
+			for each(var settingDef in _settingsDefs){
+				if(!settingDef.carryValue){
+					update.setSetting(settingDef.settingName, settingDef.defValue);
+					if(updateObjects){
+
+						if(settingDef.setter!=null){
+							settingDef.setter(settingDef.object, settingDef.prop, settingDef.defValue);
+						}else{
+							settingDef.object[settingDef.prop] = settingDef.defValue;
+						}
 					}
 				}
 			}
@@ -327,6 +413,15 @@ package{
 			}
 			return null;
 		}
+
+		private function getSettingDefByName(settingName:String):SettingDefinition{
+			for each(var settingDef in _settingsDefs){
+				if(settingDef.settingName==settingName){
+					return settingDef;
+				}
+			}
+			return null;
+		}
 	}
 
 }
@@ -340,8 +435,9 @@ class SettingDefinition{
 	public var diskSave:Boolean;
 	public var getter:Function;
 	public var setter:Function;
+	public var carryValue:Boolean;
 
-	public function SettingDefinition(object:Object, prop:String, settingName:String, defValue:*, diskSave:Boolean, getter:Function, setter:Function){
+	public function SettingDefinition(object:Object, prop:String, settingName:String, defValue:*, diskSave:Boolean, getter:Function, setter:Function, carryValue:Boolean){
 		this.object = object;
 		this.prop = prop;
 		this.defValue = defValue;
@@ -349,5 +445,6 @@ class SettingDefinition{
 		this.diskSave = diskSave;
 		this.getter = getter;
 		this.setter = setter;
+		this.carryValue = carryValue;
 	}
 }
