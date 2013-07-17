@@ -25,7 +25,7 @@ package{
 	public class PanelRoot extends MovieClip{
 
 
-		private var timer:Timer=new Timer(1);
+		//private var timer:Timer=new Timer(1);
 		private var isCanceled:Boolean=false;
 		private var finished:Boolean=false;
 		private var swfPanelName:String='SVG';
@@ -118,6 +118,7 @@ package{
 			_exportSettings.addSetting(controlsLayout.convertPatternsToSymbolsCheckBox, "selected", "convertPatternsToSymbols", true, true, radioGetter, radioSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.flattenMotionCheckBox, "selected", "flattenMotion", false, true, radioGetter, radioSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.includeBackgroundCheckBox, "selected", "includeBackground", false, true, radioGetter, radioSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.loopCheckBox, "selected", "repeatCount", true, true, radioGetter, radioSetter, Event.CHANGE);
 
 			exportGroupsChanged();
 
@@ -182,7 +183,7 @@ package{
 			);
 			//ProgressBar
 			this.controlsLayout.progressBar.minimum=0;
-			this.timer.repeatCount=2999;
+			//this.timer.repeatCount=2999;
 
 			// For some reasons, this only works after a delay...
 			//setTimeout(finSetup,500);
@@ -371,6 +372,7 @@ package{
 			var isAnim:Boolean = (this.controlsLayout.outputRow.input.selectedItem && this.controlsLayout.outputRow.input.selectedItem.showFlattenMotion);
 			this.controlsLayout.beginRow.visible = isAnim;
 			this.controlsLayout.flattenMotionCheckBox.visible = isAnim;
+			this.controlsLayout.loopCheckBox.visible = isAnim;
 			controlsLogic.update();
 		}
 		
@@ -413,6 +415,8 @@ package{
 				');'
 			].join('\n');
 			MMExecute(cmd);
+
+			this.addEventListener(Event.ENTER_FRAME, processQue);
 		}
 		private function cancel(e:Event):void
 		{
@@ -433,20 +437,20 @@ package{
 		private function processQue(e:Event):void
 		{
 			if(this.isCanceled||this.finished){return;}
-			if(this.timer.delay<100){this.timer.delay=100;}
+			//if(this.timer.delay<100){this.timer.delay=100;}
 			// attempt to process the que
 			var success,err;
 			try{
 				success=MMExecute('extensible.que.process()');
 			}catch(err){}
-			if(success=='true'){
+			/*if(success=='true'){
 				this.timer.stop();
 			}else{ // increase the delay with each failure
 				if(this.timer.delay>120){
 					this.cancel(e);
 				}
 				this.timer.delay+=20;
-			}
+			}*/
 		}
 		
 		/*public function setProgress(completed:Number,max:Number):Boolean
@@ -470,6 +474,7 @@ package{
 		
 		public function endProgress():Boolean
 		{
+			this.removeEventListener(Event.ENTER_FRAME, processQue);
 			this.controlsLogic.setEnabled(true);
 			this.controlsLayout.progressBar.indeterminate=false;
 			this.controlsLayout.progressBar.mode=ProgressBarMode.MANUAL;
@@ -485,9 +490,9 @@ package{
 			);
 			//ExternalInterface.addCallback('setProgress',null);
 			ExternalInterface.addCallback('endProgress',null);
-			if(this.timer){
+			/*if(this.timer){
 				this.timer.stop();
-			}
+			}*/
 			/*if(!this.isCanceled){
 				this.setProgress(100,100);
 			}*/

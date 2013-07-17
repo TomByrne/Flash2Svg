@@ -61,7 +61,8 @@
 			output: 'animation',// 'animation', 'images'
 			clipToScalingGrid:false, // only relevant when source=='Selected Library Items'
 			clipToBoundingBox:false, // only relevant when source=='Selected Library Items'
-			beginAnimation:"0s"
+			beginAnimation:"0s",
+			repeatCount:"indefinite"
 		});
 		if(options instanceof XML || typeof(options)=='string'){
 			ext.Task.apply(this,[settings]);
@@ -105,6 +106,9 @@
 				}
 			}
 		}
+		if(this.repeatCount==true)this.repeatCount = "indefinite";
+		else if(this.repeatCount==false)this.repeatCount = "1";
+
 		if(this.output=='animation'){
 			this.animated = true;
 		}
@@ -798,8 +802,8 @@
 							);
 
 						// remove boring transforms
-						//outputString = outputString.replace(' transform="matrix(1 0 0 1 0 0)"','');
-						//outputString = outputString.replace(" transform='matrix(1 0 0 1 0 0)'",'');
+						outputString = outputString.replace(' transform="matrix(1 0 0 1 0 0)"','');
+						outputString = outputString.replace(" transform='matrix(1 0 0 1 0 0)'",'');
 
 						// turn hairline strokes to thickness 0.1
 						outputString = outputString.replace(' stroke="0"',' stroke="0.1"' );
@@ -1411,10 +1415,10 @@
 					var totFrames = (settings.endFrame-settings.startFrame);
 
 					var animNode = <animate
-								      attributeName="display"
-								      repeatCount="indefinite" />;
+								      attributeName="display"/>;
 
 					animNode.@begin = settings.beginAnimation;
+					animNode.@repeatCount = this.repeatCount;
 
 
 					/*var animDur = totFrames*(1/ext.doc.frameRate);
@@ -1603,6 +1607,8 @@
 
 								var lastFrame = frame;
 
+								var autoRotate = 0;
+
 								while(frameEnd<layerEnd){
 									var nextFrame = layer.frames[frameEnd];
 									if(nextFrame){
@@ -1611,9 +1617,22 @@
 											if(nextFrame.elements.length!=1 || nextFrame.elements[0].libraryItem!=frame.elements[0].libraryItem)
 												break; // tweening to incompatible frame
 
+											var attemptForeRot = true;
+											var attemptBackRot = true;
 											var time = settings.timeOffset+(frameEnd*(1/ext.doc.frameRate))/animDur;
 											if(lastFrame.tweenType=="none"){
 												timeList.push(Math.roundTo(time-0.0000001, this.decimalPointPrecision));
+											}else if(lastFrame.tweenType=="motion" ){
+												switch(lastFrame.motionTweenRotate){
+													case "clockwise":
+														autoRotate += lastFrame.motionTweenRotateTimes*360;
+														attemptBackRot = false;
+														break;
+													case "counter-clockwise":
+														autoRotate += lastFrame.motionTweenRotateTimes*-360;
+														attemptForeRot = false;
+														break;
+												}
 											}
 
 											var nextElement = nextFrame.elements[0];
@@ -1626,16 +1645,19 @@
 
 											rot = (skewX+skewY)/2;
 
-											while(Math.abs(rot-lastRot)>Math.abs(rot+360-lastRot)){
+											while(attemptForeRot && Math.abs(rot-lastRot)>Math.abs(rot+360-lastRot)){
 												rot += 360;
 												skewX += 360;
 												skewY += 360;
 											}
-											while(Math.abs(rot-lastRot)>Math.abs(rot-360-lastRot)){
+											while(attemptBackRot && Math.abs(rot-lastRot)>Math.abs(rot-360-lastRot)){
 												rot -= 360;
 												skewX -= 360;
 												skewY -= 360;
 											}
+
+											rot += autoRotate;
+											fl.trace("auto: "+autoRotate);
 
 											// if there is a rotation tween of up to 45 degrees, we add extra bounds to accomodate it.
 											var rotDif = Math.abs(lastRot - rot)/180*Math.PI;
@@ -1938,11 +1960,11 @@
 			}
 
 			var animNode = <animateTransform
-						      attributeName="transform" additive="sum"
-						      repeatCount="indefinite" />;
+						      attributeName="transform" additive="sum" />;
 
 			animNode.@begin = beginAnimation;
 			animNode.@type = type;
+			animNode.@repeatCount = this.repeatCount;
 
 			animNode.@dur = totalTime+"s";
 			animNode.@keyTimes = validT.join(";");

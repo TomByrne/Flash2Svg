@@ -51,7 +51,8 @@ package{
 								layout.applyTransformationsCheckBox,
 								layout.convertPatternsToSymbolsCheckBox,
 								layout.flattenMotionCheckBox,
-								layout.includeBackgroundCheckBox];
+								layout.includeBackgroundCheckBox,
+								layout.loopCheckBox];
 
 			rightControls = [   layout.fileRow.button,
 								layout.customFramesRow,
@@ -76,7 +77,8 @@ package{
 						layout.applyTransformationsCheckBox,
 						layout.convertPatternsToSymbolsCheckBox,
 						layout.flattenMotionCheckBox,
-						layout.includeBackgroundCheckBox];
+						layout.includeBackgroundCheckBox,
+						layout.loopCheckBox];
 
 			enable = [layout.fileRow.input,
 						layout.sourceRow.input,
@@ -98,7 +100,8 @@ package{
 						layout.applyTransformationsCheckBox,
 						layout.convertPatternsToSymbolsCheckBox,
 						layout.flattenMotionCheckBox,
-						layout.includeBackgroundCheckBox];
+						layout.includeBackgroundCheckBox,
+						layout.loopCheckBox];
 
 		}
 
