@@ -592,6 +592,10 @@
 			if(!defs){
 				return;
 			}
+			var sx=matrix.scaleX;
+			var sy=matrix.scaleY;
+			if(sx==1 && sy==1)return;
+
 			if(element.hasOwnProperty('@filter')){
 				var filterID=String(
 					element.@filter
@@ -604,8 +608,6 @@
 				){
 					var filter=defs.filter.(@id==filterID[1]);
 					if(filter && filter.length()){
-						var sx=matrix.scaleX;
-						var sy=matrix.scaleY;
 						for each(var primitive in filter[0].*){
 							switch(primitive.localName()){
 								case "feGaussianBlur":
@@ -616,19 +618,22 @@
 									].join(' ');
 									break;
 							}
-						}			
-						var x=parseFloat(filter.@x);
-						var y=parseFloat(filter.@y);
-						var width=parseFloat(filter.@width);
-						var height=parseFloat(filter.@height);
-						filter.@x=String(x/(1-sx))+'%';
-						filter.@y=String(y/(1-sy))+'%';
-						filter.@width=String(100+(width-100)/(1-sx))+'%';
-						filter.@height=String(100+(height-100)/(1-sy))+'%';						
+						}
+						if(sx!=1){
+							var x=parseFloat(filter.@x);
+							var width=parseFloat(filter.@width);
+							filter.@x=String(x/(1-sx))+'%';
+							filter.@width=String(100+(width-100)/(1-sx))+'%';
+						}
+						if(sy!=1){
+							var y=parseFloat(filter.@y);
+							var height=parseFloat(filter.@height);
+							filter.@y=String(y/(1-sy))+'%';
+							filter.@height=String(100+(height-100)/(1-sy))+'%';
+						}
 					}								
 				}
 			}
-			return filter[0];
 		},
 		/**
 		 * Begins processing. 
@@ -1430,7 +1435,7 @@
 					if(settings.totalDuration!=null){
 						animDur = settings.totalDuration;
 					}else{
-						animDur = Math.roundTo(totFrames*(1/ext.doc.frameRate),this.decimalPointPrecision);
+						animDur = this.precision(totFrames*(1/ext.doc.frameRate));
 					}
 
 					animNode.@dur = animDur+"s";
@@ -1494,7 +1499,7 @@
 
 						var frameXML;
 						var startType = layer.frames[frame.startFrame].tweenType;
-						if(this.animated && (animatedFrames[i+"-"+n] || (frame.startFrame!=n && (startType=='none' || (!settings.flattenMotion && startType=="motion"))))){
+						if(this.animated && (animatedFrames[i+"-"+n] || (frame.startFrame!=n && n!=settings.startFrame && (startType=='none' || (!settings.flattenMotion && startType=="motion"))))){
 							// Skip frames that haven't changed or are motion tweens (when in animation mode).
 							continue;
 						}
@@ -1533,7 +1538,7 @@
 
 						var items = this._getItemsByFrame(frame, settings.selection);
 						var doCollateFrames = (doAnim && !settings.flattenMotion  && items.length==1 && tweenType!="shape" && items[0].$.elementType=="instance");
-						
+
 						for(var j=0; j<items.length; ++j){
 							var element = items[j];
 							element.timeline = timeline;
@@ -1621,7 +1626,7 @@
 											var attemptBackRot = true;
 											var time = settings.timeOffset+(frameEnd*(1/ext.doc.frameRate))/animDur;
 											if(lastFrame.tweenType=="none"){
-												timeList.push(Math.roundTo(time-0.0000001, this.decimalPointPrecision));
+												timeList.push(this.precision(time-0.0000001));
 											}else if(lastFrame.tweenType=="motion" ){
 												switch(lastFrame.motionTweenRotate){
 													case "clockwise":
@@ -1657,7 +1662,6 @@
 											}
 
 											rot += autoRotate;
-											fl.trace("auto: "+autoRotate);
 
 											// if there is a rotation tween of up to 45 degrees, we add extra bounds to accomodate it.
 											var rotDif = Math.abs(lastRot - rot)/180*Math.PI;
@@ -1723,10 +1727,10 @@
 									}
 								}
 								for(var h=0; h<skxList.length; h++){
-									skxList[h] = Math.roundTo(skxList[h], this.decimalPointPrecision);
+									skxList[h] = this.precision(skxList[h]);
 								}
 								for(var h=0; h<skyList.length; h++){
-									skyList[h] = Math.roundTo(skyList[h], this.decimalPointPrecision);
+									skyList[h] = this.precision(skyList[h]);
 								}
 								if(hasSkewX && this._addAnimationNode(elementXML.parent(), "skewX", [skxList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)){
 									matrix.a = 1;
@@ -1746,8 +1750,8 @@
 									// this will add in extra time for frames with non changing content (which won't be included as a real frame)
 								}
 							}
-							var frameTimeStart = String(Math.roundTo((settings.timeOffset+n*(1/ext.doc.frameRate))/animDur,this.decimalPointPrecision));
-							var frameTimeEnd = String(Math.roundTo((settings.timeOffset+frameEnd*(1/ext.doc.frameRate))/animDur,this.decimalPointPrecision));
+							var frameTimeStart = String(this.precision((settings.timeOffset+n*(1/ext.doc.frameRate))/animDur));
+							var frameTimeEnd = String(this.precision((settings.timeOffset+frameEnd*(1/ext.doc.frameRate))/animDur));
 							if(frameTimeEnd>1)frameTimeEnd = 1;
 
 							if(items.length>0 && (frameTimeStart!=0 || frameTimeEnd!=1)){ // don't bother if element is always there
@@ -1852,18 +1856,18 @@
 											
 			transPoint = element.getTransformationPoint();
 			
-			xList.push(Math.roundTo(element.matrix.tx, this.decimalPointPrecision));
-			yList.push(Math.roundTo(element.matrix.ty, this.decimalPointPrecision));
-			scxList.push(Math.roundTo(element.scaleX, this.decimalPointPrecision));
-			scyList.push(Math.roundTo(element.scaleY, this.decimalPointPrecision));
+			xList.push(this.precision(element.matrix.tx));
+			yList.push(this.precision(element.matrix.ty));
+			scxList.push(this.precision(element.scaleX));
+			scyList.push(this.precision(element.scaleY));
 			skxList.push(skewX);
 			skyList.push(skewY);
-			rotList.push(Math.roundTo(rot, this.decimalPointPrecision));
-			trxList.push(Math.roundTo(transPoint.x,this.decimalPointPrecision));
-			tryList.push(Math.roundTo(transPoint.y,this.decimalPointPrecision));
+			rotList.push(this.precision(rot));
+			trxList.push(this.precision(transPoint.x));
+			tryList.push(this.precision(transPoint.y));
 
 			splineList.push(this._getSplineData(frame));
-			timeList.push(Math.roundTo(time, this.decimalPointPrecision));
+			timeList.push(this.precision(time));
 
 			if(frame.tweenType=="none"){
 				xList.push(xList[xList.length-1]);
@@ -1997,9 +2001,9 @@
 			
 			var fract = (frame.tweenEasing/100) * 0.8; // this number determines the severness of easing (should match flash IDE, between 0-1)
 			if(frame.tweenEasing<0){
-				return '0.01 0.01 1 '+Math.roundTo(1+fract, this.decimalPointPrecision);
+				return '0.01 0.01 1 '+this.precision(1+fract);
 			}else{
-				return '0 '+Math.roundTo(fract, this.decimalPointPrecision)+' 0.99 0.99';
+				return '0 '+this.precision(fract)+' 0.99 0.99';
 			}
 		},
 		/**
@@ -2243,10 +2247,10 @@
 				}
 				filter.@filterUnits="objectBoundingBox";
 				if(boundingBox){
-					var width=(1+(leftMargin+rightMargin)/(boundingBox.right-boundingBox.left))*100;
-					var height=(1+(topMargin+bottomMargin)/(boundingBox.bottom-boundingBox.top))*100;
-					var x=(-leftMargin/(boundingBox.right-boundingBox.left))*100;
-					var y=(-topMargin/(boundingBox.bottom-boundingBox.top))*100;
+					var width=this.precision((1+(leftMargin+rightMargin)/(boundingBox.right-boundingBox.left))*100);
+					var height=this.precision((1+(topMargin+bottomMargin)/(boundingBox.bottom-boundingBox.top))*100);
+					var x=this.precision((-leftMargin/(boundingBox.right-boundingBox.left))*100);
+					var y=this.precision((-topMargin/(boundingBox.bottom-boundingBox.top))*100);
 					filter.@width=String(width)+'%';
 					filter.@height=String(height)+'%';
 					filter.@x=String(x)+'%';
@@ -3038,7 +3042,7 @@
 					var color=new ext.Color(fillObj.color);
 					xml=new XML('<solidColor/>');
 					xml['@solid-color']=color.hex;
-					if(color.opacity<1)xml['@solid-opacity']=color.opacity;
+					if(color.opacity<1)xml['@solid-opacity']=this.precision(color.opacity);
 					break;
 			}
 			xml['@id']=id;
@@ -3304,9 +3308,9 @@
 				id='g';
 			}
 			var parts=/(^.*[^\d])([\d][\d]*$)?/.exec(id);
-			var base=parts[1];
+			var base = parts?parts[1]:id; // ids that are all numbers won't match
 			var increment=0;
-			if(parts.length>2){
+			if(parts && parts.length>2){
 				increment=Number(parts[2]);
 			}
 			if(this._ids[base]!==undefined){
@@ -3316,6 +3320,9 @@
 				this._ids[base]=increment;
 				return id;
 			}
+		},
+		precision:function(num){
+			return Math.roundTo(num,this.decimalPointPrecision);
 		}/*,
 		toString:function(){
 			return this.docString+this.xml.toXMLString().replace(/(\<[^\>]*?)xlink\-(.*?)=/g,'$1xlink:$2=');
