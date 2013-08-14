@@ -19,6 +19,8 @@
 	function SVG(options){
 		fl.outputPanel.clear();
 
+		this.VIEW_BOX_PADDING=50; // Adds gap around viewBox to avoid clipping.
+
 		this.DEFAULT_GRADIENT_LENGTH=819.2; // Pre-transformation length of ALL linear gradients in flash.
 		this.DEFAULT_GRADIENT_RADIUS=810.7; // Pre-transformation radius of ALL radial gradients in flash.
 		this.DEFAULT_BITMAP_SCALE=1/20;
@@ -29,7 +31,7 @@
 		var settings=new ext.Object({
 			file:undefined,
 			decimalPointPrecision:3,
-			expandSymbols:'none', // 'Nested', 'All', 'None'
+			expandSymbols:'usedOnce', // 'nested', 'all', 'none', usedOnce
 			rendering:'auto', // 'auto', 'optimizeSpeed', 'optimizeQuality', 'inherit'
 			convertPatternsToSymbols:true,
 			applyTransformations:true,
@@ -431,7 +433,7 @@
 				return;	
 			}
 			if(name=='mask' && xml..use.length()>0){
-				this.expandUse( xml,true,defs );
+				this.expandUse( xml, xml,false,true,defs );
 			}
 			var filter,newFilter;
 			var color=colorX;
@@ -631,7 +633,7 @@
 							filter.@y=String(y/(1-sy))+'%';
 							filter.@height=String(100+(height-100)/(1-sy))+'%';
 						}
-					}								
+					}							
 				}
 			}
 		},
@@ -714,6 +716,7 @@
 		 * @see extensible.Task
 		 */
 		end:function(){
+			fl.trace("end");
 			var success=true;
 			var fileExists=FLfile.exists(this.file);
 			/*
@@ -770,16 +773,23 @@
 					var document = documents[i];
 
 					if(this.expandSymbols && this.expandSymbols!='none'){ // expand symbol instances
-						if(this.expandSymbols=='nested'){
-							this.expandUse(document,'nested',document.defs);
+						var time = (new Date()).getTime();
+						fl.trace("this.expandSymbols: "+this.expandSymbols);
+						if(this.expandSymbols=='usedOnce'){
+							this.expandUse(document, document, true);
+						}else if(this.expandSymbols=='nested'){
+							this.expandUse(document, document.defs, false,'nested',document.defs);
 						}else{
-							this.expandUse(document);
+							this.expandUse(document, document, false);
 						}
 					}
+					fl.trace("this.applyTransformations: "+this.applyTransformations);
 					if(this.applyTransformations){
 						this.applyMatrices(document);
 					}
+					fl.trace("this._applyColorEffects: ");
 					this._applyColorEffects(document,document.defs);
+					fl.trace("this.deleteUnusedReferences: ");
 					this.deleteUnusedReferences(document);
 					document['@xmlns']="http://www.w3.org/2000/svg";
 
@@ -878,27 +888,31 @@
 		 * @parameter {Boolean} recursive
 		 * @parameter {XML} defs
 		 */
-		expandUse:function( xml,recursive,defs ){
+		expandUse:function( xml, within, onlyOnceUsed, recursive, defs ){
 			defs = defs||xml.defs;
 			if(recursive==undefined){
 				recursive=true;
 			}
 			var rootIsUse=(
-				xml.localName()=='use'
+				within.localName()=='use'
 			);
-			for each(
-				var useNode in (
-					recursive ? (
-						rootIsUse ? xml : xml..use
-					):(
-						rootIsUse ? xml : xml.use
-					)
-				)
-			){
+			var nodesFound = (rootIsUse?within:(recursive?within..use:within.use));
+
+			var useNodes = {};
+			for each(var useNode in nodesFound){
 				if( useNode.localName()!='use' || !useNode['@xlink-href'] ){
 					continue;
 				}
 				var id=String(useNode['@xlink-href']).slice(1);
+				var list = useNodes[id];
+				if(list){
+					list.push(useNode);
+				}else{
+					useNodes[id] = [useNode];
+				}
+			}
+			for(var id in useNodes){
+
 				var symbol=defs.symbol.(@id==id);
 				if(
 					!symbol || 
@@ -912,48 +926,53 @@
 					continue;
 				}
 				symbol=symbol[0].copy();
-				if(recursive){
-					symbol=this.expandUse(symbol,recursive,defs);
+				var useList = useNodes[id];
+				if(onlyOnceUsed && useList.length>1){
+					continue;
 				}
-				useNode.setName('g');
-				for each(var child in symbol.*){
-					useNode.appendChild(child);
-				}
-				useNode['@id']=this._uniqueID(String(symbol['@id'])+'_1');
-				delete useNode['@xlink-href'];
-				delete useNode['@width'];
-				delete useNode['@height'];
-				delete useNode['@x'];
-				delete useNode['@y'];
-				if(useNode['@transform']==this.IDENTITY_MATRIX){
-					delete useNode['@transform'];
-				}
-				for each(var node in useNode..*){
-					if(node.hasOwnProperty('@id') && node.localName()!='mask'){
-						node.@id=this._uniqueID(String(node.@id));
+
+				for(var i=0; i<useList.length; ++i){
+					var useNode = useList[i];
+					useNode.setName('g');
+					for each(var child in symbol.*){
+						useNode.appendChild(child);
 					}
-					if(node.hasOwnProperty('@mask')){
-						var oldID=String(node.@mask).match(/(?:url\(#)(.*?)(?:\))/);
-						if(oldID && oldID.length>1){
-							var newID=this._uniqueID(oldID[1]);
-							var old=useNode.(@id==oldID[1]);
-							if(old.length()){
-								old[0].@id=newID;
-								node.@mask='url(#'+newID+')';
+					useNode['@id']=this._uniqueID(String(symbol['@id'])+'_1');
+					delete useNode['@xlink-href'];
+					delete useNode['@width'];
+					delete useNode['@height'];
+					delete useNode['@x'];
+					delete useNode['@y'];
+					if(useNode['@transform']==this.IDENTITY_MATRIX){
+						delete useNode['@transform'];
+					}
+					for each(var node in useNode..*){
+						if(node.hasOwnProperty('@id') && node.localName()!='mask'){
+							node.@id=this._uniqueID(String(node.@id));
+						}
+						if(node.hasOwnProperty('@mask')){
+							var oldID=String(node.@mask).match(/(?:url\(#)(.*?)(?:\))/);
+							if(oldID && oldID.length>1){
+								var newID=this._uniqueID(oldID[1]);
+								var old=useNode.(@id==oldID[1]);
+								if(old.length()){
+									old[0].@id=newID;
+									node.@mask='url(#'+newID+')';
+								}
 							}
 						}
-					}
-					for each(var attr in node.@*){
-						if(attr.name()!='id'){
-							var ida=String(attr).match(/(?:url\(#)(.*?)(?:\))/);
-							if(ida && ida.length>1){
-								var origDef=defs.*.(@id==ida[1]);
-								if(origDef && origDef.length()){
-									var newDef=origDef[0].copy();
-									var newID=this._uniqueID(ida[1]);
-									newDef.@id=newID;
-									node['@'+attr.name()]='url(#'+newID+')';
-									defs.appendChild(newDef);
+						for each(var attr in node.@*){
+							if(attr.name()!='id'){
+								var ida=String(attr).match(/(?:url\(#)(.*?)(?:\))/);
+								if(ida && ida.length>1){
+									var origDef=defs.*.(@id==ida[1]);
+									if(origDef && origDef.length()){
+										var newDef=origDef[0].copy();
+										var newID=this._uniqueID(ida[1]);
+										newDef.@id=newID;
+										node['@'+attr.name()]='url(#'+newID+')';
+										defs.appendChild(newDef);
+									}
 								}
 							}
 						}
@@ -961,7 +980,7 @@
 				}
 			}
 			if( rootIsUse && recursive ){
-				this.expandUse( xml,recursive,defs );
+				this.expandUse( xml, within, onlyOnceUsed, recursive, defs );
 			}
 			return xml;
 		},
@@ -1120,7 +1139,12 @@
 					return this.que.process();
 				}
 			}else{
-				return this.end();
+				try{
+					return this.end();
+				}catch(e){
+					fl.trace(e);
+					return this.que.next();
+				}
 			}
 			return true;
 		},
@@ -1239,6 +1263,32 @@
 			}
 			return result;
 		},
+
+		_getBoundingBox:function(items){
+			var ret;
+			for(var i=0; i<items.length; ++i){
+				var item = items[i];
+				if(item.right - item.left > 0 && item.bottom - item.top > 0){
+					if(ret==null){
+						ret = {left:item.left, right:item.right, top:item.top, bottom:item.bottom};
+					}else{
+						if(ret.left>item.left)ret.left = item.left;
+						if(ret.top>item.top)ret.top = item.top;
+						if(ret.right<item.right)ret.right = item.right;
+						if(ret.bottom<item.bottom)ret.bottom = item.bottom;
+					}
+				}
+			}
+			if(ret){
+				ret.left -= this.VIEW_BOX_PADDING;
+				ret.top -= this.VIEW_BOX_PADDING;
+				ret.right += this.VIEW_BOX_PADDING;
+				ret.bottom += this.VIEW_BOX_PADDING;
+				return ret;
+			}else{
+				return {left:0, right:0, top:0, bottom:0};
+			}
+		},
 		/**
 		 * Retrieves the SVG data corresponding to a timeline.
 		 * @parameter {extensible.timeline) timeline
@@ -1275,27 +1325,28 @@
 			 */
 			//var selection=settings.selection.byFrame({stacked:true});
 			var xml,instanceXML,id;
-			var timelineName=timeline.name;
 
-			// due to the way SMIL works, animations cannot practically be nested
-			var useLibrary = (settings.frameCount==null || settings.frameCount<2 || this.output!="animation");
-			if(!useLibrary){
-				if(settings.endFrame > settings.startFrame+settings.frameCount){
-					settings.endFrame = settings.startFrame+settings.frameCount;
-				}
+			if(settings.endFrame > settings.startFrame+settings.frameCount-1){
+				settings.endFrame = settings.startFrame+settings.frameCount-1;
+			}
+			if(settings.endFrame > timeline.frameCount-1){
+				settings.endFrame = timeline.frameCount-1;
 			}
 
 			var symbolIDString = timeline.name;
 			if(settings.color){
 				symbolIDString += '_'+settings.color.idString; //should factor this out and use a transform
 			}
-			if(settings.frameCount==1){
-				symbolIDString += '--'+settings.startFrame;
-				settings.endFrame = settings.startFrame+settings.frameCount;
+			if(timeline.frameCount>1){
+				if(settings.startFrame==settings.endFrame){
+					symbolIDString += '_f'+settings.startFrame;
+				}else if(settings.timeOffset!=null && settings.timeOffset>0){
+					symbolIDString += '_t'+settings.timeOffset;
+				}
 			}
 			var isNew,instanceID,boundingBox;
 			if(
-				this._symbols[symbolIDString] && useLibrary
+				this._symbols[symbolIDString]
 			){
 				isNew=false;
 				id = this._symbols[symbolIDString];
@@ -1303,7 +1354,7 @@
 			}else{
 				isNew=true;
 				id = this._uniqueID(symbolIDString);
-				if(!this._symbols[symbolIDString] && useLibrary){
+				if(!this._symbols[symbolIDString]){
 					this._symbols[symbolIDString]=id;
 				}
 				var layers = timeline.getLayers();
@@ -1319,6 +1370,32 @@
 						includeMotionTweens:settings.flattenMotion,
 						includeGuidedTweens:true
 					});
+
+				var syncedLayers = {};
+				layers = timeline.getLayers();
+				for(var i=0;i<layers.length;i++){
+					var layer=layers[i];
+					var synced = true;
+					var lastElement;
+
+					var layerEnd = settings.endFrame+1;
+					if(layerEnd>layer.frameCount)layerEnd = layer.frameCount;
+
+					for(var n=settings.startFrame; n<layerEnd; ++n){
+						var frame=layer.frames[n];
+						if(frame.startFrame!=n)continue;
+						var element = frame.elements[0];
+						if(frame.elements.length!=1 || element.symbolType!="graphic" || element.firstFrame!=n || (lastElement && element.libraryItem!=lastElement.libraryItem)){
+							synced = false;
+							break;
+						}
+						lastElement = element;
+					}
+					if(synced && lastElement){
+						syncedLayers[i] = true;
+					}
+				}
+
 				/*
 				 * Create temporary timelines where tweens exist & convert to
 				 * keyframes.
@@ -1349,23 +1426,27 @@
 					layers = timeline.getLayers();
 					for(var i=0;i<layers.length;i++){
 						var layer=layers[i];
-						var layerEnd = settings.endFrame;
+						var layerEnd = settings.endFrame+1;
 						if(layerEnd>layer.frameCount)layerEnd = layer.frameCount;
 
 						timeline.setSelectedLayers(layer.index);
 						for(var n=settings.startFrame; n<layerEnd; ++n){
 							var frame=layer.frames[n];
 							var start=frame.startFrame;
-							if(frame.tweenType=='shape' || 
+							var startFrame=layer.frames[start];
+							if(  frame.tweenType=='shape' || 
 								(n==frame.startFrame && layer.layerType=="guided" && frame.tweenType!="none") ||
 								(settings.flattenMotion && frame.tweenType=="motion") ||
-								(n==settings.startFrame && start!=n && layer.frames[start].tweenType!='none') || // this backtracks from the first frame if our range starts mid-tween
-								(n==layerEnd-1 && start!=n && layer.frames[start].tweenType!='none')){  // this breaks apart tweens which fall over the end of our range
-
+								(n==settings.startFrame && start!=n && startFrame.tweenType!='none') || // this backtracks from the first frame if our range starts mid-tween
+								(n==settings.endFrame && start!=n && startFrame.tweenType!='none') ||// this breaks apart tweens which fall over the end of our range
+								(n==frame.startFrame && frame.elements.length==1 && frame.elements[0].symbolType=="graphic" && frame.elements[0].loop!="single frame" && !syncedLayers[i])// graphic runs should be broken down into single frames (but only when the run is out of sync with the master timeline)
+								){ 
 								var end = start+frame.duration;
 								timeline.$.convertToKeyframes(start, end);
-								n = end;
+								n = end-1;
+
 							}
+
 						}
 					}
 				}
@@ -1376,7 +1457,7 @@
 					var frames = [];
 					for(var i=0;i<layers.length;i++){
 						var layer=layers[i];
-						var layerEnd = settings.endFrame;
+						var layerEnd = settings.endFrame+1;
 						if(layerEnd>layer.frameCount)layerEnd = layer.frameCount;
 
 						for(var n=settings.startFrame; n<layerEnd; ++n){
@@ -1390,34 +1471,27 @@
 						frames:frames
 					};
 					var items =timeline.getElements(options);
-					boundingBox = items.boundingBox;
+					boundingBox =this._getBoundingBox(items);
 				}else{
-					boundingBox = settings.selection.boundingBox;
+					boundingBox = this._getBoundingBox(settings.selection);
 				}
-				if(useLibrary){
-					this._symbolBounds[symbolIDString] = boundingBox;
-				}
-			}	
+				this._symbolBounds[symbolIDString] = boundingBox;
+			}
+			fl.trace("getTimeline: "+settings.startFrame+" "+settings.endFrame+" "+settings.frameCount+" "+isNew);
 			var instanceID=this._uniqueID(id);	
 			xml=new XML('<use xlink-href="#'+id+'" id="'+instanceID+'" />');
 			if(isNew){
-				if(useLibrary){
-					instanceXML=xml;
-					instanceXML['@width']=0;
-					instanceXML['@height']=0;
-					instanceXML['@x']=0;
-					instanceXML['@y']=0;
-					instanceXML['@overflow']="visible";
-				}
-				if(useLibrary){
-					xml=new XML('<symbol/>');
-				}else{
-					xml=new XML('<g/>');
-				}
+				instanceXML=xml;
+				instanceXML['@width']=0;
+				instanceXML['@height']=0;
+				instanceXML['@x']=0;
+				instanceXML['@y']=0;
+				instanceXML['@overflow']="visible";
+				xml=new XML('<symbol/>');
 				xml['@id']=id;
 
 				if(this.animated){
-					var totFrames = (settings.endFrame-settings.startFrame);
+					var totFrames = (settings.endFrame-settings.startFrame+1);
 
 					var animNode = <animate
 								      attributeName="display"/>;
@@ -1432,11 +1506,11 @@
 					}
 					animDur = Math.roundTo(animDur,this.decimalPointPrecision);*/
 
-					if(settings.totalDuration!=null){
-						animDur = settings.totalDuration;
-					}else{
+					// if(settings.totalDuration!=null){
+					// 	animDur = settings.totalDuration;
+					// }else{
 						animDur = this.precision(totFrames*(1/ext.doc.frameRate));
-					}
+					// }
 
 					animNode.@dur = animDur+"s";
 				}
@@ -1455,10 +1529,10 @@
 					var layer=layers[i];
 					if(layer.layerType=="guide")continue;
 
-					var layerEnd = settings.endFrame;
+					var layerEnd = settings.endFrame+1;
 					if(layerEnd>layer.frameCount)layerEnd = layer.frameCount;
 
-					var doAnim = this.animated && layerEnd-settings.startFrame>1;
+					var doAnim = this.animated && layerEnd-settings.startFrame-1>1 && settings.frameCount!=1;
 
 					var lVisible=layer.visible;
 					var lLocked=layer.locked;
@@ -1496,6 +1570,15 @@
 					for(var n=settings.startFrame; n<layerEnd; ++n){
 						var frame = new ext.Frame(frames[n]);
 						var tweenType = frame.tweenType;
+
+
+						var items = this._getItemsByFrame(frame, settings.selection);
+						if(items.length==0)continue;
+						var itemBounds = this._getBoundingBox(items);
+						if(boundingBox.left>itemBounds.left)boundingBox.left = itemBounds.left;
+						if(boundingBox.top>itemBounds.top)boundingBox.top = itemBounds.top;
+						if(boundingBox.right<itemBounds.right)boundingBox.right = itemBounds.right;
+						if(boundingBox.bottom<itemBounds.bottom)boundingBox.bottom = itemBounds.bottom;
 
 						var frameXML;
 						var startType = layer.frames[frame.startFrame].tweenType;
@@ -1536,21 +1619,42 @@
 							frameXML=new XML('<g id="'+layerFrameId+'" />');
 						}
 
-						var items = this._getItemsByFrame(frame, settings.selection);
 						var doCollateFrames = (doAnim && !settings.flattenMotion  && items.length==1 && tweenType!="shape" && items[0].$.elementType=="instance");
 
 						for(var j=0; j<items.length; ++j){
 							var element = items[j];
 							element.timeline = timeline;
 							var elementID=this._uniqueID('element');
+
+							var dur = settings.frameCount - (n - settings.startFrame);
+							if(frame.duration<dur)dur = frame.duration;
+
 							var elemSettings = {
 										frame:n,
 										dom:dom,
 										timeOffset:settings.timeOffset+n*(1/ext.doc.frameRate),
-										frameCount:frame.duration,
-										totalDuration:animDur,
+										frameCount:dur,
+										//totalDuration:animDur,
 										beginAnimation:settings.beginAnimation
 									};
+
+							if(element.symbolType=="graphic" && !syncedLayers[i]){
+								if(element.loop=="single frame" || frame.duration==1){
+									elemSettings.frameCount = 1;
+									elemSettings.startFrame = element.firstFrame;
+								}else{
+									elemSettings.startFrame = element.firstFrame + (n - frame.startFrame);
+									elemSettings.frameCount = (settings.endFrame + 1) - n;
+									if(elemSettings.startFrame>=element.libraryItem.timeline.frameCount){
+										if(element.loop=="loop"){
+											elemSettings.startFrame = elemSettings.startFrame%element.libraryItem.timeline.frameCount;
+										}else{
+											elemSettings.startFrame = element.libraryItem.timeline.frameCount-1;
+										}
+									}
+								}
+							}
+
 							if(this._delayedProcessing){
 								var elementXML=new XML('<g id="'+elementID+'"></g>');
 								this.qData.push({
@@ -1573,12 +1677,6 @@
 							}
 						}
 						if(doAnim){
-
-							translateSkew = function(skew){
-								var normSkew = skew%360;
-								while(normSkew<0)normSkew+=360;
-								return (normSkew<90 || normSkew>270)?-skew:skew;
-							}
 							
 							var frameEnd = n+1;
 							if(doCollateFrames){
@@ -1614,27 +1712,32 @@
 
 								var autoRotate = 0;
 
+								var mainElem = frame.elements[0];
 								while(frameEnd<layerEnd){
 									var nextFrame = layer.frames[frameEnd];
 									if(nextFrame){
 										if(nextFrame.startFrame==frameEnd){
 											// keyframe
-											if(nextFrame.elements.length!=1 || nextFrame.elements[0].libraryItem!=frame.elements[0].libraryItem)
+											var nextElem = nextFrame.elements[0];
+											if(nextFrame.elements.length!=1 || nextElem.libraryItem!=mainElem.libraryItem){
 												break; // tweening to incompatible frame
+											}else if(mainElem.symbolType=="graphic" && (nextElem.loop!=mainElem.loop || mainElem.firstFrame!=nextElem.firstFrame) && !syncedLayers[i]){
+												break; // tweening to different graphic frames
+											}
 
 											var attemptForeRot = true;
 											var attemptBackRot = true;
 											var time = settings.timeOffset+(frameEnd*(1/ext.doc.frameRate))/animDur;
 											if(lastFrame.tweenType=="none"){
 												timeList.push(this.precision(time-0.0000001));
-											}else if(lastFrame.tweenType=="motion" ){
+											}else if(lastFrame.tweenType=="motion"){
 												switch(lastFrame.motionTweenRotate){
 													case "clockwise":
-														autoRotate += lastFrame.motionTweenRotateTimes*360;
+														if(lastFrame.duration>1)autoRotate += lastFrame.motionTweenRotateTimes*360;
 														attemptBackRot = false;
 														break;
 													case "counter-clockwise":
-														autoRotate += lastFrame.motionTweenRotateTimes*-360;
+														if(lastFrame.duration>1)autoRotate += lastFrame.motionTweenRotateTimes*-360;
 														attemptForeRot = false;
 														break;
 												}
@@ -1708,11 +1811,7 @@
 									matrix.tx = 0;
 									matrix.ty = 0;
 								}
-								if(this._addAnimationNode(elementXML.parent(), "scale", [scxList, scyList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation)){
-									matrix.a = 1;
-									matrix.d = 1;
-								}
-								if(hasSkewX && hasSkewY){
+								if((hasSkewX && hasSkewY) || (!hasSkewX && !hasSkewY)){
 									for(var h=0; h<skxList.length; h++){
 										skxList[h] -= rotList[h];
 									}
@@ -1720,10 +1819,10 @@
 										skyList[h] -= rotList[h];
 									}
 									if(this._addAnimationNode(elementXML.parent(), "rotate", [rotList, trxList, tryList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)){
-										matrix.a = 1;
+										matrix.a = element.scaleX;
 										matrix.b = 0;
 										matrix.c = 0;
-										matrix.d = 1;
+										matrix.d = element.scaleY;
 									}
 								}
 								for(var h=0; h<skxList.length; h++){
@@ -1733,11 +1832,15 @@
 									skyList[h] = this.precision(skyList[h]);
 								}
 								if(hasSkewX && this._addAnimationNode(elementXML.parent(), "skewX", [skxList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)){
-									matrix.a = 1;
+									matrix.a = element.scaleX;
 									matrix.b = 0;
 								}
 								if(hasSkewY && this._addAnimationNode(elementXML.parent(), "skewY", [skyList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)){
 									matrix.c = 0;
+									matrix.d = element.scaleY;
+								}
+								if(this._addAnimationNode(elementXML.parent(), "scale", [scxList, scyList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation)){
+									matrix.a = 1;
 									matrix.d = 1;
 								}
 
@@ -1769,7 +1872,6 @@
 									fAnimNode.@values="none;inline;none;none";
 
 								}
-
 								frameXML.appendChild(fAnimNode);
 							}
 						}
@@ -1833,9 +1935,7 @@
 				String(boundingBox.right-boundingBox.left)+' '+
 				String(boundingBox.bottom-boundingBox.top)
 			);
-			if(useLibrary){
-				xml['@viewBox'] = viewBox;
-			}
+			xml['@viewBox'] = viewBox;
 			result['@width']=String(Math.ceil(boundingBox.right-boundingBox.left));
 			result['@height']=String(Math.ceil(boundingBox.bottom-boundingBox.top));
 			result['@x']=String(Math.floor(boundingBox.left));
@@ -1993,7 +2093,7 @@
 			// Tween support warnings, remove these as different tween settings gain support
 			if(frame.hasCustomEase)ext.warn('Custom easing is not yet supported (at frame '+frame.startFrame+")");
 			if(!frame.useSingleEaseCurve) ext.warn('Per property custom easing is not supported (at frame '+frame.startFrame+")");
-			if(frame.motionTweenRotateTimes!=0) ext.warn('Auto-rotate tweens are not yet supported (at frame '+frame.startFrame+")");
+			//if(frame.motionTweenRotateTimes!=0) ext.warn('Auto-rotate tweens are not yet supported (at frame '+frame.startFrame+")");
 
 			if(frame.tweenType=="none"){
 				return '0 0 1 0';
@@ -2041,13 +2141,8 @@
 				colorTransform: null,
 				libraryItem:instance.libraryItem
 			});
+			fl.trace("\n_getSymbolInstance: "+instance.libraryItem.name+" - "+instance.loop+" "+settings.frameCount+" "+settings.startFrame+" "+instance.loop);
 			settings.extend(options);
-			if(instance.symbolType=="graphic"){
-				settings.startFrame = instance.firstFrame;
-				if(instance.loop=="single frame"){
-					settings.frameCount = 1;
-				}
-			}
 			var dom = settings.dom;
 			settings.matrix = instance.matrix.concat(settings.matrix);
 			var xml = this._getTimeline(instance.timeline,settings);
@@ -2224,11 +2319,13 @@
 							){
 								var sx=element.matrix.scaleX;
 								var sy=element.matrix.scaleY;
+
 								var feGaussianBlur=<feGaussianBlur id={this._uniqueID('feGaussianBlur')} />;
-								feGaussianBlur.@stdDeviation=[f.blurX*2/sx,f.blurY*2/sy].join(' ');
+								feGaussianBlur.@stdDeviation=[f.blurX/sx,f.blurY/sy].join(' ');
 								feGaussianBlur['@in']=src;
 								feGaussianBlur.@result=src=prefix+'feGaussianBlur';
 								filter.appendChild(feGaussianBlur);
+
 								leftMargin+=f.blurX*4/sx;
 								rightMargin+=f.blurX*4/sx;
 								topMargin+=f.blurY*4/sy;
@@ -2238,6 +2335,41 @@
 						case "dropShadowFilter":
 							break;
 						case "glowFilter":
+
+				  				if(f.color.length==7){
+									var alpha = 1;
+				  				}else{
+					  				var alpha = this.precision(parseInt(f.color.substr(7,9), 16) / 0xFF);
+					  			}
+
+								var sx=element.matrix.scaleX;
+								var sy=element.matrix.scaleY;
+								
+								var feFlood=<feFlood flood-color={f.color.substr(0, 7)} flood-opacity={alpha}/>;
+								filter.appendChild(feFlood);
+								
+								var feComposite=<feComposite in2="SourceAlpha" operator="in"/>;
+								filter.appendChild(feComposite);
+
+								var feGaussianBlur=<feGaussianBlur id={this._uniqueID('feGaussianBlur')} />;
+								feGaussianBlur.@stdDeviation=[f.blurX/sx,f.blurY/sy].join(' ');
+								feGaussianBlur.@result=src=prefix+'feGaussianBlur';
+								filter.appendChild(feGaussianBlur);
+
+								filter.appendChild(  <feComponentTransfer result={prefix+'feComponentTransfer'}>
+										                 <feFuncA type="linear" slope={f.strength/100} intercept="0" />
+										             </feComponentTransfer>   );
+
+								filter.appendChild(  <feMerge>
+										                 <feMergeNode />
+										                 <feMergeNode in="SourceGraphic" />
+										             </feMerge>   );
+
+								leftMargin+=f.blurX*4/sx;
+								rightMargin+=f.blurX*4/sx;
+								topMargin+=f.blurY*4/sy;
+								bottomMargin+=f.blurY*4/sy;
+
 							break;
 						case "gradientBevelFilter":
 							break;
@@ -2413,13 +2545,13 @@
 			var descendantMatrix=new ext.Matrix();
 			var pathMatrix=null;
 			var layerLocked=shape.layer.locked;
-			var id;
+			//var id;
 			if( shape.isRectangleObject || shape.isOvalObject ){ // ! important
-				id=(
-					shape.isRectangleObject?
-					this._uniqueID('rectangleObject'):
-					this._uniqueID('ovalObject')
-				);
+				// id=(
+				// 	shape.isRectangleObject?
+				// 	this._uniqueID('rectangleObject'):
+				// 	this._uniqueID('ovalObject')
+				// );
 				shape.setTransformationPoint({x:0.0,y:0.0});
 				var origin=new ext.Point({
 					x:(shape.objectSpaceBounds.left-shape.objectSpaceBounds.right)/2,
@@ -2435,10 +2567,10 @@
 					});
 				}
 			}else if(shape.isDrawingObject){
-				id=this._uniqueID('drawingObject');
+				// id=this._uniqueID('drawingObject');
 				matrix=matrix.concat(settings.matrix);
 			}else if(shape.isGroup){
-				id=this._uniqueID('group');
+				// id=this._uniqueID('group');
 				descendantMatrix=matrix.invert();
 				/*var c=shape.center;
 				var tr=shape.getTransformationPoint();
@@ -2466,7 +2598,7 @@
 				pathMatrix=pathMatrix.invert();
 				matrix=matrix.concat(settings.matrix);*/
 			}else{
-				id=this._uniqueID('shape');
+				// id=this._uniqueID('shape');
 				matrix.tx=shape.left;
 				matrix.ty=shape.top;
 				matrix=matrix.concat(settings.matrix);
@@ -2677,7 +2809,7 @@
 							dom:dom,
 							timeOffset:settings.timeOffset,
 							frameCount:settings.frameCount,
-							totalDuration:settings.totalDuration,
+							//totalDuration:settings.totalDuration,
 							beginAnimation:settings.beginAnimation
 						}
 					);
@@ -2824,7 +2956,7 @@
 							xform+
 							'fill="none" '+
 							this._getStroke(stroke,{dom:dom})+
-							'd="'+this._getCurve(cp,(contour.orientation && paths.length<2))+'" '+
+							'd="'+this._getCurve(cp,(contour.orientation && paths.length>2)?true:false)+'" '+
 							'/>\n'
 						);
 					}
@@ -2873,11 +3005,13 @@
 				if(!controlPoints[i][0].is(controlPoints[i-1][prevdeg])){
 					m=true;
 					curveString.push(
-						"L"+String(controlPoints[i][0].x)+","+
+						(close?"L":"M")+String(controlPoints[i][0].x)+","+
 						String(controlPoints[i][0].y)+" "
 					);
 				}
-				if(deg!=prevdeg || m){curveString.push(degPrefix[deg]);}
+				if(deg!=prevdeg || m){
+					curveString.push(degPrefix[deg]);
+				}
 				for(var n=1;n<=deg;n++){
 					curveString.push(controlPoints[i][n].x+","+controlPoints[i][n].y+(n==deg?"":" "));
 				}
@@ -3281,7 +3415,7 @@
 					if(this.includeBackground){
 						xml['@enable-background']='new '+String(symbol.@viewBox);
 					}
-					this.expandUse(element,false,inputXML.defs);
+					this.expandUse(element, element,false,false,inputXML.defs);
 					xml.@id=id;
 				}else{
 					xml.@id=element.@id;	
@@ -3295,6 +3429,7 @@
 			return documents;
 		},
 		_uniqueID:function(id,xml){
+			id = id.replace(' ',"_",'g');
 			var invalid=id.match(/[^A-Za-z\d\-\.\:]/g);
 			if(invalid && invalid.length){
 				for(var i=0;i<invalid.length;i++){
@@ -3307,7 +3442,7 @@
 			if(!id ||!id.length){
 				id='g';
 			}
-			var parts=/(^.*[^\d])([\d][\d]*$)?/.exec(id);
+			var parts=/(^.*[^\d])([\d]+$)?/.exec(id);
 			var base = parts?parts[1]:id; // ids that are all numbers won't match
 			var increment=0;
 			if(parts && parts.length>2){
