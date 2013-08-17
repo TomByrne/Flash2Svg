@@ -1,21 +1,5 @@
 (function(ext){
-	/**
-	 * Creates an SVG formatted image.
-	 * @this {extensible.SVG}
-	 * @constructor
-	 * @extends Object
-	 * @extends extensible.Task
-	 * @parameter {Object} options
-	 * @parameter {String} options.file File output URI.
-	 * @parameter {Number} options.decimalPointPrecision Decimals are rounded to this many places.
-	 * @parameter {Boolean} options.expandSymbols If true, symbols are converted to graphic elements for compatibility w/ Illustrator & Webkit browsers.
-	 * @parameter {Boolean} applyTransformations If true, matrices are concatenated and applied to child elements for broader compatibility.
-	 * @parameter {Number} curveDegree Determines whether curves are created as Quadratic (2) or Cubic (3) beziers - Quadratic is faster.
-	 * @parameter {String} maskingType Determines how masks are applied: 'alpha','clipping',or 'luminance'. Clipping mimicks the way flash displays masks.
-	 * @parameter {Boolean} convertTextToOutlines If true, text is converted to outlines.
-	 * @parameter {String} swfPanelName The name of the swfPanel UI.
-	 * @parameter {Boolean} exportSelectedLibraryItems If true, selected library items are exported rather than the stage view.
-	 */
+
 	function SVG(options){
 		fl.outputPanel.clear();
 
@@ -28,6 +12,15 @@
 		this.IDENTITY_MATRIX='matrix(1 0 0 1 0 0)';
 		this.DOCUMENT_DATA='SVGExportOptions';
 		this.MODULO_STAND_IN='.__';
+
+		// Processing states
+		this.STATE_PRE_INIT = 0;
+		this.STATE_ELEMENT_READING = 1;
+		this.STATE_DELETE_EXISTING_FILES = 2;
+		this.STATE_EXPANDING_USE_NODES = 3;
+		this.STATE_FINALISING_FILES = 4;
+		this.STATE_CLEANUP = 5;
+
 		var settings=new ext.Object({
 			file:undefined,
 			decimalPointPrecision:3,
@@ -59,6 +52,7 @@
 			version:'1.1',
 			baseProfile:'basic',
 			log:ext.doc.pathURI.stripExtension()+'.log.csv', // debugging log
+			traceLog:false,
 			source:'current',// 'current', 'libraryItems'
 			output: 'animation',// 'animation', 'images'
 			clipToScalingGrid:false, // only relevant when source=='Selected Library Items'
@@ -125,11 +119,9 @@
 		//this._rootItem={};
 		this._tempFolder=ext.lib.uniqueName('temp'); // Library folder holding temporary symbols.
 		this._ids={}; // Used by uniqueID() for cross-checking IDs.
-		//this._progressMax=0;
-		//this._progress=0;
-		//this._minProgressIncrement=1; // Is later set to this._progressMax/this.MAX_INLINE_CALL_COUNT in order to prevent recursion
 		this._origSelection=new ext.Selection([]);
 		this._delayedProcessing=true;// If true, a timeline is processed one level deep in it's entirety before progressing to descendants.
+		this.currentState=0;
 
 		if(this.startFrame!=undefined){
 			if(
@@ -197,476 +189,90 @@
 		return this;
 	}
 	SVG.prototype={
-		__proto__:ext.Task,
+		__proto__:Object,
 		/**
 		 * @property
 		 * @see extensible.Object
 		 */
 		type:SVG,
-		/**
-		 * Applies transformation matrices recursively given an SVG graphic element.
-		 * @parameter {XML} xml An SVG graphic element or an SVG document. 
-		 */
-		applyMatrices:function(xml,defs,strokeX){
-			strokeX=strokeX||new ext.Matrix();
-			if(typeof xml=='string'){
-				xml=new XML(xml);
-			}
-			defs=defs||xml.defs;
-			var bApplyVertices=true;
-			var transform,mxs,matrix;
-			if(xml.hasOwnProperty('@transform')){
-				transform=String(xml['@transform']);
-				var mxa=transform.match(/matrix\(.*?\)/g);
-				if(mxa && mxa.length){
-					matrix=new ext.Matrix(mxa[0]);
-					transform=transform.replace(/matrix\(.*?\)/g,'');
-				}
-				if(transform.trim()==''){
-					delete xml['@transform'];
-				}else{
-					xml['@transform']=transform;
-				}
-			}
-			if(!matrix){
-				matrix=new ext.Matrix();
-				mxa=[this._getMatrix(matrix)];
-			}
-			var id=String(xml['@id']);
-			var reStrokeX=/^group|drawingObject|rectangleObject|ovalObject|path/;
-			if(reStrokeX.test(id)){
-				strokeX.concat(matrix.invert());
-			}else{
-				strokeX=new ext.Matrix();
-			}
-			if(xml.hasOwnProperty('@filter') && matrix){
-				this._transformFilter(matrix,xml,defs);
-			}	
-			
-			for each(var child in (xml.defs.symbol.*+xml.*)){
-				var childName=String(child.localName());
-				var cid=child.hasOwnProperty('@id')?String(child['@id']):'';
-				var cmx=undefined;
-				var tr= String(child['@transform']);
-				var nmx;
-				var nmxString;
-				if(tr){
-					tr=String(tr);
-					var cmxa=/matrix\(.*?\)/.exec(tr);
-					if(cmxa && cmxa.length){
-						cmx=new ext.Matrix(cmxa[0]);
-						nmx=cmx.concat(matrix);
-						nmxString=this._getMatrix(nmx);
-						tr=tr.replace(cmxa[0],nmxString);
-					}else{
-						tr=mxa[0]+' '+tr;
-						nmxString=mxa[0];
-						nmx=matrix;
-					}
-					if(tr==this.IDENTITY_MATRIX){
-						delete child['@transform'];
-					}else{
-						child['@transform']=tr;
-					}
-				}else{
-					nmx=matrix;
-					nmxString=mxa[0];
-					if(nmxString!=this.IDENTITY_MATRIX){
-						child['@transform']=nmxString;
-					}
-				}				
-				if(child.hasOwnProperty('@filter') && child.localName()!='g'){
-					this._transformFilter(nmx,child,defs);
-				}
-				if(bApplyVertices){
-					var gradientAttr=['stroke','fill'];
-					for(var i=0;i<gradientAttr.length;i++){
-						var attrString=child['@'+gradientAttr[i]];
-						var gradientID=undefined;
-						if(attrString){
-							attrString=String(attrString);
-							var ida=attrString.match(/(?:url\(#)(.*?)(?:\))/);
-							if(ida && ida.length>1){
-								gradientID=ida[1];
-							}
-						}
-						if(gradientID!==undefined){
-							var gradient=defs.*.(@id==gradientID);
-							if(gradient && gradient.length()){
-								gradient=gradient[0].copy();
-								gradientID=this._uniqueID(String(gradient.@id));
-								gradient.@id=gradientID;
-								child['@'+gradientAttr[i]]='url(#'+gradientID+')';
-								defs.appendChild(gradient);
-								if(gradient.localName()=='radialGradient'){
-									var gtr=gradient['@gradientTransform'];
-									if(gtr){
-										gtr=String(gtr);
-										var cmxa=/matrix\(.*?\)/.exec(gtr);
-										if(cmxa && cmxa.length){
-											var cmx=new ext.Matrix(cmxa[0]);
-										}else{
-											cmx=new ext.Matrix();
-										}
-									}else{
-										cmx=new ext.Matrix();
-									}
-									var gmx=cmx.concat(nmx);
-									var fp=new ext.Point({
-										x:Number(gradient['@fx']),
-										y:Number(gradient['@fy'])
-									});
-									var cp=new ext.Point({
-										x:Number(gradient['@cx']),
-										y:Number(gradient['@cy'])
-									});
-									var rp=new ext.Point({
-										x:cp.x+Number(gradient['@r']),
-										y:cp.y
-									});
-									var mx=new ext.Matrix({
-										a:gmx.scaleX,
-										b:0,
-										c:0,
-										d:gmx.scaleX,
-										tx:gmx.tx,
-										ty:gmx.ty
-									});
-									fp=fp.transform(mx).roundTo(this.decimalPointPrecision);
-									cp=cp.transform(mx).roundTo(this.decimalPointPrecision);
-									rp=rp.transform(mx).roundTo(this.decimalPointPrecision);
-									gmx=mx.invert().concat(gmx).roundTo(this.decimalPointPrecision);
-									gradient['@r']=String(Math.roundTo(cp.distanceTo(rp),this.decimalPointPrecision));
-									gradient['@cx']=String(cp.x);
-									gradient['@cy']=String(cp.y);
-									gradient['@fx']=String(fp.x);
-									gradient['@fy']=String(fp.y);
-									var gmxString=this._getMatrix(gmx);
-									if(gtr){
-										gtr=gtr.replace(cmxa[0],gmxString);
-									}else{
-										gtr=gmxString;
-									}
-									gradient['@gradientTransform']=gtr;
-								}else if(gradient.localName()=='linearGradient'){
-									var p1=new ext.Point({
-										x:Number(gradient['@x1']),
-										y:Number(gradient['@y1'])
-									});
-									var p2=new ext.Point({
-										x:Number(gradient['@x2']),
-										y:Number(gradient['@y2'])
-									});
-									p1=p1.transform(nmx).roundTo(this.decimalPointPrecision);
-									p2=p2.transform(nmx).roundTo(this.decimalPointPrecision);
-									gradient['@x1']=String(p1.x);
-									gradient['@y1']=String(p1.y);
-									gradient['@x2']=String(p2.x);
-									gradient['@y2']=String(p2.y);
-								}else if(gradient.localName()=='pattern'){
-									var ptr=gradient.@patternTransform;
-									if(ptr){
-										ptr=String(ptr);
-										var pmxa=/matrix\(.*?\)/.exec(ptr);
-										if(pmxa && pmxa.length){
-											var pmx=new ext.Matrix(pmxa[0]);
-										}else{
-											pmx=new ext.Matrix();
-										}
-									}else{
-										pmx=new ext.Matrix();
-									}
-									gradient.@patternTransform=this._getMatrix(pmx.concat(nmx));
-								}
-							}
-						}
-					}
-					if(child.hasOwnProperty('@d')){
-						var curveData=child['@d'];
-						var points=curveData.match(/[A-Ya-y]?[\d\.\-]*[\d\.\-][\s\,]*[\d\.\-]*[\d\.\-][Zz]?/g);
-						if(points && points.length){
-							var newPoints=new ext.Array([]);
-							for(var i=0;i<points.length;i++){
-								if(points[i].trim()==''){continue;}
-								var point=new ext.Point(points[i]);
-								point=point.transform(nmx).roundTo(this.decimalPointPrecision);
-								var pointString=String(point.x)+','+String(point.y);
-								var prefix=/^[A-Za-z]/.exec(points[i]);
-								if(prefix){
-									pointString=prefix[0]+pointString;
-								}
-								var suffix=/[A-Za-z]$/.exec(points[i]);
-								if(suffix){
-									pointString=pointString+suffix[0];
-								}
-								newPoints.push(pointString);							
-							}
-							child['@d']=newPoints.join(' ');
-							child['@transform']=String(child['@transform']).replace(nmxString,'');
-							if(String(child['@transform']).trim()==''){
-								delete child['@transform'];
-							}
-						}
-					}
-					if(child.hasOwnProperty('@stroke')){
-						var strokeW = String(child['@stroke-width']);
-						if(strokeW)strokeW = Number(strokeW);
-						else strokeW = 1;
 
-						var strokeScale=cmx?nmx.concat(strokeX.concat(cmx.invert())):nmx.concat(strokeX);
-						var scaleMult = ((strokeScale.scaleX+strokeScale.scaleY)/2);
-						if(scaleMult!=1){
-							child['@stroke-width'] = Math.roundTo(strokeW*scaleMult,this.decimalPointPrecision);
-						}
-					}
-					
-				}
-				if(child.* && child.*.length() && childName!='defs'){
-					this.applyMatrices(child,defs,strokeX?(cmx?strokeX.concat(cmx.invert()):strokeX):undefined);
-				}
-			}
-			return xml;
-		},
-		_applyColorEffects:function(xml,defs,colorX){
-			var name=xml.localName();
-			if( name=='filter' || /Gradient/.test(name) || /Color/.test(name)){
-				return;	
-			}
-			if(name=='mask' && xml..use.length()>0){
-				this.expandUse( xml, xml,false,true,defs );
-			}
-			var filter,newFilter;
-			var color=colorX;
-			if(xml.hasOwnProperty('@filter')){
-				var filterID=String(xml.@filter).match(/(?:url\(#)(.*?)(?:\))/);
-				if(filterID && filterID.length>1){
-					filter=defs.filter.(@id==filterID[1]);
-					if(filter){
-						if(filter.length()){
-							filter=filter[0];
-							color=this._colorFromEffect(filter);
-							if(color){
-								var n=0;
-								if(!color.amount.is([0,0,0,0])){
-									n+=1;
-								}
-								if(!color.percent.is([100,100,100,100])){
-									n+=1;
-								}
-								if(filter.*.length()<=n){
-									delete xml.@filter;
-								}else{
-									newFilter=filter.copy();
-									var newFilterID=this._uniqueID(String(newFilter.@id));
-									newFilter.@id=newFilterID;
-									xml.@filter="url(#"+newFilterID+")";
-									if(!color.amount.is([0,0,0,0])){
-										delete newFilter.feComponentTransfer.(@result=='colorEffect_amount');
-									}
-									if(!color.percent.is([100,100,100,100])){
-										delete newFilter.feColorMatrix.(@result=='colorEffect_percent');
-									}
-									defs.appendChild(newFilter);
-									filter=newFilter;
-								}
-							}
-						}else{
-							delete xml.@filter;
-						}
-					}
-				}
-			}
-			if(color){
-				var painted=false;
-				var paintProperties=[
-					'fill',
-					'stroke'
-				];
-				for(var i=0;i<paintProperties.length;i++){
-					if(xml.hasOwnProperty('@'+paintProperties[i])){
-						painted=true;
-						var paintStr=String(xml['@'+paintProperties[i]]);
-						var paintID=paintStr.match(/(?:url\(#)(.*?)(?:\))/);
-						if(paintID && paintID.length>1){
-							paintID=paintID[1];
-							var paint=defs.*.(@id==paintID);
-							if(paint && paint.length()){
-								for each(var stop in paint[0].stop){
-									var stopColor=new ext.Color(
-										String(stop['@stop-color'])
-									);
-									if(stop.hasOwnProperty('@stop-opacity')){
-										stopColor.amount[3]=Number(stop['@stop-opacity'])*255;
-									}else{
-										stopColor.amount[3]=255;
-									}
-									var newColor=color.transform(stopColor);
-									stop['@stop-color']=newColor.hex;
-									stop['@stop-opacity']=newColor.opacity;
-								}
-							}
-						}else if(paintStr[0]=='#'){
-							var newColor=new ext.Color(paintStr);
-							if(xml.hasOwnProperty('@'+paintProperties[i]+'-opacity')){
-								newColor.amount[3]=Number(xml['@'+paintProperties[i]+'-opacity'])*255;
-							}else{
-								newColor.amount[3]=255;
-							}
-							newColor=color.transform(newColor);
-							xml['@'+paintProperties[i]]=newColor.hex;
-							xml['@'+paintProperties[i]+'-opacity']=newColor.opacity;
-						}
-					}
-				}
-				if(
-					!painted &&
-					xml.*.length()==(
-						xml.animate?xml.animate.length():0+
-						xml.animateMotion?xml.animateMotion.length():0+
-						xml.animateColor?xml.animateColor.length():0+
-						xml.animateTransform?xml.animateTransform.length():0
-					)
-				){
-					var f=this._getFilters(
-						null,{color:color},defs
-					);
-					
-					if(xml.hasOwnProperty('@filter') && filter){
-						for each(var fe in defs.filter.(@id==f).*){
-							filter.appendChild(fe);	
-						}
-					}else{
-						xml.@filter='url(#'+f+')';	
-					}
-				}
-			}
-			for each(var element in xml.*){
-				this._applyColorEffects(element,defs,color);
-			}
-		},
-		_colorFromEffect:function(filter){
-			var feAmount=filter.feComponentTransfer.(@result=='colorEffect_amount');
-			var fePercent=filter.feColorMatrix.(@result=='colorEffect_percent');
-			if(!(feAmount.length() || fePercent.length())){
-				return;
-			}
-			var color=new ext.Color([0,0,0,0]);
-			var n=0;
-			if(feAmount.length()){
-				n+=1;
-				feAmount=feAmount[feAmount.length()-1];
-				if(feAmount.feFuncR.length()){
-					if(feAmount.feFuncR.hasOwnProperty('@intercept')){
-						color.amount[0]=Number(feAmount.feFuncR.@intercept)*255;
-					}
-				}
-				if(feAmount.feFuncG.length()){
-					if(feAmount.feFuncG.hasOwnProperty('@intercept')){
-						color.amount[1]=Number(feAmount.feFuncG.@intercept)*255;
-					}
-				}
-				if(feAmount.feFuncB.length()){
-					if(feAmount.feFuncB.hasOwnProperty('@intercept')){
-						color.amount[2]=Number(feAmount.feFuncB.@intercept)*255;
-					}
-				}
-				if(feAmount.feFuncA.length()){
-					if(feAmount.feFuncA.hasOwnProperty('@intercept')){
-						color.amount[3]=Number(feAmount.feFuncA.@intercept)*255;
-					}
-				}
-			}
-			if(fePercent.length()){
-				n+=1;
-				fePercent=fePercent[fePercent.length()-1];
-				var values=String(fePercent.@values).match(/[\d\.\-]*\d/g);
-				if(values.length>16){
-					color.percent[0]=values[0]*100;
-					color.percent[1]=values[6]*100;
-					color.percent[2]=values[12]*100;
-					color.percent[3]=values[18]*100;
-				}
-			}
-			return color;
-		},
-		_transformFilter:function(matrix,element,defs){
-			defs=defs||element.defs;
-			if(!defs){
-				return;
-			}
-			var sx=matrix.scaleX;
-			var sy=matrix.scaleY;
-			if(sx==1 && sy==1)return;
 
-			if(element.hasOwnProperty('@filter')){
-				var filterID=String(
-					element.@filter
-				).match(
-					/(?:url\(#)(.*?)(?:\))/
-				);
-				if(
-					filterID &&
-					filterID.length>1
-				){
-					var filter=defs.filter.(@id==filterID[1]);
-					if(filter && filter.length()){
-						for each(var primitive in filter[0].*){
-							switch(primitive.localName()){
-								case "feGaussianBlur":
-									var blur=new ext.Point(String(primitive.@stdDeviation));
-									primitive.@stdDeviation=[
-										blur.x*sx,
-										blur.y*sy
-									].join(' ');
-									break;
-							}
-						}
-						if(sx!=1){
-							var x=parseFloat(filter.@x);
-							var width=parseFloat(filter.@width);
-							filter.@x=String(x/(1-sx))+'%';
-							filter.@width=String(100+(width-100)/(1-sx))+'%';
-						}
-						if(sy!=1){
-							var y=parseFloat(filter.@y);
-							var height=parseFloat(filter.@height);
-							filter.@y=String(y/(1-sy))+'%';
-							filter.@height=String(100+(height-100)/(1-sy))+'%';
-						}
-					}							
-				}
-			}
-		},
+
+
 		/**
 		 * Begins processing. 
-		 * @see extensible.Task
+		 * 
 		 */
 		begin:function(){
 			this.qData = [];
-			fl.showIdleMessage(false);
-			if(this.que && this.que.isPaused){
-				this.que.resumeCmd='begin';
-				return;
+			this.doState();
+		},
+		/**
+		 * This method processes data incrementally, providing the
+		 * opportunity for the swfPanel and/or que to update progress or interupt processing if necessary.		 * 
+		 * 
+		 */
+		process:function(){
+			if(this.qData.length>0){
+				var endTime = (new Date()).getTime()+(1000/30);
+				while(
+					this.qData.length && ( new Date()).getTime()<endTime ){
+					var nextCall = this.qData.shift();
+					nextCall();
+					
+					if(!this.swfPanel){ break; }				
+				}
+			}else{
+				try{
+					return this.nextState();
+				}catch(e){
+					ext.trace(e);
+				}
 			}
+			return true;
+		},
+		/**
+		 * Moves process to next state processing.
+		 */
+		nextState:function(){
+			this.currentState++;
+			this.doState();
+		},
+		doState:function(){
+			switch(this.currentState){
+				case this.STATE_PRE_INIT:
+					this.qData.push(closure(this.doInit, [], this));
+					break;
+				case this.STATE_DELETE_EXISTING_FILES:
+					this.qData.push(closure(this.deleteExistingFiles, [], this));
+					break;
+				case this.STATE_DELETE_EXISTING_FILES:
+					this.qData.push(closure(this.deleteExistingFiles, [], this));
+					break;
+				case this.STATE_EXPANDING_USE_NODES:
+					this.qData.push(closure(this.processExpandUseNodes, [], this));
+					break;
+				case this.STATE_FINALISING_FILES:
+					this.qData.push(closure(this.processFinaliseFiles, [], this));
+					break;
+				case this.STATE_CLEANUP:
+					this.qData.push(closure(this.processCleanup, [], this));
+					break;
+				default:
+					// done all
+					return true;
+			}
+
+			return false;
+		},
+		doInit:function(){
+			fl.showIdleMessage(false);
 			if(this.log && typeof(this.log)=='string'){
 				ext.startLog({url:this.log});
 				this._timer=ext.log.startTimer('extensible.SVG()');
 				var timer=ext.log.startTimer('extensible.SVG.begin()');
 			}
 			var i,n;
-			/*if(this.swfPanel){
-				for(i=0;i<this.timelines.length;i++){
-					var timeline = this.timelines[i];
-					for(n=0;n<timeline.frames.length;n++){
-						this._progressMax+=this._getProgressIncrements(
-							timeline.timeline,
-							n,
-							true
-						);
-					}
-				}
-				this._minProgressIncrement=this._progressMax/this.MAX_INLINE_CALL_COUNT;
-			}*/
 			this._origSelection=ext.sel;
 			ext.doc.selectNone(); // selection slows performance & can cause crashes
 			this.doms = [];
@@ -709,20 +315,13 @@
 			if(ext.log){
 				ext.log.pauseTimer(timer);	
 			}
-			this.process();
 		},
-		/**
-		 * Ends processing.
-		 * @see extensible.Task
+		/*
+		 * If the target is a file and needs to be a folder, delete it first,
+		 * and vice-versa.
 		 */
-		end:function(){
-			fl.trace("end");
-			var success=true;
+		deleteExistingFiles:function(){
 			var fileExists=FLfile.exists(this.file);
-			/*
-			 * If the target is a file and needs to be a folder, delete it first,
-			 * and vice-versa.
-			 */
 			if(
 				this.file && 
 				fileExists && (
@@ -750,46 +349,120 @@
 				FLfile.remove(this.file);
 				fileExists=false;
 			}
-			var writeSuccess=true;
 
+			if(this.frames.length==1 || this.animated){
+
+				if(this.file && fileExists){
+					success = FLfile.remove(this.file);
+				}
+			}else{
+
+				if(this.file && !fileExists){
+					if(!FLfile.createFolder(this.file))
+						throw new Error('Problem creating folder.');
+				}
+			}
+		},
+		processExpandUseNodes:function(){
+			if(this.expandSymbols=="none")return;
+
+
+			var onceUsed = this.expandSymbols=='usedOnce';
+			for(var i=0; i<this.doms.length; ++i){
+				var dom = this.doms[i];
+				this.qData.push(closure(this.checkExpand, [dom, dom.defs, dom, onceUsed, this.expandSymbols=="nested"], this));
+			}
+			// for(var i=0; i<this.doms.length; ++i){
+			// 	var dom = this.doms[i];
+
+			// 	if(this.expandSymbols && this.expandSymbols!='none'){ // expand symbol instances
+			// 		var time = (new Date()).getTime();
+			// 		ext.trace("this.expandSymbols: "+this.expandSymbols);
+			// 		if(this.expandSymbols=='usedOnce'){
+			// 			this.expandUseNow(dom, dom, true);
+			// 		}else if(this.expandSymbols=='nested'){
+			// 			this.expandUseNow(dom, dom.defs, false,'nested', dom.defs);
+			// 		}else{
+			// 			this.expandUseNow(dom, dom, false);
+			// 		}
+			// 	}
+			// }
+		},
+		checkExpand:function(element, defs, root, onceUsed, nested){
+			//fl.trace("checkExpand:"+element.localName()+" "+element.@id+" "+element.childIndex());
+			var id;
+			if(element.localName()=="use" && (id = element['@xlink-href'])){
+				var allUseNodes = root..use;
+				var useList = [];
+				for(var i=0; i<allUseNodes.length(); i++){
+					var node = allUseNodes[i];
+					if(node['@xlink-href']==id){
+						useList.push(node);
+					}
+				}
+
+				//fl.trace("Ex: "+id+" "+useList.length);
+				var symbol=defs.symbol.("#"+@id==id);
+				if(symbol && symbol.length() && (!nested || (symbol[0]..use && symbol[0]..use.length()))
+					&& (!onceUsed || useList.length==1)){
+
+					this.executeExpandUse(id, symbol, useList, defs);
+
+					if(isNaN(element.childIndex())){
+						// symbol was swapped in for use node
+						element = symbol;
+						fl.trace("switch: "+element.localName());
+					}
+					fl.trace("Ex: "+id+" "+element.childIndex());
+				}
+
+			}
+
+			var children = element.children();
+			if(children.length()){
+				// goto first child
+				fl.trace("\tChild: "+element.localName()+" "+children[0].localName()+" "+children[0].@id);
+				this.qData.unshift(closure(this.checkExpand, [children[0], defs, root, onceUsed, nested], this));
+				return;
+			}
+
+			if(!element.parent())return; // empty root?
+
+			var siblings = element.parent().children();
+			var index = element.childIndex();
+			//fl.trace("> "+element.parent().localName()+" "+element.localName()+" "+index+" "+index);
+			while(index==siblings.length()-1){
+				element = element.parent();
+				if(!element.parent() || element==root)return; // finished
+
+				fl.trace("\t\tUp:"+element.@id+" "+element.parent().@id+" "+index+" "+siblings.length());
+				siblings = element.parent().children();
+				index = element.childIndex();
+
+			}
+			// goto next sibling (of self or first ancestor with a next sibling)
+			fl.trace("\tNext:"+element.localName()+" "+element.@id+" "+siblings[index+1].localName()+" "+siblings[index+1].@id+" "+index+" "+siblings.length()+" "+(element==siblings[index+1])+" "+(element==siblings[index]));
+			this.qData.unshift(closure(this.checkExpand, [siblings[index+1], defs, root, onceUsed, nested], this));
+		},
+		processFinaliseFiles:function(){
 			for(var k=0; k<this.timelines.length;k++){
 				var timeline = this.timelines[k];
 				var dom = this.doms[k];
 				if(this.frames.length==1 || this.animated){
 					documents = [dom];
-
-					if(this.file && fileExists){
-						success = FLfile.remove(this.file);
-					}
 				}else{
 					documents = this._splitXML(dom);
-
-					if(this.file && !fileExists){
-						if(!FLfile.createFolder(this.file))
-							throw new Error('Problem creating folder.');
-					}
 				}
 				for(var i=0;i<documents.length;i++){
 					var document = documents[i];
 
-					if(this.expandSymbols && this.expandSymbols!='none'){ // expand symbol instances
-						var time = (new Date()).getTime();
-						fl.trace("this.expandSymbols: "+this.expandSymbols);
-						if(this.expandSymbols=='usedOnce'){
-							this.expandUse(document, document, true);
-						}else if(this.expandSymbols=='nested'){
-							this.expandUse(document, document.defs, false,'nested',document.defs);
-						}else{
-							this.expandUse(document, document, false);
-						}
-					}
-					fl.trace("this.applyTransformations: "+this.applyTransformations);
+					ext.trace("this.applyTransformations: "+this.applyTransformations);
 					if(this.applyTransformations){
 						this.applyMatrices(document);
 					}
-					fl.trace("this._applyColorEffects: ");
+					ext.trace("this._applyColorEffects: ");
 					this._applyColorEffects(document,document.defs);
-					fl.trace("this.deleteUnusedReferences: ");
+					ext.trace("this.deleteUnusedReferences: ");
 					this.deleteUnusedReferences(document);
 					document['@xmlns']="http://www.w3.org/2000/svg";
 
@@ -862,6 +535,8 @@
 					}
 				}
 			}
+		},
+		processCleanup:function(){
 			fl.showIdleMessage(true);
 			if(this.log){
 				ext.stopLog();
@@ -877,10 +552,9 @@
 			if(this.swfPanel){
 				epSuccess=this.swfPanel.call('endProgress');	
 			}
-			if(writeSuccess && epSuccess){
+			if(epSuccess){
 				ext.message('Export Successful: '+this.file);
 			}
-			return(writeSuccess && epSuccess && this.que.next());
 		},
 		/**
 		 * Expands symbol instances ( use tags ).
@@ -888,7 +562,7 @@
 		 * @parameter {Boolean} recursive
 		 * @parameter {XML} defs
 		 */
-		expandUse:function( xml, within, onlyOnceUsed, recursive, defs ){
+		expandUseNow:function( xml, within, onlyOnceUsed, recursive, defs ){
 			defs = defs||xml.defs;
 			if(recursive==undefined){
 				recursive=true;
@@ -914,15 +588,8 @@
 			for(var id in useNodes){
 
 				var symbol=defs.symbol.(@id==id);
-				if(
-					!symbol || 
-					!symbol.length() || (
-						recursive=='nested' && !(
-							symbol[0]..use && 
-							symbol[0]..use.length()
-						)
-					)
-				){
+
+				if(!symbol || !symbol.length() || (recursive=='nested' && !(symbol[0]..use && symbol[0]..use.length()))){
 					continue;
 				}
 				symbol=symbol[0].copy();
@@ -931,10 +598,38 @@
 					continue;
 				}
 
-				for(var i=0; i<useList.length; ++i){
-					var useNode = useList[i];
+				this.executeExpandUse(id, symbol, useList, defs);
+			}
+			if( rootIsUse && recursive ){
+				this.expandUseNow( xml, within, onlyOnceUsed, recursive, defs );
+			}
+			return xml;
+		},
+		executeExpandUse:function(id, symbol, useList, defs){
+
+			var doRemove =  true;
+			for(var i=0; i<useList.length; ++i){
+				var useNode = useList[i];
+				if(i==0 && useList.length==1){
+					fl.trace("move: "+id);
+					delete symbol.parent().children()[symbol.childIndex()];
+					useNode.parent().insertChildAfter(useNode, symbol);
+					symbol.setName('g');
+					if(useNode.@id)symbol.@id = useNode.@id;
+
+					// if(useNode.@width)symbol.@width = useNode.@width;
+					// if(useNode.@height)symbol.@height = useNode.@height;
+					// if(useNode.@x)symbol.@x = useNode.@x;
+					// if(useNode.@y)symbol.@id = useNode.@y;
+
+					if(useNode.@transform && useNode.@transform!=this.IDENTITY_MATRIX)symbol.@transform = useNode.@transform;
+					delete useNode.parent().children()[useNode.childIndex()];
+
+					doRemove = false;
+				}else{
+					var symCopy = symbol[0].copy();
 					useNode.setName('g');
-					for each(var child in symbol.*){
+					for each(var child in symCopy.*){
 						useNode.appendChild(child);
 					}
 					useNode['@id']=this._uniqueID(String(symbol['@id'])+'_1');
@@ -949,6 +644,7 @@
 					for each(var node in useNode..*){
 						if(node.hasOwnProperty('@id') && node.localName()!='mask'){
 							node.@id=this._uniqueID(String(node.@id));
+							fl.trace("update id: "+node.@id);
 						}
 						if(node.hasOwnProperty('@mask')){
 							var oldID=String(node.@mask).match(/(?:url\(#)(.*?)(?:\))/);
@@ -977,12 +673,10 @@
 							}
 						}
 					}
+					fl.trace("expand: "+id);
 				}
 			}
-			if( rootIsUse && recursive ){
-				this.expandUse( xml, within, onlyOnceUsed, recursive, defs );
-			}
-			return xml;
+			if(doRemove)delete symbol.parent().children()[symbol.childIndex()];
 		},
 		/**
 		 * Deletes unreferenced defs.
@@ -1077,151 +771,29 @@
 			}
 			return xml;
 		},
-		/**
-		 * Inherited from extensible.Task, this method processes data incrementally, providing the
-		 * opportunity for the swfPanel and/or que to update progress or interupt processing if necessary.		 * 
-		 * @see extensible.Task
-		 */
-		process:function(){
-			if(this.que && this.que.isPaused){
-				this.que.resumeCmd='process';
-				return true;
-			}
-			if(this.qData.length>0){
-				/*if(this.swfPanel){
-					var progressGoal = this._progress+this._minProgressIncrement;
-				}*/
-				var endTime = (new Date()).getTime()+(1000/30);
-				while(
-					this.qData.length
-					//&& ( !this.swfPanel || this._progress<progressGoal )
-					&& ( !this.swfPanel || (new Date()).getTime()<endTime )
-				){
-					var args=this.qData.shift();
-					var id = args.id;
-					var elementXML=this._getElement(args.element,args.settings);
-					if(elementXML){
-						
-						var list = args.dom..g.(@id==id);
-						if(list.length()==1){
-							var node = list[0];
-							var parent = node.parent();
-							for(var i=0; i<node.attributes().length(); i++){
-								var attr = node.attributes()[i];
-								elementXML.@[attr.name()] = attr.toXMLString();
-							}
-							for(var i=0; i<node.children().length(); i++){
-								var child = node.children()[i];
-								elementXML.appendChild(child);
-							}
-							parent.insertChildBefore(node, elementXML);
-							delete parent.children()[node.childIndex()];
-						}else{
-							ext.warn("Error: multiple items with the same id found ("+id+")");
-						}
-					}
-					
-					if(!this.swfPanel){ break; }				
-				}
-				if(this.swfPanel){
-					/*var success=Boolean(
-						this.swfPanel.call.attempt(
-							this.swfPanel,
-							[ 'setProgress', this._progress, this._progressMax ],
-							this.MAX_INLINE_CALL_COUNT
-						)=='true'
-					);
-					if(!success){
-						ext.warn('Problem communicating with swfPanel.');
-						return this.que.process();
-					}*/
-				}else{
-					return this.que.process();
-				}
-			}else{
-				try{
-					return this.end();
-				}catch(e){
-					fl.trace(e);
-					return this.que.next();
-				}
-			}
-			return true;
-		},
-		/**
-		 * Retrieves an arbitrary measurement of the time an element
-		 * will take to translate, used for passing progress to the swfPanel.
-		 * @parameter {extensible.Element} element
-		 * @parameter {Number} frame
-		 * @parameter {Boolean} recursive
-		 */
-		/*_getProgressIncrements:function(element,frame,recursive){
-			if(typeof(frame)!='number'){frame=0;}
 
-			var BREAK_TWEEN_VALUE=10;
-			var BREAK_TEXT_VALUE=20;
-			var ELEMENT_VALUE=5;
-			var timeline;
-			var increments;
-			if(element instanceof Timeline){
-				timeline=new ext.Timeline(element);
-			}else if(element instanceof ext.Timeline){
-				timeline=element;
-			}else{
-				if(element instanceof ext.SymbolInstance){
-					var frame=element.getCurrentFrame(frame);
-					var increments=this._getProgressIncrements(
-						element.timeline,
-						frame,
-						recursive
-					);
-					return increments;
+		processElement:function(id, element, settings, dom){
+			var elementXML=this._getElement(element,settings);
+			if(elementXML){
+				var list = dom..g.(@id==id);
+				if(list.length()==1){
+					var node = list[0];
+					var parent = node.parent();
+					for(var i=0; i<node.attributes().length(); i++){
+						var attr = node.attributes()[i];
+						elementXML.@[attr.name()] = attr.toXMLString();
+					}
+					for(var i=0; i<node.children().length(); i++){
+						var child = node.children()[i];
+						elementXML.appendChild(child);
+					}
+					parent.insertChildBefore(node, elementXML);
+					delete parent.children()[node.childIndex()];
 				}else{
-					if(element instanceof ext.Shape){
-						return  ELEMENT_VALUE+element.numCubicSegments;
-					}else if(element instanceof ext.Text || element instanceof ext.TLFText){
-						return  ELEMENT_VALUE+BREAK_TEXT_VALUE;
-					}else{
-						return  ELEMENT_VALUE;
-					}
+					ext.warn("Error: multiple items with the same id found ("+id+")");
 				}
-			}
-			if(ext.log){
-				var timer=ext.log.startTimer('extensible.SVG.getProgressIncrements()');
-			}
-			if(!timeline.cache.progressIncrements){
-				timeline.cache.progressIncrements=[];	
-			}
-			if(timeline.cache.progressIncrements[frame]){
-				return timeline.cache.progressIncrements[frame];
-			}
-			var frames=timeline.getFrames({
-				position:frame,
-				includeHiddenLayers:this.includeHiddenLayers,
-				includeGuides:this.includeGuides
-			});			
-			increments=ELEMENT_VALUE;
-			for(var k=0;k<frames.length;k++){
-				if(frames[k].tweenType!=='none'){
-					increments+=BREAK_TWEEN_VALUE*frames[k].duration;
-				}
-				if(recursive){
-					var elements=frames[k].elements.expandGroups();
-					for(var i=0;i<elements.length;i++){
-						increments+=this._getProgressIncrements(
-							elements[i],
-							frame,
-							true
-						);
-					}
-				}
-			}
-			timeline.cache.progressIncrements[frame]=increments;
-			if(ext.log){
-				ext.log.pauseTimer(timer);
-			}
-			return increments;
-		},*/
+			}	
+		},
 		/**
 		 * Retrieves the svg data corresponding to a DOM Element.
 		 * @parameter {extensible.Element} element
@@ -1477,7 +1049,7 @@
 				}
 				this._symbolBounds[symbolIDString] = boundingBox;
 			}
-			fl.trace("getTimeline: "+settings.startFrame+" "+settings.endFrame+" "+settings.frameCount+" "+isNew);
+			ext.trace("getTimeline: "+settings.startFrame+" "+settings.endFrame+" "+settings.frameCount+" "+isNew);
 			var instanceID=this._uniqueID(id);	
 			xml=new XML('<use xlink-href="#'+id+'" id="'+instanceID+'" />');
 			if(isNew){
@@ -1657,12 +1229,7 @@
 
 							if(this._delayedProcessing){
 								var elementXML=new XML('<g id="'+elementID+'"></g>');
-								this.qData.push({
-									dom:dom,
-									id:elementID,
-									element:element,
-									settings:elemSettings
-								});
+								this.qData.push(closure(this.processElement, [elementID, element, elemSettings, dom], this));
 							}else{
 								var elementXML=this._getElement(
 									element,elemSettings
@@ -2141,7 +1708,7 @@
 				colorTransform: null,
 				libraryItem:instance.libraryItem
 			});
-			fl.trace("\n_getSymbolInstance: "+instance.libraryItem.name+" - "+instance.loop+" "+settings.frameCount+" "+settings.startFrame+" "+instance.loop);
+			ext.trace("\n_getSymbolInstance: "+instance.libraryItem.name+" - "+instance.loop+" "+settings.frameCount+" "+settings.startFrame+" "+instance.loop);
 			settings.extend(options);
 			var dom = settings.dom;
 			settings.matrix = instance.matrix.concat(settings.matrix);
@@ -3415,7 +2982,7 @@
 					if(this.includeBackground){
 						xml['@enable-background']='new '+String(symbol.@viewBox);
 					}
-					this.expandUse(element, element,false,false,inputXML.defs);
+					this.expandUseNow(element, element,false,false,inputXML.defs);
 					xml.@id=id;
 				}else{
 					xml.@id=element.@id;	
@@ -3458,10 +3025,456 @@
 		},
 		precision:function(num){
 			return Math.roundTo(num,this.decimalPointPrecision);
-		}/*,
-		toString:function(){
-			return this.docString+this.xml.toXMLString().replace(/(\<[^\>]*?)xlink\-(.*?)=/g,'$1xlink:$2=');
-		}*/
+		},
+		/**
+		 * Applies transformation matrices recursively given an SVG graphic element.
+		 * @parameter {XML} xml An SVG graphic element or an SVG document. 
+		 */
+		applyMatrices:function(xml,defs,strokeX){
+			strokeX=strokeX||new ext.Matrix();
+			if(typeof xml=='string'){
+				xml=new XML(xml);
+			}
+			defs=defs||xml.defs;
+			var bApplyVertices=true;
+			var transform,mxs,matrix;
+			if(xml.hasOwnProperty('@transform')){
+				transform=String(xml['@transform']);
+				var mxa=transform.match(/matrix\(.*?\)/g);
+				if(mxa && mxa.length){
+					matrix=new ext.Matrix(mxa[0]);
+					transform=transform.replace(/matrix\(.*?\)/g,'');
+				}
+				if(transform.trim()==''){
+					delete xml['@transform'];
+				}else{
+					xml['@transform']=transform;
+				}
+			}
+			if(!matrix){
+				matrix=new ext.Matrix();
+				mxa=[this._getMatrix(matrix)];
+			}
+			var id=String(xml['@id']);
+			var reStrokeX=/^group|drawingObject|rectangleObject|ovalObject|path/;
+			if(reStrokeX.test(id)){
+				strokeX.concat(matrix.invert());
+			}else{
+				strokeX=new ext.Matrix();
+			}
+			if(xml.hasOwnProperty('@filter') && matrix){
+				this._transformFilter(matrix,xml,defs);
+			}	
+			
+			for each(var child in (xml.defs.symbol.*+xml.*)){
+				var childName=String(child.localName());
+				var cid=child.hasOwnProperty('@id')?String(child['@id']):'';
+				var cmx=undefined;
+				var tr= String(child['@transform']);
+				var nmx;
+				var nmxString;
+				if(tr){
+					tr=String(tr);
+					var cmxa=/matrix\(.*?\)/.exec(tr);
+					if(cmxa && cmxa.length){
+						cmx=new ext.Matrix(cmxa[0]);
+						nmx=cmx.concat(matrix);
+						nmxString=this._getMatrix(nmx);
+						tr=tr.replace(cmxa[0],nmxString);
+					}else{
+						tr=mxa[0]+' '+tr;
+						nmxString=mxa[0];
+						nmx=matrix;
+					}
+					if(tr==this.IDENTITY_MATRIX){
+						delete child['@transform'];
+					}else{
+						child['@transform']=tr;
+					}
+				}else{
+					nmx=matrix;
+					nmxString=mxa[0];
+					if(nmxString!=this.IDENTITY_MATRIX){
+						child['@transform']=nmxString;
+					}
+				}				
+				if(child.hasOwnProperty('@filter') && child.localName()!='g'){
+					this._transformFilter(nmx,child,defs);
+				}
+				if(bApplyVertices){
+					var gradientAttr=['stroke','fill'];
+					for(var i=0;i<gradientAttr.length;i++){
+						var attrString=child['@'+gradientAttr[i]];
+						var gradientID=undefined;
+						if(attrString){
+							attrString=String(attrString);
+							var ida=attrString.match(/(?:url\(#)(.*?)(?:\))/);
+							if(ida && ida.length>1){
+								gradientID=ida[1];
+							}
+						}
+						if(gradientID!==undefined){
+							var gradient=defs.*.(@id==gradientID);
+							if(gradient && gradient.length()){
+								gradient=gradient[0].copy();
+								gradientID=this._uniqueID(String(gradient.@id));
+								gradient.@id=gradientID;
+								child['@'+gradientAttr[i]]='url(#'+gradientID+')';
+								defs.appendChild(gradient);
+								if(gradient.localName()=='radialGradient'){
+									var gtr=gradient['@gradientTransform'];
+									if(gtr){
+										gtr=String(gtr);
+										var cmxa=/matrix\(.*?\)/.exec(gtr);
+										if(cmxa && cmxa.length){
+											var cmx=new ext.Matrix(cmxa[0]);
+										}else{
+											cmx=new ext.Matrix();
+										}
+									}else{
+										cmx=new ext.Matrix();
+									}
+									var gmx=cmx.concat(nmx);
+									var fp=new ext.Point({
+										x:Number(gradient['@fx']),
+										y:Number(gradient['@fy'])
+									});
+									var cp=new ext.Point({
+										x:Number(gradient['@cx']),
+										y:Number(gradient['@cy'])
+									});
+									var rp=new ext.Point({
+										x:cp.x+Number(gradient['@r']),
+										y:cp.y
+									});
+									var mx=new ext.Matrix({
+										a:gmx.scaleX,
+										b:0,
+										c:0,
+										d:gmx.scaleX,
+										tx:gmx.tx,
+										ty:gmx.ty
+									});
+									fp=fp.transform(mx).roundTo(this.decimalPointPrecision);
+									cp=cp.transform(mx).roundTo(this.decimalPointPrecision);
+									rp=rp.transform(mx).roundTo(this.decimalPointPrecision);
+									gmx=mx.invert().concat(gmx).roundTo(this.decimalPointPrecision);
+									gradient['@r']=String(Math.roundTo(cp.distanceTo(rp),this.decimalPointPrecision));
+									gradient['@cx']=String(cp.x);
+									gradient['@cy']=String(cp.y);
+									gradient['@fx']=String(fp.x);
+									gradient['@fy']=String(fp.y);
+									var gmxString=this._getMatrix(gmx);
+									if(gtr){
+										gtr=gtr.replace(cmxa[0],gmxString);
+									}else{
+										gtr=gmxString;
+									}
+									gradient['@gradientTransform']=gtr;
+								}else if(gradient.localName()=='linearGradient'){
+									var p1=new ext.Point({
+										x:Number(gradient['@x1']),
+										y:Number(gradient['@y1'])
+									});
+									var p2=new ext.Point({
+										x:Number(gradient['@x2']),
+										y:Number(gradient['@y2'])
+									});
+									p1=p1.transform(nmx).roundTo(this.decimalPointPrecision);
+									p2=p2.transform(nmx).roundTo(this.decimalPointPrecision);
+									gradient['@x1']=String(p1.x);
+									gradient['@y1']=String(p1.y);
+									gradient['@x2']=String(p2.x);
+									gradient['@y2']=String(p2.y);
+								}else if(gradient.localName()=='pattern'){
+									var ptr=gradient.@patternTransform;
+									if(ptr){
+										ptr=String(ptr);
+										var pmxa=/matrix\(.*?\)/.exec(ptr);
+										if(pmxa && pmxa.length){
+											var pmx=new ext.Matrix(pmxa[0]);
+										}else{
+											pmx=new ext.Matrix();
+										}
+									}else{
+										pmx=new ext.Matrix();
+									}
+									gradient.@patternTransform=this._getMatrix(pmx.concat(nmx));
+								}
+							}
+						}
+					}
+					if(child.hasOwnProperty('@d')){
+						var curveData=child['@d'];
+						var points=curveData.match(/[A-Ya-y]?[\d\.\-]*[\d\.\-][\s\,]*[\d\.\-]*[\d\.\-][Zz]?/g);
+						if(points && points.length){
+							var newPoints=new ext.Array([]);
+							for(var i=0;i<points.length;i++){
+								if(points[i].trim()==''){continue;}
+								var point=new ext.Point(points[i]);
+								point=point.transform(nmx).roundTo(this.decimalPointPrecision);
+								var pointString=String(point.x)+','+String(point.y);
+								var prefix=/^[A-Za-z]/.exec(points[i]);
+								if(prefix){
+									pointString=prefix[0]+pointString;
+								}
+								var suffix=/[A-Za-z]$/.exec(points[i]);
+								if(suffix){
+									pointString=pointString+suffix[0];
+								}
+								newPoints.push(pointString);							
+							}
+							child['@d']=newPoints.join(' ');
+							child['@transform']=String(child['@transform']).replace(nmxString,'');
+							if(String(child['@transform']).trim()==''){
+								delete child['@transform'];
+							}
+						}
+					}
+					if(child.hasOwnProperty('@stroke')){
+						var strokeW = String(child['@stroke-width']);
+						if(strokeW)strokeW = Number(strokeW);
+						else strokeW = 1;
+
+						var strokeScale=cmx?nmx.concat(strokeX.concat(cmx.invert())):nmx.concat(strokeX);
+						var scaleMult = ((strokeScale.scaleX+strokeScale.scaleY)/2);
+						if(scaleMult!=1){
+							child['@stroke-width'] = Math.roundTo(strokeW*scaleMult,this.decimalPointPrecision);
+						}
+					}
+					
+				}
+				if(child.* && child.*.length() && childName!='defs'){
+					this.applyMatrices(child,defs,strokeX?(cmx?strokeX.concat(cmx.invert()):strokeX):undefined);
+				}
+			}
+			return xml;
+		},
+		_applyColorEffects:function(xml,defs,colorX){
+			var name=xml.localName();
+			if( name=='filter' || /Gradient/.test(name) || /Color/.test(name)){
+				return;	
+			}
+			if(name=='mask' && xml..use.length()>0){
+				this.expandUseNow( xml, xml,false,true,defs );
+			}
+			var filter,newFilter;
+			var color=colorX;
+			if(xml.hasOwnProperty('@filter')){
+				var filterID=String(xml.@filter).match(/(?:url\(#)(.*?)(?:\))/);
+				if(filterID && filterID.length>1){
+					filter=defs.filter.(@id==filterID[1]);
+					if(filter){
+						if(filter.length()){
+							filter=filter[0];
+							color=this._colorFromEffect(filter);
+							if(color){
+								var n=0;
+								if(!color.amount.is([0,0,0,0])){
+									n+=1;
+								}
+								if(!color.percent.is([100,100,100,100])){
+									n+=1;
+								}
+								if(filter.*.length()<=n){
+									delete xml.@filter;
+								}else{
+									newFilter=filter.copy();
+									var newFilterID=this._uniqueID(String(newFilter.@id));
+									newFilter.@id=newFilterID;
+									xml.@filter="url(#"+newFilterID+")";
+									if(!color.amount.is([0,0,0,0])){
+										delete newFilter.feComponentTransfer.(@result=='colorEffect_amount');
+									}
+									if(!color.percent.is([100,100,100,100])){
+										delete newFilter.feColorMatrix.(@result=='colorEffect_percent');
+									}
+									defs.appendChild(newFilter);
+									filter=newFilter;
+								}
+							}
+						}else{
+							delete xml.@filter;
+						}
+					}
+				}
+			}
+			if(color){
+				var painted=false;
+				var paintProperties=[
+					'fill',
+					'stroke'
+				];
+				for(var i=0;i<paintProperties.length;i++){
+					if(xml.hasOwnProperty('@'+paintProperties[i])){
+						painted=true;
+						var paintStr=String(xml['@'+paintProperties[i]]);
+						var paintID=paintStr.match(/(?:url\(#)(.*?)(?:\))/);
+						if(paintID && paintID.length>1){
+							paintID=paintID[1];
+							var paint=defs.*.(@id==paintID);
+							if(paint && paint.length()){
+								for each(var stop in paint[0].stop){
+									var stopColor=new ext.Color(
+										String(stop['@stop-color'])
+									);
+									if(stop.hasOwnProperty('@stop-opacity')){
+										stopColor.amount[3]=Number(stop['@stop-opacity'])*255;
+									}else{
+										stopColor.amount[3]=255;
+									}
+									var newColor=color.transform(stopColor);
+									stop['@stop-color']=newColor.hex;
+									stop['@stop-opacity']=newColor.opacity;
+								}
+							}
+						}else if(paintStr[0]=='#'){
+							var newColor=new ext.Color(paintStr);
+							if(xml.hasOwnProperty('@'+paintProperties[i]+'-opacity')){
+								newColor.amount[3]=Number(xml['@'+paintProperties[i]+'-opacity'])*255;
+							}else{
+								newColor.amount[3]=255;
+							}
+							newColor=color.transform(newColor);
+							xml['@'+paintProperties[i]]=newColor.hex;
+							xml['@'+paintProperties[i]+'-opacity']=newColor.opacity;
+						}
+					}
+				}
+				if(
+					!painted &&
+					xml.*.length()==(
+						xml.animate?xml.animate.length():0+
+						xml.animateMotion?xml.animateMotion.length():0+
+						xml.animateColor?xml.animateColor.length():0+
+						xml.animateTransform?xml.animateTransform.length():0
+					)
+				){
+					var f=this._getFilters(
+						null,{color:color},defs
+					);
+					
+					if(xml.hasOwnProperty('@filter') && filter){
+						for each(var fe in defs.filter.(@id==f).*){
+							filter.appendChild(fe);	
+						}
+					}else{
+						xml.@filter='url(#'+f+')';	
+					}
+				}
+			}
+			for each(var element in xml.*){
+				this._applyColorEffects(element,defs,color);
+			}
+		},
+		_colorFromEffect:function(filter){
+			var feAmount=filter.feComponentTransfer.(@result=='colorEffect_amount');
+			var fePercent=filter.feColorMatrix.(@result=='colorEffect_percent');
+			if(!(feAmount.length() || fePercent.length())){
+				return;
+			}
+			var color=new ext.Color([0,0,0,0]);
+			var n=0;
+			if(feAmount.length()){
+				n+=1;
+				feAmount=feAmount[feAmount.length()-1];
+				if(feAmount.feFuncR.length()){
+					if(feAmount.feFuncR.hasOwnProperty('@intercept')){
+						color.amount[0]=Number(feAmount.feFuncR.@intercept)*255;
+					}
+				}
+				if(feAmount.feFuncG.length()){
+					if(feAmount.feFuncG.hasOwnProperty('@intercept')){
+						color.amount[1]=Number(feAmount.feFuncG.@intercept)*255;
+					}
+				}
+				if(feAmount.feFuncB.length()){
+					if(feAmount.feFuncB.hasOwnProperty('@intercept')){
+						color.amount[2]=Number(feAmount.feFuncB.@intercept)*255;
+					}
+				}
+				if(feAmount.feFuncA.length()){
+					if(feAmount.feFuncA.hasOwnProperty('@intercept')){
+						color.amount[3]=Number(feAmount.feFuncA.@intercept)*255;
+					}
+				}
+			}
+			if(fePercent.length()){
+				n+=1;
+				fePercent=fePercent[fePercent.length()-1];
+				var values=String(fePercent.@values).match(/[\d\.\-]*\d/g);
+				if(values.length>16){
+					color.percent[0]=values[0]*100;
+					color.percent[1]=values[6]*100;
+					color.percent[2]=values[12]*100;
+					color.percent[3]=values[18]*100;
+				}
+			}
+			return color;
+		},
+		_transformFilter:function(matrix,element,defs){
+			defs=defs||element.defs;
+			if(!defs){
+				return;
+			}
+			var sx=matrix.scaleX;
+			var sy=matrix.scaleY;
+			if(sx==1 && sy==1)return;
+
+			if(element.hasOwnProperty('@filter')){
+				var filterID=String(
+					element.@filter
+				).match(
+					/(?:url\(#)(.*?)(?:\))/
+				);
+				if(
+					filterID &&
+					filterID.length>1
+				){
+					var filter=defs.filter.(@id==filterID[1]);
+					if(filter && filter.length()){
+						for each(var primitive in filter[0].*){
+							switch(primitive.localName()){
+								case "feGaussianBlur":
+									var blur=new ext.Point(String(primitive.@stdDeviation));
+									primitive.@stdDeviation=[
+										blur.x*sx,
+										blur.y*sy
+									].join(' ');
+									break;
+							}
+						}
+						if(sx!=1){
+							var x=parseFloat(filter.@x);
+							var width=parseFloat(filter.@width);
+							filter.@x=String(x/(1-sx))+'%';
+							filter.@width=String(100+(width-100)/(1-sx))+'%';
+						}
+						if(sy!=1){
+							var y=parseFloat(filter.@y);
+							var height=parseFloat(filter.@height);
+							filter.@y=String(y/(1-sy))+'%';
+							filter.@height=String(100+(height-100)/(1-sy))+'%';
+						}
+					}							
+				}
+			}
+		}
 	};
 	ext.extend({SVG:SVG});
 })(extensible);
+
+
+
+closure = function(meth, args, scope, passArgs){
+	if(passArgs){
+		return function(){
+			var args2 = Array.prototype.slice.call(arguments);
+			return meth.apply(scope, args2.concat(args));
+		}
+	}else{
+		return function(){
+			return meth.apply(scope, args);
+		}
+	}
+}
