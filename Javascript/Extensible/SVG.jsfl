@@ -20,6 +20,7 @@
 		this.STATE_EXPANDING_USE_NODES = 3;
 		this.STATE_FINALISING_FILES = 4;
 		this.STATE_CLEANUP = 5;
+		this.STATE_DONE = 6;
 
 		var settings=new ext.Object({
 			file:undefined,
@@ -226,7 +227,7 @@
 				try{
 					return this.nextState();
 				}catch(e){
-					ext.trace(e);
+					ext.message(e);
 				}
 			}
 			return true;
@@ -237,6 +238,10 @@
 		nextState:function(){
 			this.currentState++;
 			this.doState();
+		},
+		end:function(){
+			this.currentState = STATE_DONE;
+			this.qData = [];
 		},
 		doState:function(){
 			switch(this.currentState){
@@ -263,7 +268,7 @@
 					return true;
 			}
 
-			return false;
+			return true;
 		},
 		doInit:function(){
 			fl.showIdleMessage(false);
@@ -377,7 +382,7 @@
 
 			// 	if(this.expandSymbols && this.expandSymbols!='none'){ // expand symbol instances
 			// 		var time = (new Date()).getTime();
-			// 		ext.trace("this.expandSymbols: "+this.expandSymbols);
+			// 		ext.message("this.expandSymbols: "+this.expandSymbols);
 			// 		if(this.expandSymbols=='usedOnce'){
 			// 			this.expandUseNow(dom, dom, true);
 			// 		}else if(this.expandSymbols=='nested'){
@@ -456,13 +461,13 @@
 				for(var i=0;i<documents.length;i++){
 					var document = documents[i];
 
-					ext.trace("this.applyTransformations: "+this.applyTransformations);
+					ext.message("this.applyTransformations: "+this.applyTransformations);
 					if(this.applyTransformations){
 						this.applyMatrices(document);
 					}
-					ext.trace("this._applyColorEffects: ");
+					ext.message("this._applyColorEffects: ");
 					this._applyColorEffects(document,document.defs);
-					ext.trace("this.deleteUnusedReferences: ");
+					ext.message("this.deleteUnusedReferences: ");
 					this.deleteUnusedReferences(document);
 					document['@xmlns']="http://www.w3.org/2000/svg";
 
@@ -1049,7 +1054,7 @@
 				}
 				this._symbolBounds[symbolIDString] = boundingBox;
 			}
-			ext.trace("getTimeline: "+settings.startFrame+" "+settings.endFrame+" "+settings.frameCount+" "+isNew);
+			ext.message("getTimeline: "+settings.startFrame+" "+settings.endFrame+" "+settings.frameCount+" "+isNew);
 			var instanceID=this._uniqueID(id);	
 			xml=new XML('<use xlink-href="#'+id+'" id="'+instanceID+'" />');
 			if(isNew){
@@ -1708,7 +1713,7 @@
 				colorTransform: null,
 				libraryItem:instance.libraryItem
 			});
-			ext.trace("\n_getSymbolInstance: "+instance.libraryItem.name+" - "+instance.loop+" "+settings.frameCount+" "+settings.startFrame+" "+instance.loop);
+			ext.message("\n_getSymbolInstance: "+instance.libraryItem.name+" - "+instance.loop+" "+settings.frameCount+" "+settings.startFrame+" "+instance.loop);
 			settings.extend(options);
 			var dom = settings.dom;
 			settings.matrix = instance.matrix.concat(settings.matrix);
