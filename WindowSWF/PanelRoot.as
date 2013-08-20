@@ -43,6 +43,8 @@ package{
 			_dev = value;
 			context.customItems = _dev?[devModeOnItem]:[devModeOffItem];
 			_panelSettings.updateSetting(this, "dev");
+
+			MMExecute('extensible.dev = '+value);
 		}
 
 		private var context:ContextMenu;
@@ -55,6 +57,7 @@ package{
 		public function PanelRoot(){
 
 			this.alpha = 0;
+
 
 			controlsLayout = new ControlLayout();
 			scrollPane.source = controlsLayout;
@@ -89,6 +92,7 @@ package{
 					'extensible.dev.valueOf()'
 				].join('\n'))=='true'
 			);
+			_dev = true;
 			var jsDir:String = MMExecute('extensible.dir.valueOf()');
 
 			_panelSettings = new SettingsSaver(jsDir+'/Settings/SVGPanel/', true);
@@ -111,7 +115,7 @@ package{
 			_exportSettings.addSetting(controlsLayout.masksRow.input, "selectedIndex", "maskingType", "clipping", true, comboGetter, comboSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.decimalRow.input, "value", "decimalPointPrecision", 3, true, null, null, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.curvesRow.input, "selectedIndex", "curveDegree", 2, true, comboGetter, comboSetter, Event.CHANGE);
-			_exportSettings.addSetting(controlsLayout.expandRow.input, "selectedIndex", "expandSymbols", "none", true, comboGetter, comboSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.expandRow.input, "selectedIndex", "expandSymbols", "usedOnce", true, comboGetter, comboSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.beginRow.input, "selectedIndex", "beginAnimation", "0s", true, comboGetter, comboSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.renderingRow.input, "selectedIndex", "rendering", "auto", true, comboGetter, comboSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.applyTransformationsCheckBox, "selected", "applyTransformations", true, true, radioGetter, radioSetter, Event.CHANGE);
@@ -144,7 +148,8 @@ package{
 			this.controlsLayout.curvesRow.input.dataProvider = new DataProvider([{label:'Quadratic', 		data:2},
 																				 {label:'Cubic', 			data:3}]);
 
-			this.controlsLayout.expandRow.input.dataProvider = new DataProvider([{label:'All', 				data:"all"},
+			this.controlsLayout.expandRow.input.dataProvider = new DataProvider([{label:'Once Used Symbols',data:"usedOnce"},
+																				 {label:'All', 				data:"all"},
 																				 {label:'None', 			data:"none"},
 																				 {label:'Nested', 			data:"nested"}]);
 			
@@ -369,6 +374,8 @@ package{
 			controlsLogic.update();
 		}
 		private function onOutputChanged(e:Event=null):void{
+			if(this.controlsLayout.outputRow.input.selectedIndex==-1)this.controlsLayout.outputRow.input.selectedIndex = 0;
+
 			var isAnim:Boolean = (this.controlsLayout.outputRow.input.selectedItem && this.controlsLayout.outputRow.input.selectedItem.showFlattenMotion);
 			this.controlsLayout.beginRow.visible = isAnim;
 			this.controlsLayout.flattenMotionCheckBox.visible = isAnim;
@@ -398,6 +405,7 @@ package{
 			ExternalInterface.addCallback('endProgress',endProgress);
 			//Save options
 			var xml = _exportSettings.getXml();
+			xml.appendChild(<traceLog>{_dev}</traceLog>);
 			xml['swfPanelName']='SVG';
 			if(dev){
 				MMExecute([
@@ -431,18 +439,22 @@ package{
 			/*if(!killed=='true'){ // If kill command does not return "true"
 				this.controlsLayout.progressBar.setProgress(0,100);
 			}*/
-			Fl.trace("SVG Export Failed");
+			Fl.log("SVG Export Failed");
 		}
 		
 		private function processQue(e:Event):void
 		{
+			Fl.log("processQue");
 			if(this.isCanceled||this.finished){return;}
 			//if(this.timer.delay<100){this.timer.delay=100;}
 			// attempt to process the que
 			var success,err;
 			try{
 				success=MMExecute('extensible.que.process()');
-			}catch(err){}
+			Fl.log("processQue: "+success);
+			}catch(err){
+				Fl.log("processQue.err: "+err);
+			}
 			/*if(success=='true'){
 				this.timer.stop();
 			}else{ // increase the delay with each failure
@@ -474,6 +486,7 @@ package{
 		
 		public function endProgress():Boolean
 		{
+			Fl.log("endProgress");
 			this.removeEventListener(Event.ENTER_FRAME, processQue);
 			this.controlsLogic.setEnabled(true);
 			this.controlsLayout.progressBar.indeterminate=false;

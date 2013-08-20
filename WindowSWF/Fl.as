@@ -13,7 +13,8 @@ package{
 			return MMExecute("confirm(unescape('"+escape(msg)+"'))")=="true";
 		}
 
-		public static function trace(... params):void{
+		public static function log(... params):void{
+			trace.apply(null, params);
 			MMExecute("fl.trace(unescape('"+escape(params.join(" "))+"'))");
 		}
 	}

@@ -18,9 +18,10 @@
 		this.STATE_ELEMENT_READING = 1;
 		this.STATE_DELETE_EXISTING_FILES = 2;
 		this.STATE_EXPANDING_USE_NODES = 3;
-		this.STATE_FINALISING_FILES = 4;
-		this.STATE_CLEANUP = 5;
-		this.STATE_DONE = 6;
+		this.STATE_REMOVING_UNUSED_SYMBOLS = 4;
+		this.STATE_FINALISING_FILES = 5;
+		this.STATE_CLEANUP = 6;
+		this.STATE_DONE = 7;
 
 		var settings=new ext.Object({
 			file:undefined,
@@ -116,6 +117,7 @@
 		this._timer=undefined;
 		this._symbols={};
 		this._symbolBounds={};
+		this._symbolToUseNodes={};
 		this._bitmaps={};
 		//this._rootItem={};
 		this._tempFolder=ext.lib.uniqueName('temp'); // Library folder holding temporary symbols.
@@ -251,11 +253,11 @@
 				case this.STATE_DELETE_EXISTING_FILES:
 					this.qData.push(closure(this.deleteExistingFiles, [], this));
 					break;
-				case this.STATE_DELETE_EXISTING_FILES:
-					this.qData.push(closure(this.deleteExistingFiles, [], this));
-					break;
 				case this.STATE_EXPANDING_USE_NODES:
 					this.qData.push(closure(this.processExpandUseNodes, [], this));
+					break;
+				case this.STATE_REMOVING_UNUSED_SYMBOLS:
+					//this.qData.push(closure(this.processRemoveUnused, [], this));
 					break;
 				case this.STATE_FINALISING_FILES:
 					this.qData.push(closure(this.processFinaliseFiles, [], this));
@@ -372,83 +374,143 @@
 			if(this.expandSymbols=="none")return;
 
 
+			if(this.expandSymbols=='usedOnce'){
+				for(var i in this._symbols){
+					var useList = this._symbolToUseNodes[i];
+					if(useList.length==1){
+						var symbol = this._symbols[i];
+						this.qData.push(closure(this.executeExpandUse, [symbol.@id, symbol, useList, this.doms[0].defs], this));
+					}
+				}
+			}
+			else if(this.expandSymbols=='nested'){
+				for(var i in this._symbols){
+					var useList = this._symbolToUseNodes[i];
+					var j=0;
+					while(j<useList.length){
+						var useNode = useList[j];
+						if(!isDescendant(this.doms[0].defs, useNode)){
+							useList.splice(j, 1);
+						}else{
+							++j;
+						}
+					}
+					if(useList.length>0){
+						var symbol = this._symbols[i];
+						this.qData.push(closure(this.executeExpandUse, [symbol.@id, symbol, useList, this.doms[0].defs], this));
+					}
+				}
+			}
+			else{
+				// expand all
+				for(var i in this._symbols){
+					var useList = this._symbolToUseNodes[i];
+					var symbol = this._symbols[i];
+					this.qData.push(closure(this.executeExpandUse, [symbol.@id, symbol, useList, this.doms[0].defs], this));
+				}
+			}
+
+
+			// for(var i=0; i<this.doms.length; ++i){
+			// 	var dom = this.doms[i];
+			// 	this.qData.push(closure(this.checkExpand, [dom, dom.defs, dom, onceUsed, this.expandSymbols=="nested"], this));
+			// }
+		},
+		isDescendant:function(parent, child){
+			while(child.parent()){
+				if(child.parent()==parent){
+					return true;
+				}
+				child = child.parent();
+			}
+			return false;
+		},
+		// checkExpand:function(element, defs, root, onceUsed, nested){
+		// 	//fl.trace("checkExpand:"+element.localName()+" "+element.@id+" "+element.childIndex());
+		// 	var id;
+		// 	if(element.localName()=="use" && (id = element['@xlink-href'])){
+		// 		var allUseNodes = root..use;
+		// 		var useList = [];
+		// 		for(var i=0; i<allUseNodes.length(); i++){
+		// 			var node = allUseNodes[i];
+		// 			if(node['@xlink-href']==id){
+		// 				useList.push(node);
+		// 			}
+		// 		}
+
+		// 		//fl.trace("Ex: "+id+" "+useList.length);
+		// 		var symbol=defs.symbol.("#"+@id==id);
+		// 		if(symbol && symbol.length() && (!nested || (symbol[0]..use && symbol[0]..use.length()))
+		// 			&& (!onceUsed || useList.length==1)){
+
+		// 			this.executeExpandUse(id, symbol, useList, defs);
+
+		// 			if(isNaN(element.childIndex())){
+		// 				// symbol was swapped in for use node
+		// 				element = symbol;
+		// 				fl.trace("switch: "+element.localName());
+		// 			}
+		// 			fl.trace("Ex: "+id+" "+element.childIndex());
+		// 		}
+
+		// 	}
+
+		// 	var children = element.children();
+		// 	if(children.length()){
+		// 		// goto first child
+		// 		fl.trace("\tChild: "+element.localName()+" "+children[0].localName()+" "+children[0].@id);
+		// 		this.qData.unshift(closure(this.checkExpand, [children[0], defs, root, onceUsed, nested], this));
+		// 		return;
+		// 	}
+
+		// 	if(!element.parent())return; // empty root?
+
+		// 	var siblings = element.parent().children();
+		// 	var index = element.childIndex();
+		// 	//fl.trace("> "+element.parent().localName()+" "+element.localName()+" "+index+" "+index);
+		// 	while(index==siblings.length()-1){
+		// 		element = element.parent();
+		// 		if(!element.parent() || element==root)return; // finished
+
+		// 		fl.trace("\t\tUp:"+element.@id+" "+element.parent().@id+" "+index+" "+siblings.length());
+		// 		siblings = element.parent().children();
+		// 		index = element.childIndex();
+
+		// 	}
+		// 	// goto next sibling (of self or first ancestor with a next sibling)
+		// 	fl.trace("\tNext:"+element.localName()+" "+element.@id+" "+siblings[index+1].localName()+" "+siblings[index+1].@id+" "+index+" "+siblings.length()+" "+(element==siblings[index+1])+" "+(element==siblings[index]));
+		// 	this.qData.unshift(closure(this.checkExpand, [siblings[index+1], defs, root, onceUsed, nested], this));
+		// },
+		/*processRemoveUnused:function(){
 			var onceUsed = this.expandSymbols=='usedOnce';
 			for(var i=0; i<this.doms.length; ++i){
 				var dom = this.doms[i];
-				this.qData.push(closure(this.checkExpand, [dom, dom.defs, dom, onceUsed, this.expandSymbols=="nested"], this));
+				this.qData.push(closure(this.checkUnused, [dom.defs.symbol[0], dom, dom..use], this));
 			}
-			// for(var i=0; i<this.doms.length; ++i){
-			// 	var dom = this.doms[i];
-
-			// 	if(this.expandSymbols && this.expandSymbols!='none'){ // expand symbol instances
-			// 		var time = (new Date()).getTime();
-			// 		ext.message("this.expandSymbols: "+this.expandSymbols);
-			// 		if(this.expandSymbols=='usedOnce'){
-			// 			this.expandUseNow(dom, dom, true);
-			// 		}else if(this.expandSymbols=='nested'){
-			// 			this.expandUseNow(dom, dom.defs, false,'nested', dom.defs);
-			// 		}else{
-			// 			this.expandUseNow(dom, dom, false);
-			// 		}
-			// 	}
-			// }
 		},
-		checkExpand:function(element, defs, root, onceUsed, nested){
-			//fl.trace("checkExpand:"+element.localName()+" "+element.@id+" "+element.childIndex());
-			var id;
-			if(element.localName()=="use" && (id = element['@xlink-href'])){
-				var allUseNodes = root..use;
-				var useList = [];
-				for(var i=0; i<allUseNodes.length(); i++){
-					var node = allUseNodes[i];
-					if(node['@xlink-href']==id){
-						useList.push(node);
-					}
+		checkUnused:function(element, root, useNodes){
+			var id = "#"+element.@id;
+			var useNodes = root..use;
+			var found = false;
+			for(var i=0; i<useNodes.length(); ++i){
+				var useNode = useNodes[i];
+				if(useNode['@xlink-href']==id){
+					found = true;
+					break;
 				}
-
-				//fl.trace("Ex: "+id+" "+useList.length);
-				var symbol=defs.symbol.("#"+@id==id);
-				if(symbol && symbol.length() && (!nested || (symbol[0]..use && symbol[0]..use.length()))
-					&& (!onceUsed || useList.length==1)){
-
-					this.executeExpandUse(id, symbol, useList, defs);
-
-					if(isNaN(element.childIndex())){
-						// symbol was swapped in for use node
-						element = symbol;
-						fl.trace("switch: "+element.localName());
-					}
-					fl.trace("Ex: "+id+" "+element.childIndex());
-				}
-
 			}
-
-			var children = element.children();
-			if(children.length()){
-				// goto first child
-				fl.trace("\tChild: "+element.localName()+" "+children[0].localName()+" "+children[0].@id);
-				this.qData.unshift(closure(this.checkExpand, [children[0], defs, root, onceUsed, nested], this));
-				return;
-			}
-
-			if(!element.parent())return; // empty root?
-
-			var siblings = element.parent().children();
+			var parent = element.parent();
 			var index = element.childIndex();
-			//fl.trace("> "+element.parent().localName()+" "+element.localName()+" "+index+" "+index);
-			while(index==siblings.length()-1){
-				element = element.parent();
-				if(!element.parent() || element==root)return; // finished
-
-				fl.trace("\t\tUp:"+element.@id+" "+element.parent().@id+" "+index+" "+siblings.length());
-				siblings = element.parent().children();
-				index = element.childIndex();
-
+			if(!found){
+				delete parent.children()[index];
+				--index;
 			}
-			// goto next sibling (of self or first ancestor with a next sibling)
-			fl.trace("\tNext:"+element.localName()+" "+element.@id+" "+siblings[index+1].localName()+" "+siblings[index+1].@id+" "+index+" "+siblings.length()+" "+(element==siblings[index+1])+" "+(element==siblings[index]));
-			this.qData.unshift(closure(this.checkExpand, [siblings[index+1], defs, root, onceUsed, nested], this));
-		},
+
+			var siblings = parent.children();
+			if(index==siblings.length()-1)return; // done
+
+			this.qData.unshift(closure(this.checkUnused, [siblings[index+1], root, useNodes], this));
+		},*/
 		processFinaliseFiles:function(){
 			for(var k=0; k<this.timelines.length;k++){
 				var timeline = this.timelines[k];
@@ -467,8 +529,8 @@
 					}
 					ext.message("this._applyColorEffects: ");
 					this._applyColorEffects(document,document.defs);
-					ext.message("this.deleteUnusedReferences: ");
-					this.deleteUnusedReferences(document);
+					//ext.message("this.deleteUnusedReferences: ");
+					//this.deleteUnusedReferences(document);
 					document['@xmlns']="http://www.w3.org/2000/svg";
 
 					if(!document['@viewBox']){
@@ -687,67 +749,67 @@
 		 * Deletes unreferenced defs.
 		 * @parameter {XML} xml
 		 */
-		deleteUnusedReferences:function(xml){
-			if(!xml.defs || xml.defs.length()==0){
-				return xml;	
-			}
-			var refs=this._listReferences(xml);//memory errors!
-			var references=xml.defs.*.copy();
-			delete xml.defs.*;
-			for each(var def in references){
-				if(
-					refs.indexOf(String(def.@id))>=0 && (
-						def.localName()!='filter' ||
-						def.*.length()>0
-					)
-				){
-					xml.defs.appendChild(def);
-				}
-			}
-			return xml;
-		},
+		// deleteUnusedReferences:function(xml){
+		// 	if(!xml.defs || xml.defs.length()==0){
+		// 		return xml;	
+		// 	}
+		// 	var refs=this._listReferences(xml);//memory errors!
+		// 	var references=xml.defs.*.copy();
+		// 	delete xml.defs.*;
+		// 	for each(var def in references){
+		// 		if(
+		// 			refs.indexOf(String(def.@id))>=0 && (
+		// 				def.localName()!='filter' ||
+		// 				def.*.length()>0
+		// 			)
+		// 		){
+		// 			xml.defs.appendChild(def);
+		// 		}
+		// 	}
+		// 	return xml;
+		// },
 		/**
 		 * Retrieves a list of references used.
 		 * @parameter {XML} xml
 		 */
-		_listReferences:function(xml,defs){
-			defs=defs||xml.defs;
-			var refs=new ext.Array();
-			if(!defs){return refs;}
-			for each(var x in xml.*){
-				if(x.localName()!='defs'){
-					for each(var a in x.@*){
-						if(
-							a.localName()=='id' ||
-							a.localName()=='d'
-						){
-							continue;
-						}
-						var reference=(
-							String(a).match(/(?:url\(#)(.*?)(?:\))/)||
-							String(a).trim().match(/(?:^#)(.*$)/)
-						);
-						if(
-							(reference instanceof Array) &&
-							reference.length>1
-						){
-							var ref=defs.*.(@id==reference[1]);
-							if(ref && ref.length()){
-								refs.push(reference[1]);
-								refs.extend(this._listReferences(ref[0],defs));
-							}
+		// _listReferences:function(xml,defs){
+		// 	defs=defs||xml.defs;
+		// 	var refs=new ext.Array();
+		// 	if(!defs){return refs;}
+		// 	for each(var x in xml.*){
+		// 		if(x.localName()!='defs'){
+		// 			for each(var a in x.@*){
+		// 				if(
+		// 					a.localName()=='id' ||
+		// 					a.localName()=='d'
+		// 				){
+		// 					continue;
+		// 				}
+		// 				var reference=(
+		// 					String(a).match(/(?:url\(#)(.*?)(?:\))/)||
+		// 					String(a).trim().match(/(?:^#)(.*$)/)
+		// 				);
+		// 				if(
+		// 					(reference instanceof Array) &&
+		// 					reference.length>1
+		// 				){
+		// 					var ref=defs.*.(@id==reference[1]);
+		// 					if(ref && ref.length()){
+		// 						refs.push(reference[1]);
+		// 						refs.extend(this._listReferences(ref[0],defs));
+		// 					}
 							
-						}
-					}
-					if(x.*.length()){
-						refs.extend(
-							this._listReferences(x,defs)
-						);
-					}
-				}
-			}
-			return refs;
-		},
+		// 				}
+		// 			}
+		// 			if(x.*.length()){
+		// 				refs.extend(
+		// 					this._listReferences(x,defs)
+		// 				);
+		// 			}
+		// 		}
+		// 	}
+		// 	return refs;
+		// },
 		/**
 		 * Loads an xml settings file.
 		 * @parameter {String} uri The location of the settings file.
@@ -777,12 +839,12 @@
 			return xml;
 		},
 
-		processElement:function(id, element, settings, dom){
+		processElement:function(id, node, element, settings, dom){
 			var elementXML=this._getElement(element,settings);
 			if(elementXML){
-				var list = dom..g.(@id==id);
-				if(list.length()==1){
-					var node = list[0];
+				//var list = dom..g.(@id==id);
+				//if(list.length()==1){
+					//var node = list[0];
 					var parent = node.parent();
 					for(var i=0; i<node.attributes().length(); i++){
 						var attr = node.attributes()[i];
@@ -794,10 +856,10 @@
 					}
 					parent.insertChildBefore(node, elementXML);
 					delete parent.children()[node.childIndex()];
-				}else{
-					ext.warn("Error: multiple items with the same id found ("+id+")");
-				}
-			}	
+				// }else{
+				// 	ext.warn("Error: multiple items with the same id found ("+id+")");
+				// }
+			}
 		},
 		/**
 		 * Retrieves the svg data corresponding to a DOM Element.
@@ -922,18 +984,14 @@
 				}
 			}
 			var isNew,instanceID,boundingBox;
-			if(
-				this._symbols[symbolIDString]
-			){
+			if(this._symbols[symbolIDString]){
 				isNew=false;
-				id = this._symbols[symbolIDString];
+				xml = this._symbols[symbolIDString];
+				id = xml.@id;
 				boundingBox = this._symbolBounds[symbolIDString];
 			}else{
 				isNew=true;
 				id = this._uniqueID(symbolIDString);
-				if(!this._symbols[symbolIDString]){
-					this._symbols[symbolIDString]=id;
-				}
 				var layers = timeline.getLayers();
 
 				/*
@@ -1056,16 +1114,19 @@
 			}
 			ext.message("getTimeline: "+settings.startFrame+" "+settings.endFrame+" "+settings.frameCount+" "+isNew);
 			var instanceID=this._uniqueID(id);	
-			xml=new XML('<use xlink-href="#'+id+'" id="'+instanceID+'" />');
+			instanceXML=new XML('<use xlink-href="#'+id+'" id="'+instanceID+'" />');
 			if(isNew){
-				instanceXML=xml;
 				instanceXML['@width']=0;
 				instanceXML['@height']=0;
 				instanceXML['@x']=0;
 				instanceXML['@y']=0;
 				instanceXML['@overflow']="visible";
+
 				xml=new XML('<symbol/>');
 				xml['@id']=id;
+
+				this._symbols[symbolIDString] = xml;
+				this._symbolToUseNodes[symbolIDString] = [instanceXML];
 
 				if(this.animated){
 					var totFrames = (settings.endFrame-settings.startFrame+1);
@@ -1234,7 +1295,7 @@
 
 							if(this._delayedProcessing){
 								var elementXML=new XML('<g id="'+elementID+'"></g>');
-								this.qData.push(closure(this.processElement, [elementID, element, elemSettings, dom], this));
+								this.qData.push(closure(this.processElement, [elementID, elementXML, element, elemSettings, dom], this));
 							}else{
 								var elementXML=this._getElement(
 									element,elemSettings
@@ -1466,12 +1527,14 @@
 					this._doMask(xml, masked, maskId);
 				}
 			}else{
-				var vb=String(dom.defs.symbol.(@id==id)[0]['@viewBox']).split(' ');
-				xml['@width']=vb[2];
-				xml['@height']=vb[3];
-				xml['@x']=vb[0];
-				xml['@y']=vb[1];
-				xml['@overflow']="visible";
+				fl.trace("use: "+xml.@id);
+				var vb=String(xml['@viewBox']).split(' ');
+				instanceXML['@width']=vb[2];
+				instanceXML['@height']=vb[3];
+				instanceXML['@x']=vb[0];
+				instanceXML['@y']=vb[1];
+				instanceXML['@overflow']="visible";
+				this._symbolToUseNodes[symbolIDString].push(instanceXML);
 			}
 			/*
 			 *  If this is a temporary scene, delete it and return to the original.
@@ -1491,15 +1554,11 @@
 					ext.lib.deleteItem(tempName);	
 				}
 			}
-			var result;
-			if(instanceXML){ // set the viewBox
+			if(isNew){ // set the viewBox
 				if(settings.isRoot && this.clipToScalingGrid && settings.libraryItem){
 					boundingBox=settings.libraryItem.scalingGridRect;
 				}
 				dom.defs.appendChild(xml);
-				result=instanceXML;
-			}else{
-				result=xml;
 			}
 			var viewBox=(
 				String(boundingBox.left)+' '+
@@ -1507,12 +1566,16 @@
 				String(boundingBox.right-boundingBox.left)+' '+
 				String(boundingBox.bottom-boundingBox.top)
 			);
-			xml['@viewBox'] = viewBox;
-			result['@width']=String(Math.ceil(boundingBox.right-boundingBox.left));
-			result['@height']=String(Math.ceil(boundingBox.bottom-boundingBox.top));
-			result['@x']=String(Math.floor(boundingBox.left));
-			result['@y']=String(Math.floor(boundingBox.top));
-			result['@transform'] = this._getMatrix(settings.matrix);
+			if(isNew){
+				xml['@viewBox'] = viewBox;
+			}else{
+				instanceXML['@viewBox'] = viewBox;
+			}
+			instanceXML['@width']=String(Math.ceil(boundingBox.right-boundingBox.left));
+			instanceXML['@height']=String(Math.ceil(boundingBox.bottom-boundingBox.top));
+			instanceXML['@x']=String(Math.floor(boundingBox.left));
+			instanceXML['@y']=String(Math.floor(boundingBox.top));
+			instanceXML['@transform'] = this._getMatrix(settings.matrix);
 			if(settings.isRoot && settings.libraryItem){
 				dom.@viewBox = viewBox;
 				dom.@width = result.@width;
@@ -1522,7 +1585,7 @@
 			if(ext.log){
 				ext.log.pauseTimer(timer);	
 			}
-			return result;
+			return instanceXML;
 		},
 		_addAnimFrame:function(frame, element, time, rot, skewX, skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, timeList, splineList){
 											
