@@ -682,12 +682,12 @@
 					delete symbol.parent().children()[symbol.childIndex()];
 					useNode.parent().insertChildAfter(useNode, symbol);
 					symbol.setName('g');
-					if(useNode.@id)symbol.@id = useNode.@id;
-
+					//if(useNode.@id)symbol.@id = useNode.@id;
 					// if(useNode.@width)symbol.@width = useNode.@width;
 					// if(useNode.@height)symbol.@height = useNode.@height;
 					// if(useNode.@x)symbol.@x = useNode.@x;
 					// if(useNode.@y)symbol.@id = useNode.@y;
+					this.copyNodeContents(useNode, symbol);
 
 					if(useNode.@transform && useNode.@transform!=this.IDENTITY_MATRIX)symbol.@transform = useNode.@transform;
 					delete useNode.parent().children()[useNode.childIndex()];
@@ -695,6 +695,7 @@
 					doRemove = false;
 				}else{
 					var symCopy = symbol[0].copy();
+					this.copyNodeContents(useNode, symCopy);
 					useNode.setName('g');
 					for each(var child in symCopy.*){
 						useNode.appendChild(child);
@@ -846,19 +847,22 @@
 				//if(list.length()==1){
 					//var node = list[0];
 					var parent = node.parent();
-					for(var i=0; i<node.attributes().length(); i++){
-						var attr = node.attributes()[i];
-						elementXML.@[attr.name()] = attr.toXMLString();
-					}
-					for(var i=0; i<node.children().length(); i++){
-						var child = node.children()[i];
-						elementXML.appendChild(child);
-					}
+					this.copyNodeContents(node, elementXML);
 					parent.insertChildBefore(node, elementXML);
 					delete parent.children()[node.childIndex()];
 				// }else{
 				// 	ext.warn("Error: multiple items with the same id found ("+id+")");
 				// }
+			}
+		},
+		copyNodeContents:function(fromNode, toNode){
+			for(var i=0; i<fromNode.attributes().length(); i++){
+				var attr = fromNode.attributes()[i];
+				toNode.@[attr.name()] = attr.toXMLString();
+			}
+			for(var i=0; i<fromNode.children().length(); i++){
+				var child = fromNode.children()[i];
+				toNode.appendChild(child);
 			}
 		},
 		/**
@@ -1329,12 +1333,14 @@
 								var tryList = [];
 
 								var timeList = [];
+								var longTimeList = [];
 								var splineList = [];
+								var longSplineList = [];
 
 								var tweensFound = (frame.tweenType!="none");
 
 								var time = settings.timeOffset+(n*(1/ext.doc.frameRate))/animDur;
-								this._addAnimFrame(frame, element, time, rot, element.skewX, element.skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, timeList, splineList);
+								this._addAnimFrame(frame, element, time, rot, element.skewX, element.skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, timeList, splineList, longTimeList, longSplineList);
 								
 								var lastRot = rot;
 
@@ -1360,9 +1366,10 @@
 
 											var attemptForeRot = true;
 											var attemptBackRot = true;
-											var time = settings.timeOffset+(frameEnd*(1/ext.doc.frameRate))/animDur;
+											var time = settings.timeOffset+(frameEnd*(1/ext.doc.frameRate))/(animDur-1);
 											if(lastFrame.tweenType=="none"){
 												timeList.push(this.precision(time-0.0000001));
+												longTimeList.push(this.precision(time-0.0000001));
 											}else if(lastFrame.tweenType=="motion"){
 												switch(lastFrame.motionTweenRotate){
 													case "clockwise":
@@ -1411,7 +1418,7 @@
 											if(boundingBox.right<swingRight)boundingBox.right = swingRight;
 											if(boundingBox.bottom<swingBottom)boundingBox.bottom = swingBottom;
 
-											this._addAnimFrame(nextFrame, nextElement, time, rot, skewX, skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, timeList, splineList);
+											this._addAnimFrame(nextFrame, nextElement, time, rot, skewX, skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, timeList, splineList, longTimeList, longSplineList);
 
 
 											if(nextFrame.tweenType!="none")tweensFound = true;
@@ -1438,9 +1445,10 @@
 									trxList.pop();
 									tryList.pop();
 									splineList.pop();
+									longSplineList.pop();
 								}
 								var matrix = this._cloneMatrix(element.matrix);
-								if(this._addAnimationNode(elementXML.parent(), "translate", [xList, yList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)){
+								if(this._addAnimationNode(elementXML, "translate", [xList, yList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)){
 									matrix.tx = 0;
 									matrix.ty = 0;
 								}
@@ -1451,7 +1459,7 @@
 									for(var h=0; h<skyList.length; h++){
 										skyList[h] -= rotList[h];
 									}
-									if(this._addAnimationNode(elementXML.parent(), "rotate", [rotList, trxList, tryList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)){
+									if(this._addAnimationNode(elementXML, "rotate", [rotList, trxList, tryList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)){
 										matrix.a = element.scaleX;
 										matrix.b = 0;
 										matrix.c = 0;
@@ -1464,15 +1472,16 @@
 								for(var h=0; h<skyList.length; h++){
 									skyList[h] = this.precision(skyList[h]);
 								}
-								if(hasSkewX && this._addAnimationNode(elementXML.parent(), "skewX", [skxList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)){
+								if(hasSkewX && this._addAnimationNode(elementXML, "skewX", [skxList], longTimeList, animDur, longSplineList, tweensFound, null, settings.beginAnimation)){
 									matrix.a = element.scaleX;
 									matrix.b = 0;
 								}
-								if(hasSkewY && this._addAnimationNode(elementXML.parent(), "skewY", [skyList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)){
+								if(hasSkewY && this._addAnimationNode(elementXML, "skewY", [skyList], longTimeList, animDur, longSplineList, tweensFound, null, settings.beginAnimation)){
 									matrix.c = 0;
 									matrix.d = element.scaleY;
 								}
-								if(this._addAnimationNode(elementXML.parent(), "scale", [scxList, scyList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation)){
+								// the ordering of these animation nodes is important
+								if(this._addAnimationNode(elementXML, "scale", [scxList, scyList], longTimeList, animDur, splineList, tweensFound, 1, settings.beginAnimation)){
 									matrix.a = 1;
 									matrix.d = 1;
 								}
@@ -1527,7 +1536,6 @@
 					this._doMask(xml, masked, maskId);
 				}
 			}else{
-				fl.trace("use: "+xml.@id);
 				var vb=String(xml['@viewBox']).split(' ');
 				instanceXML['@width']=vb[2];
 				instanceXML['@height']=vb[3];
@@ -1587,16 +1595,83 @@
 			}
 			return instanceXML;
 		},
-		_addAnimFrame:function(frame, element, time, rot, skewX, skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, timeList, splineList){
+		_addAnimFrame:function(frame, element, time, rot, skewX, skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, timeList, splineList, longTimeList, longSplineList){
 											
 			transPoint = element.getTransformationPoint();
-			
+
+			var xHem = this._getRotHemisphere(skewX);
+			var yHem = this._getRotHemisphere(skewY);
+			var incrList = [];
+			var timeTotal;
+			var lastTime;
+			if(timeList.length && frame.tweenType!="none"){
+				var lastScX = scxList[scxList.length-1];
+				var lastScY = scyList[scyList.length-1];
+				var lastSkX = skxList[skxList.length-1];
+				var lastSkY = skyList[skyList.length-1];
+
+				lastTime = timeList[timeList.length-1];
+				timeTotal = time - lastTime;
+				timeStep = timeTotal;
+				var xHemLast = this._getRotHemisphere(lastSkX);
+				if(xHem!=xHemLast){
+					var dist = skewX-lastSkX;
+					if(dist>0){ // increasing
+						incrList.push((((xHemLast+1)*180-90)-lastSkX)/dist*timeTotal); // add for the first time it crosses the x-axis (shorter interval than the others)
+						for(var i=xHemLast+1; i<xHem; ++i){
+							incrList.push((i*180-90)/dist*timeTotal); // add an increment for each following time it crosses the x-axis
+						}
+					}
+				}
+				var yHemLast = this._getRotHemisphere(lastSkY);
+				if(yHem!=yHemLast){
+					var dist = skewY-lastSkY;
+					if(dist>0){ // increasing
+						var time2 = (((yHemLast+1)*180-90)-lastSkY)/dist*timeTotal;
+						if(incrList.indexOf(time2)==-1)incrList.push(time2); // add for the first time it crosses the x-axis (shorter interval than the others)
+						for(var i=yHemLast+1; i<yHem; ++i){
+							var time2 = (i*180-90)/dist*timeTotal;
+							if(incrList.indexOf(time2)==-1)incrList.push(time2); // add an increment for each following time it crosses the x-axis
+						}
+					}
+				}
+				incrList.sort();
+				if(incrList[incrList.length-1]!=timeTotal){
+					incrList.push(timeTotal);
+				}
+			}else{
+				var lastScX = 0;
+				var lastScY = 0;
+				var lastSkX = 0;
+				var lastSkY = 0;
+				var lastRot = 0;
+				timeTotal = 1;
+				incrList.push(1);
+				lastTime = 0;
+			}
+
+			// convert scale & skew to HTML compatible values
+			var scXDif = (element.scaleX * Math.cos(skewY*Math.PI/180)) - lastScX;
+			var scYDif = (element.scaleY * Math.cos(skewX*Math.PI/180)) - lastScY;
+			var skXDif = (skewX * (xHem%2?-1:1)) - lastSkX;
+			var skYDif = (skewY * (yHem%2?-1:1)) - lastSkY;
+
+
+			for(var i=0; i<incrList.length; ++i){
+				var incr = incrList[i];
+				var fract = incr/timeTotal;
+
+				
+				scxList.push(this.precision(lastScX + scXDif * fract));
+				scyList.push(this.precision(lastScY + scYDif * fract));
+				skxList.push(this.precision(lastSkX + skXDif * fract));
+				skyList.push(this.precision(lastSkY + skYDif * fract));
+
+				longSplineList.push("0 0 0.9 0.99"); // skews should ease in a circular manner (although the associated scale ease should remain linear)
+				longTimeList.push(this.precision(lastTime + time * fract));
+			}
 			xList.push(this.precision(element.matrix.tx));
 			yList.push(this.precision(element.matrix.ty));
-			scxList.push(this.precision(element.scaleX));
-			scyList.push(this.precision(element.scaleY));
-			skxList.push(skewX);
-			skyList.push(skewY);
 			rotList.push(this.precision(rot));
 			trxList.push(this.precision(transPoint.x));
 			tryList.push(this.precision(transPoint.y));
@@ -1616,6 +1691,9 @@
 				tryList.push(tryList[tryList.length-1]);
 				splineList.push(splineList[splineList.length-1]);
 			}
+		},
+		_getRotHemisphere:function(rot){
+			return Math.floor((rot+90)/180);
 		},
 		_normaliseDegrees:function(deg){
 			deg = deg%360;
@@ -1661,7 +1739,10 @@
 			if(!found || !hasDifVals){
 				return false;
 			}
-
+			while(times.length>splineList.length){
+				// we use this so that scale values can use the short spline list (improves easing)
+				splineList.push(times[0]);
+			}
 
 			var lastVal = getValue(valueLists, 0);
 			var lastTime = times[0];
@@ -1723,7 +1804,9 @@
 		 * Gets the spline points for a motion tweened frame.
 		 * Spline data is in the format 'x1 y1 x2 y2;' (per frame)
 		 */
-		_getSplineData:function(frame){
+		_getSplineData:function(frame, incr){
+
+			if(incr==null)incr = 1;
 
 			// Tween support warnings, remove these as different tween settings gain support
 			if(frame.hasCustomEase)ext.warn('Custom easing is not yet supported (at frame '+frame.startFrame+")");
