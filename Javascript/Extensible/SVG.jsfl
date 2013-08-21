@@ -374,47 +374,49 @@
 			if(this.expandSymbols=="none")return;
 
 
-			if(this.expandSymbols=='usedOnce'){
-				for(var i in this._symbols){
-					var useList = this._symbolToUseNodes[i];
-					if(useList.length==1){
-						var symbol = this._symbols[i];
-						this.qData.push(closure(this.executeExpandUse, [symbol.@id, symbol, useList, this.doms[0].defs], this));
-					}
-				}
-			}
-			else if(this.expandSymbols=='nested'){
-				for(var i in this._symbols){
-					var useList = this._symbolToUseNodes[i];
-					var j=0;
-					while(j<useList.length){
-						var useNode = useList[j];
-						if(!isDescendant(this.doms[0].defs, useNode)){
-							useList.splice(j, 1);
-						}else{
-							++j;
-						}
-					}
-					if(useList.length>0){
-						var symbol = this._symbols[i];
-						this.qData.push(closure(this.executeExpandUse, [symbol.@id, symbol, useList, this.doms[0].defs], this));
-					}
-				}
-			}
-			else{
-				// expand all
-				for(var i in this._symbols){
-					var useList = this._symbolToUseNodes[i];
-					var symbol = this._symbols[i];
-					this.qData.push(closure(this.executeExpandUse, [symbol.@id, symbol, useList, this.doms[0].defs], this));
-				}
-			}
-
-
-			// for(var i=0; i<this.doms.length; ++i){
-			// 	var dom = this.doms[i];
-			// 	this.qData.push(closure(this.checkExpand, [dom, dom.defs, dom, onceUsed, this.expandSymbols=="nested"], this));
+			// if(this.expandSymbols=='usedOnce'){
+			// 	for(var i in this._symbols){
+			// 		var useList = this._symbolToUseNodes[i];
+			// 		if(useList.length==1){
+			// 			var symbol = this._symbols[i];
+			// 			this.qData.push(closure(this.executeExpandUse, [symbol.@id, symbol, useList, this.doms[0].defs], this));
+			// 		}
+			// 	}
 			// }
+			// else if(this.expandSymbols=='nested'){
+			// 	for(var i in this._symbols){
+			// 		var useList = this._symbolToUseNodes[i];
+			// 		var j=0;
+			// 		while(j<useList.length){
+			// 			var useNode = useList[j];
+			// 			if(!isDescendant(this.doms[0].defs, useNode)){
+			// 				useList.splice(j, 1);
+			// 			}else{
+			// 				++j;
+			// 			}
+			// 		}
+			// 		if(useList.length>0){
+			// 			var symbol = this._symbols[i];
+			// 			this.qData.push(closure(this.executeExpandUse, [symbol.@id, symbol, useList, this.doms[0].defs], this));
+			// 		}
+			// 	}
+			// }
+			// else{
+			// 	// expand all
+			// 	for(var i in this._symbols){
+			// 		var useList = this._symbolToUseNodes[i];
+			// 		var symbol = this._symbols[i];
+			// 		this.qData.push(closure(this.executeExpandUse, [symbol.@id, symbol, useList, this.doms[0].defs], this));
+			// 	}
+			// }
+
+
+			var onceUsed = this.expandSymbols=='usedOnce';
+			var nested = this.expandSymbols=='nested';
+			for(var i=0; i<this.doms.length; ++i){
+				var dom = this.doms[i];
+				this.qData.push(closure(this.checkExpand, [dom, dom.defs, dom, onceUsed, nested], this));
+			}
 		},
 		isDescendant:function(parent, child){
 			while(child.parent()){
@@ -425,62 +427,62 @@
 			}
 			return false;
 		},
-		// checkExpand:function(element, defs, root, onceUsed, nested){
-		// 	//fl.trace("checkExpand:"+element.localName()+" "+element.@id+" "+element.childIndex());
-		// 	var id;
-		// 	if(element.localName()=="use" && (id = element['@xlink-href'])){
-		// 		var allUseNodes = root..use;
-		// 		var useList = [];
-		// 		for(var i=0; i<allUseNodes.length(); i++){
-		// 			var node = allUseNodes[i];
-		// 			if(node['@xlink-href']==id){
-		// 				useList.push(node);
-		// 			}
-		// 		}
+		checkExpand:function(element, defs, root, onceUsed, nested){
+			//fl.trace("checkExpand:"+element.localName()+" "+element.@id+" "+element.childIndex());
+			var id;
+			if(element.localName()=="use" && (id = element['@xlink-href'])){
+				var allUseNodes = root..use;
+				var useList = [];
+				for(var i=0; i<allUseNodes.length(); i++){
+					var node = allUseNodes[i];
+					if(node['@xlink-href']==id){
+						useList.push(node);
+					}
+				}
 
-		// 		//fl.trace("Ex: "+id+" "+useList.length);
-		// 		var symbol=defs.symbol.("#"+@id==id);
-		// 		if(symbol && symbol.length() && (!nested || (symbol[0]..use && symbol[0]..use.length()))
-		// 			&& (!onceUsed || useList.length==1)){
+				//fl.trace("Ex: "+id+" "+useList.length);
+				var symbol=defs.symbol.("#"+@id==id);
+				if(symbol && symbol.length() && (!nested || (symbol[0]..use && symbol[0]..use.length()))
+					&& (!onceUsed || useList.length==1)){
 
-		// 			this.executeExpandUse(id, symbol, useList, defs);
+					this.executeExpandUse(id, symbol, useList, defs);
 
-		// 			if(isNaN(element.childIndex())){
-		// 				// symbol was swapped in for use node
-		// 				element = symbol;
-		// 				fl.trace("switch: "+element.localName());
-		// 			}
-		// 			fl.trace("Ex: "+id+" "+element.childIndex());
-		// 		}
+					if(isNaN(element.childIndex())){
+						// symbol was swapped in for use node
+						element = symbol;
+						fl.trace("switch: "+element.localName());
+					}
+					fl.trace("Ex: "+id+" "+element.childIndex());
+				}
 
-		// 	}
+			}
 
-		// 	var children = element.children();
-		// 	if(children.length()){
-		// 		// goto first child
-		// 		fl.trace("\tChild: "+element.localName()+" "+children[0].localName()+" "+children[0].@id);
-		// 		this.qData.unshift(closure(this.checkExpand, [children[0], defs, root, onceUsed, nested], this));
-		// 		return;
-		// 	}
+			var children = element.children();
+			if(children.length()){
+				// goto first child
+				fl.trace("\tChild: "+element.localName()+" "+children[0].localName()+" "+children[0].@id);
+				this.qData.unshift(closure(this.checkExpand, [children[0], defs, root, onceUsed, nested], this));
+				return;
+			}
 
-		// 	if(!element.parent())return; // empty root?
+			if(!element.parent())return; // empty root?
 
-		// 	var siblings = element.parent().children();
-		// 	var index = element.childIndex();
-		// 	//fl.trace("> "+element.parent().localName()+" "+element.localName()+" "+index+" "+index);
-		// 	while(index==siblings.length()-1){
-		// 		element = element.parent();
-		// 		if(!element.parent() || element==root)return; // finished
+			var siblings = element.parent().children();
+			var index = element.childIndex();
+			//fl.trace("> "+element.parent().localName()+" "+element.localName()+" "+index+" "+index);
+			while(index==siblings.length()-1){
+				element = element.parent();
+				if(!element.parent() || element==root)return; // finished
 
-		// 		fl.trace("\t\tUp:"+element.@id+" "+element.parent().@id+" "+index+" "+siblings.length());
-		// 		siblings = element.parent().children();
-		// 		index = element.childIndex();
+				fl.trace("\t\tUp:"+element.@id+" "+element.parent().@id+" "+index+" "+siblings.length());
+				siblings = element.parent().children();
+				index = element.childIndex();
 
-		// 	}
-		// 	// goto next sibling (of self or first ancestor with a next sibling)
-		// 	fl.trace("\tNext:"+element.localName()+" "+element.@id+" "+siblings[index+1].localName()+" "+siblings[index+1].@id+" "+index+" "+siblings.length()+" "+(element==siblings[index+1])+" "+(element==siblings[index]));
-		// 	this.qData.unshift(closure(this.checkExpand, [siblings[index+1], defs, root, onceUsed, nested], this));
-		// },
+			}
+			// goto next sibling (of self or first ancestor with a next sibling)
+			fl.trace("\tNext:"+element.localName()+" "+element.@id+" "+siblings[index+1].localName()+" "+siblings[index+1].@id+" "+index+" "+siblings.length()+" "+(element==siblings[index+1])+" "+(element==siblings[index]));
+			this.qData.unshift(closure(this.checkExpand, [siblings[index+1], defs, root, onceUsed, nested], this));
+		},
 		/*processRemoveUnused:function(){
 			var onceUsed = this.expandSymbols=='usedOnce';
 			for(var i=0; i<this.doms.length; ++i){
@@ -1152,6 +1154,7 @@
 					// 	animDur = settings.totalDuration;
 					// }else{
 						animDur = this.precision(totFrames*(1/ext.doc.frameRate));
+						var smallAnimDur = this.precision((totFrames-1)*(1/ext.doc.frameRate)); // when assigning keyframes with time values, we behave as if the timeline is 1 frame shorter so the last KF acts as an end-point
 					// }
 
 					animNode.@dur = animDur+"s";
@@ -1339,7 +1342,7 @@
 
 								var tweensFound = (frame.tweenType!="none");
 
-								var time = settings.timeOffset+(n*(1/ext.doc.frameRate))/animDur;
+								var time = settings.timeOffset+(n*(1/ext.doc.frameRate))/smallAnimDur;
 								this._addAnimFrame(frame, element, time, rot, element.skewX, element.skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, timeList, splineList, longTimeList, longSplineList);
 								
 								var lastRot = rot;
@@ -1366,7 +1369,7 @@
 
 											var attemptForeRot = true;
 											var attemptBackRot = true;
-											var time = settings.timeOffset+(frameEnd*(1/ext.doc.frameRate))/(animDur-1);
+											var time = (settings.timeOffset+frameEnd*(1/ext.doc.frameRate))/smallAnimDur;
 											if(lastFrame.tweenType=="none"){
 												timeList.push(this.precision(time-0.0000001));
 												longTimeList.push(this.precision(time-0.0000001));
@@ -1448,30 +1451,30 @@
 									longSplineList.pop();
 								}
 								var matrix = this._cloneMatrix(element.matrix);
-								if(this._addAnimationNode(elementXML, "translate", [xList, yList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)){
+								if(this._addAnimationNode(elementXML, "translate", [xList, yList], longTimeList, animDur, splineList, tweensFound, null, settings.beginAnimation)){
 									matrix.tx = 0;
 									matrix.ty = 0;
 								}
-								if((hasSkewX && hasSkewY) || (!hasSkewX && !hasSkewY)){
-									for(var h=0; h<skxList.length; h++){
-										skxList[h] -= rotList[h];
-									}
-									for(var h=0; h<skyList.length; h++){
-										skyList[h] -= rotList[h];
-									}
+								//if((hasSkewX && hasSkewY) || (!hasSkewX && !hasSkewY)){
+									// for(var h=0; h<skxList.length; h++){
+									// 	skxList[h] -= rotList[h];
+									// }
+									// for(var h=0; h<skyList.length; h++){
+									// 	skyList[h] -= rotList[h];
+									// }
 									if(this._addAnimationNode(elementXML, "rotate", [rotList, trxList, tryList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)){
 										matrix.a = element.scaleX;
 										matrix.b = 0;
 										matrix.c = 0;
 										matrix.d = element.scaleY;
 									}
-								}
-								for(var h=0; h<skxList.length; h++){
-									skxList[h] = this.precision(skxList[h]);
-								}
-								for(var h=0; h<skyList.length; h++){
-									skyList[h] = this.precision(skyList[h]);
-								}
+								//}
+								// for(var h=0; h<skxList.length; h++){
+								// 	skxList[h] = this.precision(skxList[h]);
+								// }
+								// for(var h=0; h<skyList.length; h++){
+								// 	skyList[h] = this.precision(skyList[h]);
+								// }
 								if(hasSkewX && this._addAnimationNode(elementXML, "skewX", [skxList], longTimeList, animDur, longSplineList, tweensFound, null, settings.beginAnimation)){
 									matrix.a = element.scaleX;
 									matrix.b = 0;
@@ -1596,15 +1599,27 @@
 			return instanceXML;
 		},
 		_addAnimFrame:function(frame, element, time, rot, skewX, skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, timeList, splineList, longTimeList, longSplineList){
-											
 			transPoint = element.getTransformationPoint();
+
+
+			// flash duplicates the data accross the properties, we just want the difference
+			if(Math.abs(skewX)<Math.abs(skewY)){
+				rot = skewX;
+			}else{
+				rot = skewY;
+			}
+			skewX -= rot;
+			skewY -= rot;							
+			//skewX = -skewX;
 
 			var xHem = this._getRotHemisphere(skewX);
 			var yHem = this._getRotHemisphere(skewY);
 			var incrList = [];
 			var timeTotal;
 			var lastTime;
-			if(timeList.length && frame.tweenType!="none"){
+			if(timeList.length){
+				var lastX = xList[xList.length-1];
+				var lastY = yList[yList.length-1];
 				var lastScX = scxList[scxList.length-1];
 				var lastScY = scyList[scyList.length-1];
 				var lastSkX = skxList[skxList.length-1];
@@ -1614,24 +1629,44 @@
 				timeTotal = time - lastTime;
 				timeStep = timeTotal;
 				var xHemLast = this._getRotHemisphere(lastSkX);
+						fl.trace("inc: "+time+" "+lastTime);
 				if(xHem!=xHemLast){
 					var dist = skewX-lastSkX;
 					if(dist>0){ // increasing
-						incrList.push((((xHemLast+1)*180-90)-lastSkX)/dist*timeTotal); // add for the first time it crosses the x-axis (shorter interval than the others)
-						for(var i=xHemLast+1; i<xHem; ++i){
-							incrList.push((i*180-90)/dist*timeTotal); // add an increment for each following time it crosses the x-axis
+						var baseTime = ((xHemLast+1)*180-90-lastSkX)/dist*timeTotal;
+						incrList.push(baseTime); // add for the first time it crosses the x-axis (shorter interval than the others)
+						var count = xHemLast-xHem;
+						for(var i=1; i<count; ++i){
+							incrList.push(((xHemLast+1+i)*180-90-lastSkX)/dist*timeTotal); // add an increment for each following time it crosses the x-axis
+						}
+					}else{ // decreasing
+						var baseTime = ((xHemLast-1)*180+90-lastSkX)/dist*timeTotal;
+						incrList.push(baseTime); // add for the first time it crosses the x-axis (shorter interval than the others)
+						var count = xHem-xHemLast;
+						for(var i=1; i<count; ++i){
+							incrList.push(((xHemLast-1-i)*180+90-lastSkX)/dist*timeTotal); // add an increment for each following time it crosses the x-axis
 						}
 					}
 				}
 				var yHemLast = this._getRotHemisphere(lastSkY);
+						fl.trace("inc: "+yHem+" "+yHemLast);
 				if(yHem!=yHemLast){
 					var dist = skewY-lastSkY;
 					if(dist>0){ // increasing
-						var time2 = (((yHemLast+1)*180-90)-lastSkY)/dist*timeTotal;
-						if(incrList.indexOf(time2)==-1)incrList.push(time2); // add for the first time it crosses the x-axis (shorter interval than the others)
-						for(var i=yHemLast+1; i<yHem; ++i){
-							var time2 = (i*180-90)/dist*timeTotal;
-							if(incrList.indexOf(time2)==-1)incrList.push(time2); // add an increment for each following time it crosses the x-axis
+						var baseTime = ((yHemLast+1)*180-90-lastSkY)/dist*timeTotal;
+						if(incrList.indexOf(baseTime)==-1)incrList.push(baseTime); // add for the first time it crosses the y-axis (shorter interval than the others)
+						var count = yHemLast-yHem;
+						for(var i=1; i<count; ++i){
+							var incr = ((yHemLast+1+i)*180-90-lastSkY)/dist*timeTotal;
+							if(incrList.indexOf(incr)==-1)incrList.push(incr); // add an increment for each following time it crosses the y-axis
+						}
+					}else{ // decreasing
+						var baseTime = ((yHemLast-1)*180+90-lastSkY)/dist*timeTotal;
+						if(incrList.indexOf(baseTime)==-1)incrList.push(baseTime); // add for the first time it crosses the y-axis (shorter interval than the others)
+						var count = yHem-yHemLast;
+						for(var i=1; i<count; ++i){
+							var incr = ((yHemLast-1-i)*180+90-lastSkY)/dist*timeTotal;
+							if(incrList.indexOf(incr)==-1)incrList.push(incr); // add an increment for each following time it crosses the y-axis
 						}
 					}
 				}
@@ -1640,16 +1675,19 @@
 					incrList.push(timeTotal);
 				}
 			}else{
+				var lastX = 0;
+				var lastY = 0;
 				var lastScX = 0;
 				var lastScY = 0;
 				var lastSkX = 0;
 				var lastSkY = 0;
-				var lastRot = 0;
 				timeTotal = 1;
 				incrList.push(1);
 				lastTime = 0;
 			}
 
+			var xDif = element.matrix.tx - lastX;
+			var yDif = element.matrix.ty - lastY;
 			// convert scale & skew to HTML compatible values
 			var scXDif = (element.scaleX * Math.cos(skewY*Math.PI/180)) - lastScX;
 			var scYDif = (element.scaleY * Math.cos(skewX*Math.PI/180)) - lastScY;
@@ -1661,20 +1699,34 @@
 				var incr = incrList[i];
 				var fract = incr/timeTotal;
 
+				var skX = lastSkX + skXDif * fract;
+				var skY = lastSkY + skYDif * fract;
+
+				// fl.trace("key: "+skewX+" "+skewY+" "+rot+" "+transPoint.y+" "+Math.sin(skewX * Math.PI / 180)+" "+(transPoint.y * Math.sin(skewX * Math.PI / 180)));
+				// var x = element.matrix.tx;
+				// x -= (transPoint.y * Math.cos(skX * Math.PI / 180));
 				
+				var xOffset = (transPoint.y * Math.sin(skX * Math.PI / 180));
+				var yOffset = (transPoint.y * Math.sin(skY / 2 * Math.PI / 180) * 2);
+				fl.trace("\tadd: "+skX+" "+xOffset+" "+yOffset);
+				xList.push(this.precision(lastX + xDif * fract + xOffset));
+				yList.push(this.precision(lastY + yDif * fract + yOffset));
 				scxList.push(this.precision(lastScX + scXDif * fract));
 				scyList.push(this.precision(lastScY + scYDif * fract));
-				skxList.push(this.precision(lastSkX + skXDif * fract));
-				skyList.push(this.precision(lastSkY + skYDif * fract));
+				skxList.push(this.precision(skX));
+				skyList.push(this.precision(skY));
 
 				longSplineList.push("0 0 0.9 0.99"); // skews should ease in a circular manner (although the associated scale ease should remain linear)
 				longTimeList.push(this.precision(lastTime + time * fract));
 			}
-			xList.push(this.precision(element.matrix.tx));
-			yList.push(this.precision(element.matrix.ty));
+				fl.trace("hm: "+xList+" "+yList);
+			// xList.push(this.precision(element.matrix.tx));
+			// yList.push(this.precision(element.matrix.ty));
 			rotList.push(this.precision(rot));
-			trxList.push(this.precision(transPoint.x));
-			tryList.push(this.precision(transPoint.y));
+			//trxList.push(this.precision(transPoint.x));
+			//tryList.push(this.precision(transPoint.y));
+			trxList.push(0);
+			tryList.push(0); // only rotation supports a transform point so we're better off using none
 
 			splineList.push(this._getSplineData(frame));
 			timeList.push(this.precision(time));
