@@ -84,7 +84,7 @@
 			this.frames=new ext.Array([]);
 			if(this.source=='current'){
 				this.startFrame=ext.frame;
-				this.endFrame=ext.frame+1;
+				this.endFrame=ext.frame;
 			}else{
 				this.startFrame=0;
 				this.endFrame=1;
@@ -93,13 +93,13 @@
 			this.startFrame=0;
 
 			if(this.source=='current'){
-				this.endFrame = ext.timeline.$.frameCount;
+				this.endFrame = ext.timeline.$.frameCount-1;
 			}else if(this.source=='libraryItems'){
-				this.endFrame=1;
+				this.endFrame=0;
 				for(var i=0;i<selectedItems.length;i++){
 					timeline=selectedItems[i].timeline;
-					if(timeline.$.frameCount>this.endFrame){
-						this.endFrame = timeline.$.frameCount;
+					if(timeline.$.frameCount-1>this.endFrame){
+						this.endFrame = timeline.$.frameCount-1;
 					}
 				}
 			}
@@ -689,7 +689,13 @@
 					// if(useNode.@height)symbol.@height = useNode.@height;
 					// if(useNode.@x)symbol.@x = useNode.@x;
 					// if(useNode.@y)symbol.@id = useNode.@y;
+					delete useNode['@xlink-href'];
+					delete useNode['@width'];
+					delete useNode['@height'];
+					delete useNode['@x'];
+					delete useNode['@y'];
 					this.copyNodeContents(useNode, symbol);
+					delete symbol['@viewBox'];
 
 					if(useNode.@transform && useNode.@transform!=this.IDENTITY_MATRIX)symbol.@transform = useNode.@transform;
 					delete useNode.parent().children()[useNode.childIndex()];
@@ -971,11 +977,15 @@
 			//var selection=settings.selection.byFrame({stacked:true});
 			var xml,instanceXML,id;
 
-			if(settings.endFrame > settings.startFrame+settings.frameCount-1){
-				settings.endFrame = settings.startFrame+settings.frameCount-1;
-			}
-			if(settings.endFrame > timeline.frameCount-1){
-				settings.endFrame = timeline.frameCount-1;
+			if(settings.frameCount==null){
+				settings.frameCount = settings.endFrame-settings.startFrame+1;
+			}else{
+				if(settings.endFrame > settings.startFrame+settings.frameCount-1){
+					settings.endFrame = settings.startFrame+settings.frameCount-1;
+				}
+				if(settings.endFrame > timeline.frameCount-1){
+					settings.endFrame = timeline.frameCount-1;
+				}
 			}
 
 			var symbolIDString = timeline.name;
@@ -1154,7 +1164,7 @@
 					// 	animDur = settings.totalDuration;
 					// }else{
 						animDur = this.precision(totFrames*(1/ext.doc.frameRate));
-						var smallAnimDur = this.precision((totFrames-1)*(1/ext.doc.frameRate)); // when assigning keyframes with time values, we behave as if the timeline is 1 frame shorter so the last KF acts as an end-point
+						var smallAnimDur = (totFrames-1)*(1/ext.doc.frameRate); // when assigning keyframes with time values, we behave as if the timeline is 1 frame shorter so the last KF acts as an end-point
 					// }
 
 					animNode.@dur = animDur+"s";
@@ -1423,7 +1433,6 @@
 
 											this._addAnimFrame(nextFrame, nextElement, time, rot, skewX, skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, timeList, splineList, longTimeList, longSplineList);
 
-
 											if(nextFrame.tweenType!="none")tweensFound = true;
 
 											animatedFrames[i+"-"+frameEnd] = true;
@@ -1589,8 +1598,8 @@
 			instanceXML['@transform'] = this._getMatrix(settings.matrix);
 			if(settings.isRoot && settings.libraryItem){
 				dom.@viewBox = viewBox;
-				dom.@width = result.@width;
-				dom.@height = result.@height;
+				dom.@width = instanceXML.@width;
+				dom.@height = instanceXML.@height;
 			}
 
 			if(ext.log){
@@ -1603,14 +1612,15 @@
 
 
 			// flash duplicates the data accross the properties, we just want the difference
-			if(Math.abs(skewX)<Math.abs(skewY)){
-				rot = skewX;
-			}else{
-				rot = skewY;
-			}
+			// if(Math.abs(skewX)<Math.abs(skewY)){
+			// 	rot = skewX;
+			// }else{
+			// 	rot = skewY;
+			// }
 			skewX -= rot;
-			skewY -= rot;							
-			//skewX = -skewX;
+			skewY -= rot;		
+			skewX = -skewX;
+			fl.trace("anim: "+skewX+" "+skewY+" "+rot);
 
 			var xHem = this._getRotHemisphere(skewX);
 			var yHem = this._getRotHemisphere(skewY);
@@ -1629,7 +1639,6 @@
 				timeTotal = time - lastTime;
 				timeStep = timeTotal;
 				var xHemLast = this._getRotHemisphere(lastSkX);
-						fl.trace("inc: "+time+" "+lastTime);
 				if(xHem!=xHemLast){
 					var dist = skewX-lastSkX;
 					if(dist>0){ // increasing
@@ -1649,7 +1658,6 @@
 					}
 				}
 				var yHemLast = this._getRotHemisphere(lastSkY);
-						fl.trace("inc: "+yHem+" "+yHemLast);
 				if(yHem!=yHemLast){
 					var dist = skewY-lastSkY;
 					if(dist>0){ // increasing
@@ -1701,30 +1709,21 @@
 
 				var skX = lastSkX + skXDif * fract;
 				var skY = lastSkY + skYDif * fract;
-
-				// fl.trace("key: "+skewX+" "+skewY+" "+rot+" "+transPoint.y+" "+Math.sin(skewX * Math.PI / 180)+" "+(transPoint.y * Math.sin(skewX * Math.PI / 180)));
-				// var x = element.matrix.tx;
-				// x -= (transPoint.y * Math.cos(skX * Math.PI / 180));
 				
 				var xOffset = (transPoint.y * Math.sin(skX * Math.PI / 180));
-				var yOffset = (transPoint.y * Math.sin(skY / 2 * Math.PI / 180) * 2);
-				fl.trace("\tadd: "+skX+" "+xOffset+" "+yOffset);
-				xList.push(this.precision(lastX + xDif * fract + xOffset));
-				yList.push(this.precision(lastY + yDif * fract + yOffset));
+				var yOffset = (transPoint.y * Math.sin(skY * Math.PI / 180));
+				xList.push(this.precision(lastX + xDif * fract - xOffset));
+				yList.push(this.precision(lastY + yDif * fract - yOffset));
 				scxList.push(this.precision(lastScX + scXDif * fract));
 				scyList.push(this.precision(lastScY + scYDif * fract));
 				skxList.push(this.precision(skX));
 				skyList.push(this.precision(skY));
 
+				fl.trace("\tadd: "+incr+" "+skX+" "+skY);
 				longSplineList.push("0 0 0.9 0.99"); // skews should ease in a circular manner (although the associated scale ease should remain linear)
 				longTimeList.push(this.precision(lastTime + time * fract));
 			}
-				fl.trace("hm: "+xList+" "+yList);
-			// xList.push(this.precision(element.matrix.tx));
-			// yList.push(this.precision(element.matrix.ty));
 			rotList.push(this.precision(rot));
-			//trxList.push(this.precision(transPoint.x));
-			//tryList.push(this.precision(transPoint.y));
 			trxList.push(0);
 			tryList.push(0); // only rotation supports a transform point so we're better off using none
 
@@ -1793,7 +1792,7 @@
 			}
 			while(times.length>splineList.length){
 				// we use this so that scale values can use the short spline list (improves easing)
-				splineList.push(times[0]);
+				splineList.push(splineList[0]);
 			}
 
 			var lastVal = getValue(valueLists, 0);
