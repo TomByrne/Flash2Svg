@@ -1022,8 +1022,13 @@
 						includeGuidedTweens:true
 					});
 
+				 /**
+					If a graphic layer is completely in sync with the root timeline it gets exported as a whole timeline (like an MC).
+					Otherwise, it is exported frame by frame, which can be reused elsewhere (but is bigger).
+				 */
 				var syncedLayers = {};
 				layers = timeline.getLayers();
+				var frameOffset = settings.timeOffset/(1/ext.doc.frameRate);
 				for(var i=0;i<layers.length;i++){
 					var layer=layers[i];
 					var synced = true;
@@ -1036,7 +1041,7 @@
 						var frame=layer.frames[n];
 						if(frame.startFrame!=n)continue;
 						var element = frame.elements[0];
-						if(frame.elements.length!=1 || element.symbolType!="graphic" || element.firstFrame!=n || (lastElement && element.libraryItem!=lastElement.libraryItem)){
+						if(frame.elements.length!=1 || element.symbolType!="graphic" || frameOffset!=element.firstFrame || (lastElement && element.libraryItem!=lastElement.libraryItem) || (element.loop=="single frame" && frame.duration>1)){
 							synced = false;
 							break;
 						}
@@ -1460,40 +1465,26 @@
 									longSplineList.pop();
 								}
 								var matrix = this._cloneMatrix(element.matrix);
-								if(this._addAnimationNode(elementXML, "translate", [xList, yList], longTimeList, animDur, splineList, tweensFound, null, settings.beginAnimation)){
+								if(this._addAnimationNode(elementXML, "translate", [xList, yList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)){
 									matrix.tx = 0;
 									matrix.ty = 0;
 								}
-								//if((hasSkewX && hasSkewY) || (!hasSkewX && !hasSkewY)){
-									// for(var h=0; h<skxList.length; h++){
-									// 	skxList[h] -= rotList[h];
-									// }
-									// for(var h=0; h<skyList.length; h++){
-									// 	skyList[h] -= rotList[h];
-									// }
-									if(this._addAnimationNode(elementXML, "rotate", [rotList, trxList, tryList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)){
-										matrix.a = element.scaleX;
-										matrix.b = 0;
-										matrix.c = 0;
-										matrix.d = element.scaleY;
-									}
-								//}
-								// for(var h=0; h<skxList.length; h++){
-								// 	skxList[h] = this.precision(skxList[h]);
-								// }
-								// for(var h=0; h<skyList.length; h++){
-								// 	skyList[h] = this.precision(skyList[h]);
-								// }
-								if(hasSkewX && this._addAnimationNode(elementXML, "skewX", [skxList], longTimeList, animDur, longSplineList, tweensFound, null, settings.beginAnimation)){
+								if(this._addAnimationNode(elementXML, "rotate", [rotList, trxList, tryList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)){
 									matrix.a = element.scaleX;
 									matrix.b = 0;
+									matrix.c = 0;
+									matrix.d = element.scaleY;
 								}
-								if(hasSkewY && this._addAnimationNode(elementXML, "skewY", [skyList], longTimeList, animDur, longSplineList, tweensFound, null, settings.beginAnimation)){
+								// if(hasSkewX && this._addAnimationNode(elementXML, "skewX", [skxList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)){
+								// 	matrix.a = element.scaleX;
+								// 	matrix.b = 0;
+								// }
+								if(hasSkewY && this._addAnimationNode(elementXML, "skewY", [skyList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)){
 									matrix.c = 0;
 									matrix.d = element.scaleY;
 								}
 								// the ordering of these animation nodes is important
-								if(this._addAnimationNode(elementXML, "scale", [scxList, scyList], longTimeList, animDur, splineList, tweensFound, 1, settings.beginAnimation)){
+								if(this._addAnimationNode(elementXML, "scale", [scxList, scyList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation)){
 									matrix.a = 1;
 									matrix.d = 1;
 								}
@@ -1613,116 +1604,132 @@
 
 			// flash duplicates the data accross the properties, we just want the difference
 			// if(Math.abs(skewX)<Math.abs(skewY)){
-			// 	rot = skewX;
+			 	rot = skewX;
 			// }else{
 			// 	rot = skewY;
 			// }
-			skewX -= rot;
-			skewY -= rot;		
-			skewX = -skewX;
-			fl.trace("anim: "+skewX+" "+skewY+" "+rot);
+			// fl.trace("\nanim-pre: "+skewX+" "+skewY+" "+rot);
+			 skewX -= rot;
+			 skewY -= rot;		
+			// //skewX = -skewX;
+			// fl.trace("anim-post: "+skewX+" "+skewY+" "+rot);
 
-			var xHem = this._getRotHemisphere(skewX);
-			var yHem = this._getRotHemisphere(skewY);
-			var incrList = [];
-			var timeTotal;
-			var lastTime;
-			if(timeList.length){
-				var lastX = xList[xList.length-1];
-				var lastY = yList[yList.length-1];
-				var lastScX = scxList[scxList.length-1];
-				var lastScY = scyList[scyList.length-1];
-				var lastSkX = skxList[skxList.length-1];
-				var lastSkY = skyList[skyList.length-1];
+			// var xHem = this._getRotHemisphere(skewX);
+			// var yHem = this._getRotHemisphere(skewY);
+			// var incrList = [];
+			// var timeTotal;
+			// var lastTime;
+			// if(timeList.length){
+			// 	var lastX = xList[xList.length-1];
+			// 	var lastY = yList[yList.length-1];
+			// 	var lastScX = scxList[scxList.length-1];
+			// 	var lastScY = scyList[scyList.length-1];
+			// 	var lastSkX = skxList[skxList.length-1];
+			// 	var lastSkY = skyList[skyList.length-1];
 
-				lastTime = timeList[timeList.length-1];
-				timeTotal = time - lastTime;
-				timeStep = timeTotal;
-				var xHemLast = this._getRotHemisphere(lastSkX);
-				if(xHem!=xHemLast){
-					var dist = skewX-lastSkX;
-					if(dist>0){ // increasing
-						var baseTime = ((xHemLast+1)*180-90-lastSkX)/dist*timeTotal;
-						incrList.push(baseTime); // add for the first time it crosses the x-axis (shorter interval than the others)
-						var count = xHemLast-xHem;
-						for(var i=1; i<count; ++i){
-							incrList.push(((xHemLast+1+i)*180-90-lastSkX)/dist*timeTotal); // add an increment for each following time it crosses the x-axis
-						}
-					}else{ // decreasing
-						var baseTime = ((xHemLast-1)*180+90-lastSkX)/dist*timeTotal;
-						incrList.push(baseTime); // add for the first time it crosses the x-axis (shorter interval than the others)
-						var count = xHem-xHemLast;
-						for(var i=1; i<count; ++i){
-							incrList.push(((xHemLast-1-i)*180+90-lastSkX)/dist*timeTotal); // add an increment for each following time it crosses the x-axis
-						}
-					}
-				}
-				var yHemLast = this._getRotHemisphere(lastSkY);
-				if(yHem!=yHemLast){
-					var dist = skewY-lastSkY;
-					if(dist>0){ // increasing
-						var baseTime = ((yHemLast+1)*180-90-lastSkY)/dist*timeTotal;
-						if(incrList.indexOf(baseTime)==-1)incrList.push(baseTime); // add for the first time it crosses the y-axis (shorter interval than the others)
-						var count = yHemLast-yHem;
-						for(var i=1; i<count; ++i){
-							var incr = ((yHemLast+1+i)*180-90-lastSkY)/dist*timeTotal;
-							if(incrList.indexOf(incr)==-1)incrList.push(incr); // add an increment for each following time it crosses the y-axis
-						}
-					}else{ // decreasing
-						var baseTime = ((yHemLast-1)*180+90-lastSkY)/dist*timeTotal;
-						if(incrList.indexOf(baseTime)==-1)incrList.push(baseTime); // add for the first time it crosses the y-axis (shorter interval than the others)
-						var count = yHem-yHemLast;
-						for(var i=1; i<count; ++i){
-							var incr = ((yHemLast-1-i)*180+90-lastSkY)/dist*timeTotal;
-							if(incrList.indexOf(incr)==-1)incrList.push(incr); // add an increment for each following time it crosses the y-axis
-						}
-					}
-				}
-				incrList.sort();
-				if(incrList[incrList.length-1]!=timeTotal){
-					incrList.push(timeTotal);
-				}
-			}else{
-				var lastX = 0;
-				var lastY = 0;
-				var lastScX = 0;
-				var lastScY = 0;
-				var lastSkX = 0;
-				var lastSkY = 0;
-				timeTotal = 1;
-				incrList.push(1);
-				lastTime = 0;
-			}
+			// 	lastTime = timeList[timeList.length-1];
+			// 	timeTotal = time - lastTime;
+			// 	timeStep = timeTotal;
+			// 	var xHemLast = this._getRotHemisphere(lastSkX);
+			// 	if(xHem!=xHemLast){
+			// 		var dist = skewX-lastSkX;
+			// 		if(dist>0){ // increasing
+			// 			var baseTime = ((xHemLast+1)*180-90-lastSkX)/dist*timeTotal;
+			// 			incrList.push(baseTime); // add for the first time it crosses the x-axis (shorter interval than the others)
+			// 			var count = xHemLast-xHem;
+			// 			for(var i=1; i<count; ++i){
+			// 				incrList.push(((xHemLast+1+i)*180-90-lastSkX)/dist*timeTotal); // add an increment for each following time it crosses the x-axis
+			// 			}
+			// 		}else{ // decreasing
+			// 			var baseTime = ((xHemLast-1)*180+90-lastSkX)/dist*timeTotal;
+			// 			incrList.push(baseTime); // add for the first time it crosses the x-axis (shorter interval than the others)
+			// 			var count = xHem-xHemLast;
+			// 			for(var i=1; i<count; ++i){
+			// 				incrList.push(((xHemLast-1-i)*180+90-lastSkX)/dist*timeTotal); // add an increment for each following time it crosses the x-axis
+			// 			}
+			// 		}
+			// 	}
+			// 	var yHemLast = this._getRotHemisphere(lastSkY);
+			// 	if(yHem!=yHemLast){
+			// 		var dist = skewY-lastSkY;
+			// 		if(dist>0){ // increasing
+			// 			var baseTime = ((yHemLast+1)*180-90-lastSkY)/dist*timeTotal;
+			// 			if(incrList.indexOf(baseTime)==-1)incrList.push(baseTime); // add for the first time it crosses the y-axis (shorter interval than the others)
+			// 			var count = yHemLast-yHem;
+			// 			for(var i=1; i<count; ++i){
+			// 				var incr = ((yHemLast+1+i)*180-90-lastSkY)/dist*timeTotal;
+			// 				if(incrList.indexOf(incr)==-1)incrList.push(incr); // add an increment for each following time it crosses the y-axis
+			// 			}
+			// 		}else{ // decreasing
+			// 			var baseTime = ((yHemLast-1)*180+90-lastSkY)/dist*timeTotal;
+			// 			if(incrList.indexOf(baseTime)==-1)incrList.push(baseTime); // add for the first time it crosses the y-axis (shorter interval than the others)
+			// 			var count = yHem-yHemLast;
+			// 			for(var i=1; i<count; ++i){
+			// 				var incr = ((yHemLast-1-i)*180+90-lastSkY)/dist*timeTotal;
+			// 				if(incrList.indexOf(incr)==-1)incrList.push(incr); // add an increment for each following time it crosses the y-axis
+			// 			}
+			// 		}
+			// 	}
+			// 	incrList.sort();
+			// 	if(incrList[incrList.length-1]!=timeTotal){
+			// 		incrList.push(timeTotal);
+			// 	}
+			// }else{
+			// 	var lastX = 0;
+			// 	var lastY = 0;
+			// 	var lastScX = 0;
+			// 	var lastScY = 0;
+			// 	var lastSkX = 0;
+			// 	var lastSkY = 0;
+			// 	timeTotal = 1;
+			// 	incrList.push(1);
+			// 	lastTime = 0;
+			// }
 
-			var xDif = element.matrix.tx - lastX;
-			var yDif = element.matrix.ty - lastY;
-			// convert scale & skew to HTML compatible values
-			var scXDif = (element.scaleX * Math.cos(skewY*Math.PI/180)) - lastScX;
-			var scYDif = (element.scaleY * Math.cos(skewX*Math.PI/180)) - lastScY;
-			var skXDif = (skewX * (xHem%2?-1:1)) - lastSkX;
-			var skYDif = (skewY * (yHem%2?-1:1)) - lastSkY;
+			// var xDif = element.matrix.tx - lastX;
+			// var yDif = element.matrix.ty - lastY;
+			// // convert scale & skew to HTML compatible values
+			// // var scXDif = (element.scaleX * Math.cos(skewY*Math.PI/180)) - lastScX;
+			// // var scYDif = (element.scaleY * Math.cos(skewX*Math.PI/180)) - lastScY;
+			// var scXDif = (element.scaleX) - lastScX;
+			// var scYDif = (element.scaleY) - lastScY;
+
+			// because html doesn't mirror things when skewing across the axis
+			// var skXDif = (skewX * (xHem%2?-1:1)) - lastSkX;
+			// var skYDif = (skewY * (yHem%2?-1:1)) - lastSkY;
+			// var skXDif = skewX - lastSkX;
+			// var skYDif = skewY - lastSkY;
 
 
-			for(var i=0; i<incrList.length; ++i){
-				var incr = incrList[i];
-				var fract = incr/timeTotal;
+			// for(var i=0; i<incrList.length; ++i){
+			// 	var incr = incrList[i];
+			// 	var fract = incr/timeTotal;
 
-				var skX = lastSkX + skXDif * fract;
-				var skY = lastSkY + skYDif * fract;
+			// 	var skX = lastSkX + skXDif * fract;
+			// 	var skY = lastSkY + skYDif * fract;
 				
-				var xOffset = (transPoint.y * Math.sin(skX * Math.PI / 180));
-				var yOffset = (transPoint.y * Math.sin(skY * Math.PI / 180));
-				xList.push(this.precision(lastX + xDif * fract - xOffset));
-				yList.push(this.precision(lastY + yDif * fract - yOffset));
-				scxList.push(this.precision(lastScX + scXDif * fract));
-				scyList.push(this.precision(lastScY + scYDif * fract));
-				skxList.push(this.precision(skX));
-				skyList.push(this.precision(skY));
+			// 	var xOffset = (transPoint.y * Math.sin(skX * Math.PI / 180));
+			// 	var yOffset = (transPoint.y * Math.sin(skY * Math.PI / 180));
+			// 	xList.push(this.precision(lastX + xDif * fract - xOffset));
+			// 	yList.push(this.precision(lastY + yDif * fract - yOffset));
+			// 	scxList.push(this.precision(lastScX + scXDif * fract));
+			// 	scyList.push(this.precision(lastScY + scYDif * fract));
+			// 	skxList.push(this.precision(skX));
+			// 	skyList.push(this.precision(skY));
 
-				fl.trace("\tadd: "+incr+" "+skX+" "+skY);
-				longSplineList.push("0 0 0.9 0.99"); // skews should ease in a circular manner (although the associated scale ease should remain linear)
-				longTimeList.push(this.precision(lastTime + time * fract));
-			}
+			// 	fl.trace("\tadd: "+incr+" "+skX+" "+skY);
+			// 	longSplineList.push("0 0 0.9 0.99"); // skews should ease in a circular manner (although the associated scale ease should remain linear)
+			// 	longTimeList.push(this.precision(lastTime + time * fract));
+			// }
+			
+			var flip = Math.abs(skewY)>90 && Math.abs(skewY)<270;
+			fl.trace("flip: "+flip);
+			xList.push(this.precision(element.matrix.tx));
+			yList.push(this.precision(element.matrix.ty));
+			scxList.push(this.precision(element.scaleX * (flip?-1:1)));
+			scyList.push(this.precision(element.scaleY));
+			skxList.push(this.precision(element.matrix.b));
+			skyList.push(this.precision(element.matrix.c));
 			rotList.push(this.precision(rot));
 			trxList.push(0);
 			tryList.push(0); // only rotation supports a transform point so we're better off using none

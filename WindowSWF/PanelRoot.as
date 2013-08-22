@@ -89,11 +89,11 @@ package{
 					'if(!this.extensible){',
 					'	fl.runScript(fl.configURI+"Javascript/Extensible/init.jsfl");',
 					'}',
-					'extensible.dev.valueOf()'
+					'extensible.dev'
 				].join('\n'))=='true'
 			);
 			_dev = true;
-			var jsDir:String = MMExecute('extensible.dir.valueOf()');
+			var jsDir:String = MMExecute('extensible.dir');
 
 			_panelSettings = new SettingsSaver(jsDir+'/Settings/SVGPanel/', true);
 			_panelSettings.addSetting(this, "dev", "dev", _dev);
