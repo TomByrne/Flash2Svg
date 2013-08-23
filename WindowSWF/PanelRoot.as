@@ -444,14 +444,12 @@ package{
 		
 		private function processQue(e:Event):void
 		{
-			Fl.log("processQue");
 			if(this.isCanceled||this.finished){return;}
 			//if(this.timer.delay<100){this.timer.delay=100;}
 			// attempt to process the que
 			var success,err;
 			try{
 				success=MMExecute('extensible.que.process()');
-			Fl.log("processQue: "+success);
 			}catch(err){
 				Fl.log("processQue.err: "+err);
 			}

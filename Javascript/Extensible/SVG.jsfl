@@ -260,7 +260,7 @@
 					//this.qData.push(closure(this.processRemoveUnused, [], this));
 					break;
 				case this.STATE_FINALISING_FILES:
-					this.qData.push(closure(this.processFinaliseFiles, [], this));
+					this.qData.push(closure(this.processFinaliseDocuments, [], this));
 					break;
 				case this.STATE_CLEANUP:
 					this.qData.push(closure(this.processCleanup, [], this));
@@ -445,6 +445,7 @@
 				if(symbol && symbol.length() && (!nested || (symbol[0]..use && symbol[0]..use.length()))
 					&& (!onceUsed || useList.length==1)){
 
+					fl.trace("executeExpandUse: "+id+" "+useList.length);
 					this.executeExpandUse(id, symbol, useList, defs);
 
 					if(isNaN(element.childIndex())){
@@ -460,7 +461,7 @@
 			var children = element.children();
 			if(children.length()){
 				// goto first child
-				fl.trace("\tChild: "+element.localName()+" "+children[0].localName()+" "+children[0].@id);
+				//fl.trace("\tChild: "+element.localName()+" "+children[0].localName()+" "+children[0].@id);
 				this.qData.unshift(closure(this.checkExpand, [children[0], defs, root, onceUsed, nested], this));
 				return;
 			}
@@ -474,13 +475,13 @@
 				element = element.parent();
 				if(!element.parent() || element==root)return; // finished
 
-				fl.trace("\t\tUp:"+element.@id+" "+element.parent().@id+" "+index+" "+siblings.length());
+				//fl.trace("\t\tUp:"+element.@id+" "+element.parent().@id+" "+index+" "+siblings.length());
 				siblings = element.parent().children();
 				index = element.childIndex();
 
 			}
 			// goto next sibling (of self or first ancestor with a next sibling)
-			fl.trace("\tNext:"+element.localName()+" "+element.@id+" "+siblings[index+1].localName()+" "+siblings[index+1].@id+" "+index+" "+siblings.length()+" "+(element==siblings[index+1])+" "+(element==siblings[index]));
+			//fl.trace("\tNext:"+element.localName()+" "+element.@id+" "+siblings[index+1].localName()+" "+siblings[index+1].@id+" "+index+" "+siblings.length()+" "+(element==siblings[index+1])+" "+(element==siblings[index]));
 			this.qData.unshift(closure(this.checkExpand, [siblings[index+1], defs, root, onceUsed, nested], this));
 		},
 		/*processRemoveUnused:function(){
@@ -513,7 +514,7 @@
 
 			this.qData.unshift(closure(this.checkUnused, [siblings[index+1], root, useNodes], this));
 		},*/
-		processFinaliseFiles:function(){
+		processFinaliseDocuments:function(){
 			for(var k=0; k<this.timelines.length;k++){
 				var timeline = this.timelines[k];
 				var dom = this.doms[k];
@@ -544,65 +545,73 @@
 					}
 
 					if(this.file){
-						var outputString=(
-							this.docString+
-							document.toXMLString().replace(
-								/(<[^>]*?)xlink-(.*?)="/g,
-								'$1xlink:$2="'
-							)
-						);
+						var outputObject = {};
+						outputObject.string= this.docString + document.toXMLString();
 
-						// shorten colour values (e.g. #FF3300 > #F30)
-						outputString = outputString.replace(
-								/#([0-9A-F])\1([0-9A-F])\2([0-9A-F])\3/gi,
-								'#$1$2$3'
-							);
-
-						// remove boring transforms
-						outputString = outputString.replace(' transform="matrix(1 0 0 1 0 0)"','');
-						outputString = outputString.replace(" transform='matrix(1 0 0 1 0 0)'",'');
-
-						// turn hairline strokes to thickness 0.1
-						outputString = outputString.replace(' stroke="0"',' stroke="0.1"' );
-						outputString = outputString.replace(" stroke='0'"," stroke='0.1'" );
-
-						if(documents.length==1){
-							success=FLfile.write(this.file,outputString);
-						}else{
-							var rPath=decodeURIComponent(
-								String(
-									documents[i].@id
-								).replace(
-									this.MODULO_STAND_IN,
-									'%',
-									'g'
-								)
-							);
-							var rPathArray=rPath.split('/');
-							for(var n=0;n<rPathArray.length;n++){
-								rPathArray[n]=rPathArray[n].safeFileName();
-							}
-							rPath=rPathArray.join('/');
-							if(rPathArray.length>1){
-								var rDir=rPath.dir;
-								if(!FLfile.exists(rDir)){
-									FLfile.createFolder(this.file+'/'+rDir);
-								}
-							}
-							var outputPath=(
-								this.file+'/'+
-								rPath+'.svg'
-							);
-							success=FLfile.write(
-								outputPath,
-								outputString
-							);
-						}
-						if(!success){
-							ext.warn('Problem writing '+outputPath||this.file);
-						}
+						this.qData.push(closure(this.processFixUseLinks, [outputObject], this));
+						this.qData.push(closure(this.processCompactColours, [outputObject], this));
+						this.qData.push(closure(this.processRemoveIdentMatrices, [outputObject], this));
+						this.qData.push(closure(this.processConvertHairlineStrokes, [outputObject], this));
+						this.qData.push(closure(this.processSaveFile, [documents, outputObject], this));
 					}
 				}
+			}
+		},
+		processFixUseLinks:function(outputObj){
+			outputObj.string = outputObj.string.replace(
+									/(<[^>]*?)xlink-(.*?)="/g,
+									'$1xlink:$2="'
+								);
+		},
+		processCompactColours:function(outputObj){
+			outputObj.string = outputObj.string.replace(
+									/#([0-9A-F])\1([0-9A-F])\2([0-9A-F])\3/gi,
+									'#$1$2$3'
+								);
+		},
+		processRemoveIdentMatrices:function(outputObj){
+			outputObj.string = outputObj.string.replace(' transform="matrix(1 0 0 1 0 0)"','');
+			outputObj.string = outputObj.string.replace(" transform='matrix(1 0 0 1 0 0)'",'');
+		},
+		processConvertHairlineStrokes:function(outputObj){
+			outputObj.string = outputObj.string.replace(' stroke="0"',' stroke="0.1"');
+			outputObj.string = outputObj.string.replace(" stroke='0'",' stroke="0.1"');
+		},
+		processSaveFile:function(documents, outputObj){
+			if(documents.length==1){
+				success=FLfile.write(this.file,outputObj.string);
+			}else{
+				var rPath=decodeURIComponent(
+					String(
+						documents[i].@id
+					).replace(
+						this.MODULO_STAND_IN,
+						'%',
+						'g'
+					)
+				);
+				var rPathArray=rPath.split('/');
+				for(var n=0;n<rPathArray.length;n++){
+					rPathArray[n]=rPathArray[n].safeFileName();
+				}
+				rPath=rPathArray.join('/');
+				if(rPathArray.length>1){
+					var rDir=rPath.dir;
+					if(!FLfile.exists(rDir)){
+						FLfile.createFolder(this.file+'/'+rDir);
+					}
+				}
+				var outputPath=(
+					this.file+'/'+
+					rPath+'.svg'
+				);
+				success=FLfile.write(
+					outputPath,
+					outputObj.string
+				);
+			}
+			if(!success){
+				ext.warn('Problem writing '+outputPath||this.file);
 			}
 		},
 		processCleanup:function(){
@@ -680,7 +689,6 @@
 			for(var i=0; i<useList.length; ++i){
 				var useNode = useList[i];
 				if(i==0 && useList.length==1){
-					fl.trace("move: "+id);
 					delete symbol.parent().children()[symbol.childIndex()];
 					useNode.parent().insertChildAfter(useNode, symbol);
 					symbol.setName('g');
@@ -720,7 +728,6 @@
 					for each(var node in useNode..*){
 						if(node.hasOwnProperty('@id') && node.localName()!='mask'){
 							node.@id=this._uniqueID(String(node.@id));
-							fl.trace("update id: "+node.@id);
 						}
 						if(node.hasOwnProperty('@mask')){
 							var oldID=String(node.@mask).match(/(?:url\(#)(.*?)(?:\))/);
@@ -994,6 +1001,30 @@
 			}
 			if(timeline.frameCount>1){
 				if(settings.startFrame==settings.endFrame){
+					// check whether we can use a previous frame
+					var failed = false;
+					var lastPrior = settings.startFrame;
+					var layers = timeline.getLayers();
+					for(var i=0; i<layers.length && !failed; i++){
+						var layer=layers[i];
+						var thisFrame = layer.frames[settings.startFrame];
+						for(var j=0; j<thisFrame.elements.length; j++){
+							var element = thisFrame.elements[j];
+							if(element.symbolType=="graphics" && element.loop!="single frame"){
+								failed = true;
+								break;
+							}
+						}
+						if(thisFrame.startFrame<lastPrior){
+							lastPrior = thisFrame.startFrame;
+						}
+					}
+					if(!failed){
+						fl.trace("use earlier frame: "+settings.startFrame+" "+ lastPrior+" "+(this._symbols[symbolIDString]!=null));
+						settings.startFrame = lastPrior;
+						settings.endFrame = lastPrior;
+					}
+
 					symbolIDString += '_f'+settings.startFrame;
 				}else if(settings.timeOffset!=null && settings.timeOffset>0){
 					symbolIDString += '_t'+settings.timeOffset;
@@ -1133,7 +1164,7 @@
 				}
 				this._symbolBounds[symbolIDString] = boundingBox;
 			}
-			ext.message("getTimeline: "+settings.startFrame+" "+settings.endFrame+" "+settings.frameCount+" "+isNew);
+			ext.message("getTimeline: "+symbolIDString+" "+settings.startFrame+" "+settings.endFrame+" "+settings.frameCount+" "+isNew);
 			var instanceID=this._uniqueID(id);	
 			instanceXML=new XML('<use xlink-href="#'+id+'" id="'+instanceID+'" />');
 			if(isNew){
@@ -1723,7 +1754,7 @@
 			// }
 			
 			var flip = Math.abs(skewY)>90 && Math.abs(skewY)<270;
-			fl.trace("flip: "+flip);
+			//fl.trace("flip: "+flip);
 			xList.push(this.precision(element.matrix.tx));
 			yList.push(this.precision(element.matrix.ty));
 			scxList.push(this.precision(element.scaleX * (flip?-1:1)));
@@ -1820,8 +1851,10 @@
 				lastTime = times[i];
 				if(lastTime>1)lastTime = 1;
 
-				if(newVal==lastVal && endPointMode){
+				var noneTween = (splineList[i]=="0 0 1 0");
+				if(newVal==lastVal && (endPointMode || noneTween)){
 					validT[validT.length-1] = lastTime;
+					if(noneTween)validS[validT.length-1] = "0 0 1 0"; 
 				}else{
 					endPointMode = (newVal==lastVal);
 					lastVal = newVal;
@@ -2321,13 +2354,13 @@
 			var descendantMatrix=new ext.Matrix();
 			var pathMatrix=null;
 			var layerLocked=shape.layer.locked;
-			//var id;
+			var id;
 			if( shape.isRectangleObject || shape.isOvalObject ){ // ! important
-				// id=(
-				// 	shape.isRectangleObject?
-				// 	this._uniqueID('rectangleObject'):
-				// 	this._uniqueID('ovalObject')
-				// );
+				id=(
+					shape.isRectangleObject?
+					this._uniqueID('rectangleObject'):
+					this._uniqueID('ovalObject')
+				);
 				shape.setTransformationPoint({x:0.0,y:0.0});
 				var origin=new ext.Point({
 					x:(shape.objectSpaceBounds.left-shape.objectSpaceBounds.right)/2,
@@ -2343,11 +2376,12 @@
 					});
 				}
 			}else if(shape.isDrawingObject){
-				// id=this._uniqueID('drawingObject');
+				id=this._uniqueID('drawingObject');
 				matrix=matrix.concat(settings.matrix);
 			}else if(shape.isGroup){
-				// id=this._uniqueID('group');
-				descendantMatrix=matrix.invert();
+				id=this._uniqueID('group');
+				//descendantMatrix=matrix.invert();
+				matrix=new ext.Matrix();
 				/*var c=shape.center;
 				var tr=shape.getTransformationPoint();
 				var osb=shape.objectSpaceBounds;
@@ -2374,7 +2408,7 @@
 				pathMatrix=pathMatrix.invert();
 				matrix=matrix.concat(settings.matrix);*/
 			}else{
-				// id=this._uniqueID('shape');
+				id=this._uniqueID('shape');
 				matrix.tx=shape.left;
 				matrix.ty=shape.top;
 				matrix=matrix.concat(settings.matrix);
@@ -2520,7 +2554,8 @@
 				}
 			}			
 			var svg=new XML('<g id="'+id+'"/>');
-			svg['@transform']=this._getMatrix(matrix);
+			var matrixStr = this._getMatrix(matrix);
+			if(matrixStr!=this.IDENTITY_MATRIX)svg['@transform']=matrixStr;
 			for(var i=0;i<svgArray.length;i++){
 				if(svgArray[i].path.length()){ // eliminate duplicate paths
 					ii=0; 
