@@ -98,6 +98,21 @@
 				tx:Math.round(this.tx*multiplier)/multiplier,
 				ty:Math.round(this.ty*multiplier)/multiplier
 			});
+		},
+		transformPoint:function (x, y, doTranslate) {
+		    var result = new ext.Point(
+		        (x*this.a)+(y*this.c),
+		        (x*this.b)+(y*this.d)
+		    );
+		    if(doTranslate==null || doTranslate){
+		    	result.x += this.tx;
+		    	result.y += this.ty;
+		    }
+
+		    return result;
+		},
+		clone:function (x, y, doTranslate) {
+		    return new ext.Matrix([this.a, this.b, this.c, this.d, this.tx, this.ty]);
 		}
 	}
 	ext.extend({Matrix:ExtensibleMatrix});
