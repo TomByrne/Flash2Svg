@@ -1428,7 +1428,10 @@
 
 								//var transPoint = element.getTransformationPoint();
 
-								var rot = (element.skewX+element.skewY)/2;
+								//var rot = (element.skewX+element.skewY)/2;
+								var firstRot = this._getRotation(element);
+								var firstSkX = element.skewX;
+								var firstSkY = element.skewY;
 
 								var xList = [];
 								var yList = [];
@@ -1447,8 +1450,9 @@
 								var tweensFound = (frame.tweenType!="none");
 
 								var matrix = element.matrix.clone();
+								var invMatrix = matrix.invert();
 								var time = settings.timeOffset+(n*(1/ext.doc.frameRate))/animDur;
-								this._addAnimFrame(frame, element, time, rot, element.skewX, element.skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, timeList, splineList);
+								this._addAnimFrame(frame, element, invMatrix, time, 0, 0, 0, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, timeList, splineList);
 								
 								var lastRot = rot;
 
@@ -1496,13 +1500,16 @@
 
 											var nextElement = nextFrame.elements[0];
 
-											var skewX = nextElement.skewX;
-											var skewY = nextElement.skewY;
+											//var skewX = nextElement.skewX;
+											//var skewY = nextElement.skewY;
 
 											if(!hasSkewX && skewX!=0)hasSkewX = true;
 											if(!hasSkewY && skewY!=0)hasSkewY = true;
 
-											rot = (skewX+skewY)/2;
+											//rot = (skewX+skewY)/2;
+											var rot = this._getRotation(nextElement) - firstRot;
+											var skewX = nextElement.skewX - firstSkX;
+											var skewY = nextElement.skewY - firstSkY;
 
 											while(attemptForeRot && Math.abs(rot-lastRot)>Math.abs(rot+360-lastRot)){
 												rot += 360;
@@ -1529,7 +1536,7 @@
 											if(boundingBox.right<swingRight)boundingBox.right = swingRight;
 											if(boundingBox.bottom<swingBottom)boundingBox.bottom = swingBottom;
 
-											this._addAnimFrame(nextFrame, nextElement, time, rot, skewX, skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, timeList, splineList);
+											this._addAnimFrame(nextFrame, nextElement, invMatrix, time, rot, skewX, skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, timeList, splineList);
 
 											if(nextFrame.tweenType!="none")tweensFound = true;
 
@@ -1557,28 +1564,28 @@
 									splineList.pop();
 									//longSplineList.pop();
 								}
-								if(this._addAnimationNode(elementXML, "rotate", [rotList, trxList, tryList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, rotList.length>1)){
-									matrix.a = element.scaleX;
-									matrix.b = 0;
-									matrix.c = 0;
-									matrix.d = element.scaleY;
-								}
-								// if(hasSkewX && this._addAnimationNode(elementXML, "skewX", [skxList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)){
-								// 	matrix.a = element.scaleX;
-								// 	matrix.b = 0;
-								// }
-								if(hasSkewY && this._addAnimationNode(elementXML, "skewY", [skyList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)){
-									matrix.c = 0;
-									matrix.d = element.scaleY;
-								}
-								// the ordering of these animation nodes is important
-								if(this._addAnimationNode(elementXML, "scale", [scxList, scyList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation, scxList.length>1)){
-									matrix.a = 1;
-									matrix.d = 1;
-								}
 								if(this._addAnimationNode(elementXML, "translate", [xList, yList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)){
-									matrix.tx = 0;
-									matrix.ty = 0;
+									// matrix.tx = 0;
+									// matrix.ty = 0;
+								}
+								if(this._addAnimationNode(elementXML, "rotate", [rotList, trxList, tryList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, rotList.length>1)){
+									// matrix.a = element.scaleX;
+									// matrix.b = 0;
+									// matrix.c = 0;
+									// matrix.d = element.scaleY;
+								}
+								if(this._addAnimationNode(elementXML, "skewX", [skxList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)){
+								 	// matrix.a = element.scaleX;
+								 	// matrix.b = 0;
+								}
+								if(this._addAnimationNode(elementXML, "skewY", [skyList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)){
+								// 	// matrix.c = 0;
+								// 	// matrix.d = element.scaleY;
+								}
+								// // the ordering of these animation nodes is important
+								if(this._addAnimationNode(elementXML, "scale", [scxList, scyList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation, scxList.length>1)){
+								 	// matrix.a = 1;
+								 	// matrix.d = 1;
 								}
 
 								elementXML.@transform = this._getMatrix(matrix);
@@ -1692,31 +1699,47 @@
 			}
 			return instanceXML;
 		},
-		_addAnimFrame:function(frame, element, time, rot, skewX, skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, timeList, splineList){
+		_getRotation:function(element){
+			if(isNaN(element.rotation) || element.rotation==0){
+				return element.skewX;
+			}else{
+				return element.rotation;
+			}
+		},
+		_addAnimFrame:function(frame, element, invMatrix, time, rot, skewX, skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, timeList, splineList){
 
-			//var transPoint = element.getTransformationPoint();
+			var transPoint = element.getTransformationPoint();
 
-			rot = skewX;
 			skewX -= rot;
 			skewY -= rot;
 
-			var flip = Math.abs(skewY)>90 && Math.abs(skewY)<270;
-			var pos = element.matrix.invert().transformPoint(element.matrix.tx, element.matrix.ty, false);
-			//pos.x += Math.sin(rot / 2 / 180 * Math.PI) * transPoint.y * 2 + Math.sin(rot / 180 * Math.PI) * transPoint.x;
-			//pos.y += Math.sin(rot / 2 / 180 * Math.PI) * transPoint.x * 2 + Math.sin(rot / 180 * Math.PI) * transPoint.y;
-			xList.push(this.precision(pos.x));
-			yList.push(this.precision(pos.y));
-			scxList.push(this.precision(element.scaleX * (flip?-1:1)));
-			scyList.push(this.precision(element.scaleY));
-			skxList.push(this.precision(element.matrix.b));
-			skyList.push(this.precision(element.matrix.c));
+
 			rotList.push(this.precision(rot));
 
-			//transPoint = element.matrix.transformPoint(transPoint.x, transPoint.y, false);
-			//trxList.push(-transPoint.x);
-			//tryList.push(-transPoint.y); // only rotation supports a transform point so we're better off using none
-			trxList.push(0);
-			tryList.push(0); // only rotation supports a transform point so we're better off using none
+			var rotRad = rot / 180 * Math.PI;
+			var rotMatrix = new ext.Matrix();
+			rotMatrix.a = Math.cos(rotRad);
+			rotMatrix.b = Math.sin(rotRad);
+			rotMatrix.c = -Math.sin(rotRad);
+			rotMatrix.d = Math.cos(rotRad);
+
+
+			var matrix = element.matrix.concat(invMatrix);
+			var edittedTrans = matrix.transformPoint(transPoint);
+			var rotCos = Math.cos(rotRad) - 1;
+			var rotSin = Math.sin(rotRad);
+			xList.push(this.precision(matrix.tx + transPoint.x * rotCos - transPoint.y * rotSin));
+			yList.push(this.precision(matrix.ty + transPoint.y * rotCos + transPoint.x * rotSin));
+
+			matrix = matrix.concat(rotMatrix.invert());
+			scxList.push(this.precision(matrix.a));
+			scyList.push(this.precision(matrix.d));
+
+			skxList.push(this.precision(-skewX));
+			skyList.push(this.precision(-skewY));
+
+			trxList.push(transPoint.x);
+			tryList.push(transPoint.y);
 
 			splineList.push(this._getSplineData(frame));
 			timeList.push(this.precision(time));
