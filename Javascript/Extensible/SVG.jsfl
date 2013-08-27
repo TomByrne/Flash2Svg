@@ -1047,33 +1047,33 @@
 			}
 			if(timeline.frameCount>1){
 				if(settings.startFrame==settings.endFrame){
-					// check whether we can use a previous frame
-					var failed = false;
-					var lastPrior = settings.startFrame;
-					var layers = timeline.getLayers();
-					for(var i=0; i<layers.length && !failed; i++){
-						var layer=layers[i];
-						var thisFrame = layer.frames[settings.startFrame];
-						if(thisFrame){
-							for(var j=0; j<thisFrame.elements.length; j++){
-								var element = thisFrame.elements[j];
-								if(element.symbolType=="graphics" && element.loop!="single frame"){
-									failed = true;
-									break;
-								}
-							}
-							if(thisFrame.startFrame>lastPrior){
-								lastPrior = thisFrame.startFrame;
-							}
-						}else if(layer.frames.length-1>lastPrior){
-							lastPrior = layer.frames.length-1;
-						}
-					}
-					if(!failed){
-						fl.trace("use earlier frame: "+settings.startFrame+" "+ lastPrior+" "+(this._symbols[symbolIDString]!=null));
-						settings.startFrame = lastPrior;
-						settings.endFrame = lastPrior;
-					}
+					// // check whether we can use a previous frame
+					// var failed = false;
+					// var lastPrior = settings.startFrame;
+					// var layers = timeline.getLayers();
+					// for(var i=0; i<layers.length && !failed; i++){
+					// 	var layer=layers[i];
+					// 	var thisFrame = layer.frames[settings.startFrame];
+					// 	if(thisFrame){
+					// 		for(var j=0; j<thisFrame.elements.length; j++){
+					// 			var element = thisFrame.elements[j];
+					// 			if(element.symbolType=="graphics" && element.loop!="single frame"){
+					// 				failed = true;
+					// 				break;
+					// 			}
+					// 		}
+					// 		if(thisFrame.startFrame>lastPrior){
+					// 			lastPrior = thisFrame.startFrame;
+					// 		}
+					// 	}else if(layer.frames.length-1>lastPrior){
+					// 		lastPrior = layer.frames.length-1;
+					// 	}
+					// }
+					// if(!failed){
+					// 	fl.trace("use earlier frame: "+settings.startFrame+" "+ lastPrior+" "+(this._symbols[symbolIDString]!=null));
+					// 	settings.startFrame = lastPrior;
+					// 	settings.endFrame = lastPrior;
+					// }
 
 					symbolIDString += '_f'+settings.startFrame;
 				}else if(settings.timeOffset!=null && settings.timeOffset>0){
@@ -1109,7 +1109,7 @@
 					If a graphic layer is completely in sync with the root timeline it gets exported as a whole timeline (like an MC).
 					Otherwise, it is exported frame by frame, which can be reused elsewhere (but is bigger).
 				 */
-				var syncedLayers = {};
+				/*var syncedLayers = {};
 				layers = timeline.getLayers();
 				var frameOffset = settings.timeOffset/(1/ext.doc.frameRate);
 				for(var i=0;i<layers.length;i++){
@@ -1134,7 +1134,7 @@
 						fl.trace("in sync: "+layer.name);
 						syncedLayers[i] = true;
 					}
-				}
+				}*/
 
 				/*
 				 * Create temporary timelines where tweens exist & convert to
@@ -1179,7 +1179,7 @@
 								(settings.flattenMotion && frame.tweenType=="motion") ||
 								(n==settings.startFrame && start!=n && startFrame.tweenType!='none') || // this backtracks from the first frame if our range starts mid-tween
 								(n==settings.endFrame && start!=n && startFrame.tweenType!='none') ||// this breaks apart tweens which fall over the end of our range
-								(n==frame.startFrame && frame.elements.length==1 && frame.elements[0].symbolType=="graphic" && frame.elements[0].loop!="single frame" && !syncedLayers[i])// graphic runs should be broken down into single frames (but only when the run is out of sync with the master timeline)
+								(n==frame.startFrame && frame.elements.length==1 && frame.elements[0].symbolType=="graphic" && frame.elements[0].loop!="single frame"/* && !syncedLayers[i]*/)// graphic runs should be broken down into single frames (but only when the run is out of sync with the master timeline)
 								){ 
 								var end = start+frame.duration;
 								timeline.$.convertToKeyframes(start, end);
@@ -1387,10 +1387,11 @@
 										beginAnimation:settings.beginAnimation
 									};
 
-							if(element.symbolType=="graphic" && !syncedLayers[i]){
+							//if(element.symbolType=="graphic" && !syncedLayers[i]){
+							if(element.symbolType=="graphic"){
 								if(element.loop=="single frame" || frame.duration==1){
 									elemSettings.frameCount = 1;
-									elemSettings.startFrame = element.firstFrame;
+									elemSettings.startFrame = this._getPriorFrame(element.timeline, element.firstFrame);
 								}else{
 									elemSettings.startFrame = element.firstFrame + (n - frame.startFrame);
 									var maxCount = (settings.endFrame + 1) - n;
@@ -1404,6 +1405,7 @@
 									}
 								}
 							}
+							if(element.libraryItem)fl.trace("child: "+element.libraryItem.name+" "+element.firstFrame+" "+elemSettings.startFrame);
 
 							if(this._delayedProcessing){
 								var elementXML=new XML('<g id="'+elementID+'"></g>');
@@ -1456,9 +1458,6 @@
 								
 								var lastRot = rot;
 
-								var hasSkewX = element.skewX!=0;
-								var hasSkewY = element.skewY!=0;
-
 								var lastFrame = frame;
 
 								var autoRotate = 0;
@@ -1474,7 +1473,9 @@
 											if(nextFrame.elements.length!=1){
 												break; // tweening to incompatible frame
 											}else if(nextElem.libraryItem!=mainElem.libraryItem ||
-													(mainElem.symbolType=="graphic" && (nextElem.loop!=mainElem.loop || mainElem.firstFrame!=nextElem.firstFrame) && !syncedLayers[i])){
+													(mainElem.symbolType=="graphic" &&
+														(nextElem.loop!=mainElem.loop || (nextElem.loop=="single frame" || nextFrame.duration==1) && settings.startFrame!=this._getPriorFrame(nextElem.timeline, nextElem.firstFrame)
+														 || (nextElem.loop!="single frame" && nextFrame.duration>1 && mainElem.firstFrame!=nextElem.firstFrame))/* && !syncedLayers[i]*/)){
 												//tweening to different symbol
 												isLast = true;
 											}
@@ -1499,14 +1500,6 @@
 											}
 
 											var nextElement = nextFrame.elements[0];
-
-											//var skewX = nextElement.skewX;
-											//var skewY = nextElement.skewY;
-
-											if(!hasSkewX && skewX!=0)hasSkewX = true;
-											if(!hasSkewY && skewY!=0)hasSkewY = true;
-
-											//rot = (skewX+skewY)/2;
 											var rot = this._getRotation(nextElement) - firstRot;
 											var skewX = nextElement.skewX - firstSkX;
 											var skewY = nextElement.skewY - firstSkY;
@@ -1562,34 +1555,15 @@
 									trxList.pop();
 									tryList.pop();
 									splineList.pop();
-									//longSplineList.pop();
-								}
-								if(this._addAnimationNode(elementXML, "translate", [xList, yList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)){
-									// matrix.tx = 0;
-									// matrix.ty = 0;
-								}
-								if(this._addAnimationNode(elementXML, "rotate", [rotList, trxList, tryList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, rotList.length>1)){
-									// matrix.a = element.scaleX;
-									// matrix.b = 0;
-									// matrix.c = 0;
-									// matrix.d = element.scaleY;
-								}
-								if(this._addAnimationNode(elementXML, "skewX", [skxList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)){
-								 	// matrix.a = element.scaleX;
-								 	// matrix.b = 0;
-								}
-								if(this._addAnimationNode(elementXML, "skewY", [skyList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)){
-								// 	// matrix.c = 0;
-								// 	// matrix.d = element.scaleY;
 								}
 								// // the ordering of these animation nodes is important
-								if(this._addAnimationNode(elementXML, "scale", [scxList, scyList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation, scxList.length>1)){
-								 	// matrix.a = 1;
-								 	// matrix.d = 1;
-								}
+								this._addAnimationNode(elementXML, "translate", [xList, yList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)
+								this._addAnimationNode(elementXML, "rotate", [rotList, trxList, tryList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, rotList.length>1)
+								this._addAnimationNode(elementXML, "skewX", [skxList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)
+								this._addAnimationNode(elementXML, "skewY", [skyList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)
+								this._addAnimationNode(elementXML, "scale", [scxList, scyList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation, scxList.length>1)
 
 								elementXML.@transform = this._getMatrix(matrix);
-								//elementXML.@transform = ''; // empty this instead of deleting (so that delayed processing elements also get cleared after this)
 
 							}else if(tweenType=='none'){
 								while(frameEnd<layer.frames.length && layer.frames[frameEnd].startFrame==n){
@@ -1755,6 +1729,36 @@
 				trxList.push(trxList[trxList.length-1]);
 				tryList.push(tryList[tryList.length-1]);
 				splineList.push(splineList[splineList.length-1]);
+			}
+		},
+		_getPriorFrame:function(timeline, frame){
+			// check whether we can use a previous frame
+			var failed = false;
+			var lastPrior = -1;
+			var layers = timeline.getLayers();
+			for(var i=0; i<layers.length && !failed; i++){
+				var layer=layers[i];
+				var thisFrame = layer.frames[frame];
+				fl.trace("\tlayer: "+layer.name+" "+(thisFrame!=null)+" "+lastPrior);
+				if(thisFrame){
+					for(var j=0; j<thisFrame.elements.length; j++){
+						var element = thisFrame.elements[j];
+						if(element.symbolType=="graphics" && element.loop!="single frame"){
+							failed = true;
+							break;
+						}
+					}
+					if(thisFrame.startFrame>lastPrior){
+						lastPrior = thisFrame.startFrame;
+					}
+				}else if(layer.frames.length-1>lastPrior){
+					lastPrior = layer.frames.length-1;
+				}
+			}
+			if(!failed && lastPrior!=-1){
+				return lastPrior;
+			}else{
+				return frame;
 			}
 		},
 		_getRotHemisphere:function(rot){
@@ -1928,8 +1932,8 @@
 				colorTransform: null,
 				libraryItem:instance.libraryItem
 			});
-			ext.message("\n_getSymbolInstance: "+instance.libraryItem.name+" - "+instance.loop+" "+settings.frameCount+" "+settings.startFrame+" "+instance.loop);
 			settings.extend(options);
+			ext.message("\n_getSymbolInstance: "+instance.libraryItem.name+" - loop:"+instance.loop+" frameCount:"+settings.frameCount+" startFrame:"+settings.startFrame);
 			var dom = settings.dom;
 			settings.matrix = instance.matrix.concat(settings.matrix);
 			var xml = this._getTimeline(instance.timeline,settings);
