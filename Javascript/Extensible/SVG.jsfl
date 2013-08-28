@@ -1174,17 +1174,33 @@
 							var frame=layer.frames[n];
 							var start=frame.startFrame;
 							var startFrame=layer.frames[start];
+							var breakApart = false;
+							var firstElement = frame.elements[0];
 							if(  frame.tweenType=='shape' || 
 								(n==frame.startFrame && layer.layerType=="guided" && frame.tweenType!="none") ||
 								(settings.flattenMotion && frame.tweenType=="motion") ||
 								(n==settings.startFrame && start!=n && startFrame.tweenType!='none') || // this backtracks from the first frame if our range starts mid-tween
-								(n==settings.endFrame && start!=n && startFrame.tweenType!='none') ||// this breaks apart tweens which fall over the end of our range
-								(n==frame.startFrame && frame.elements.length==1 && frame.elements[0].symbolType=="graphic" && frame.elements[0].loop!="single frame"/* && !syncedLayers[i]*/)// graphic runs should be broken down into single frames (but only when the run is out of sync with the master timeline)
-								){ 
+								(n==settings.endFrame && start!=n && startFrame.tweenType!='none')// ||// this breaks apart tweens which fall over the end of our range
+								//(n==frame.startFrame && frame.elements.length==1 && frame.elements[0].symbolType=="graphic"/* && frame.elements[0].loop!="single frame"*/)// graphic runs should be broken down into single frames (but only when the run is out of sync with the master timeline)
+								){
+								breakApart = true;
+
+							}else if(n==frame.startFrame && frame.duration>1 && frame.elements.length==1 && firstElement.symbolType=="graphic" && firstElement.loop!="single frame"){
+								// if all frames in a graphic run resolve to the same frame then don't break it apart.
+								// Otherwise break it apart so graphic frames can be referrenced
+								var resolvedFrame = this._getPriorFrame(firstElement.timeline, firstElement.firstFrame);
+								for(var k=0; k<frame.duration; ++k){
+									if(this._getPriorFrame(firstElement.timeline, firstElement.firstFrame + k) != resolvedFrame){
+										breakApart = true;
+										break;
+									}
+								}
+							}
+							if(breakApart){
+								fl.trace(">>>>    "+start+" "+frame.duration);
 								var end = start+frame.duration;
 								timeline.$.convertToKeyframes(start, end);
 								n = end-1;
-
 							}
 
 						}
@@ -1259,7 +1275,6 @@
 							animDur = this.precision(totFrames*(1/ext.doc.frameRate));
 						}
 					// }
-					fl.trace("animDur: "+animDur+" "+totFrames+" "+settings.totalDuration);
 
 					animNode.@dur = animDur+"s";
 				}
@@ -1405,7 +1420,6 @@
 									}
 								}
 							}
-							if(element.libraryItem)fl.trace("child: "+element.libraryItem.name+" "+element.firstFrame+" "+elemSettings.startFrame);
 
 							if(this._delayedProcessing){
 								var elementXML=new XML('<g id="'+elementID+'"></g>');
@@ -1474,7 +1488,7 @@
 												break; // tweening to incompatible frame
 											}else if(nextElem.libraryItem!=mainElem.libraryItem ||
 													(mainElem.symbolType=="graphic" &&
-														(nextElem.loop!=mainElem.loop || (nextElem.loop=="single frame" || nextFrame.duration==1) && settings.startFrame!=this._getPriorFrame(nextElem.timeline, nextElem.firstFrame)
+														(nextElem.loop!=mainElem.loop || (nextElem.loop=="single frame" || nextFrame.duration==1) && elemSettings.startFrame!=this._getPriorFrame(nextElem.timeline, nextElem.firstFrame)
 														 || (nextElem.loop!="single frame" && nextFrame.duration>1 && mainElem.firstFrame!=nextElem.firstFrame))/* && !syncedLayers[i]*/)){
 												//tweening to different symbol
 												isLast = true;
@@ -1709,8 +1723,8 @@
 			scxList.push(this.precision(matrix.a));
 			scyList.push(this.precision(matrix.d));
 
-			skxList.push(this.precision(-skewX));
-			skyList.push(this.precision(-skewY));
+			skxList.push(this.precision(-this._getClosestRot(skewX, skxList)));
+			skyList.push(this.precision(-this._getClosestRot(skewY, skyList)));
 
 			trxList.push(transPoint.x);
 			tryList.push(transPoint.y);
@@ -1731,6 +1745,23 @@
 				splineList.push(splineList[splineList.length-1]);
 			}
 		},
+		_getClosestRot:function(rot, rotList){
+			if(rotList.length==0){
+				return rot;
+			}else{
+				var prev = rotList[rotList.length-1];
+				var forward = rot+360;
+				var dif = Math.abs(rot - prev);
+				var backward;
+				if(Math.abs(forward - prev)<dif){
+					return forward;
+				}else if(Math.abs((backward = (rot-360)) - prev)<dif){
+					return backward;
+				}else{
+					return rot;
+				}
+			}
+		},
 		_getPriorFrame:function(timeline, frame){
 			// check whether we can use a previous frame
 			var failed = false;
@@ -1739,7 +1770,6 @@
 			for(var i=0; i<layers.length && !failed; i++){
 				var layer=layers[i];
 				var thisFrame = layer.frames[frame];
-				fl.trace("\tlayer: "+layer.name+" "+(thisFrame!=null)+" "+lastPrior);
 				if(thisFrame){
 					for(var j=0; j<thisFrame.elements.length; j++){
 						var element = thisFrame.elements[j];
@@ -1844,7 +1874,6 @@
 					validS.push(splineList[i]);
 				}
 			}
-			fl.trace("_addAnimationNode: "+type+" "+validT[0]+" "+(validT[0]<1));
 			if(validT[0]<1){
 				validV.push(lastVal);
 				validT.push(1);
