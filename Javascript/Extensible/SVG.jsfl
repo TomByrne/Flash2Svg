@@ -1103,7 +1103,6 @@
 						includeMotionTweens:true,
 						includeGuidedTweens:true
 					});
-				 fl.trace("settings.startFrame: "+settings.startFrame+" "+settings.endFrame+" "+hasTweens+" "+timeline.layers.length);
 
 				 /**
 					If a graphic layer is completely in sync with the root timeline it gets exported as a whole timeline (like an MC).
@@ -1195,9 +1194,11 @@
 										break;
 									}
 								}
+								if(!breakApart){
+									firstElement.loop = "single frame";
+								}
 							}
 							if(breakApart){
-								fl.trace(">>>>    "+start+" "+frame.duration);
 								var end = start+frame.duration;
 								timeline.$.convertToKeyframes(start, end);
 								n = end-1;
@@ -1292,6 +1293,8 @@
 				for(var i=0;i<layers.length;i++){
 					var layer=layers[i];
 					if(layer.layerType=="guide")continue;
+
+					fl.trace("layer: "+layer.name);
 
 					var layerEnd = settings.endFrame+1;
 					if(layerEnd>layer.frameCount)layerEnd = layer.frameCount;
@@ -1696,35 +1699,43 @@
 		},
 		_addAnimFrame:function(frame, element, invMatrix, time, rot, skewX, skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, timeList, splineList){
 
+
+			var matrix = element.matrix.concat(invMatrix);
 			var transPoint = element.getTransformationPoint();
+
 
 			skewX -= rot;
 			skewY -= rot;
 
 
+			fl.trace("\trot: "+this.precision(rot)+" "+((matrix.b<0) != (matrix.c<0) && (matrix.b<0) && isNaN(element.rotation))+" "+matrix);
+			if((matrix.b<0) != (matrix.c<0) && (matrix.b<0 || matrix.d>0) && isNaN(element.rotation)){
+				rot = -rot;
+			}
+			var rotRad = rot / 180 * Math.PI;
+
 			rotList.push(this.precision(rot));
 
-			var rotRad = rot / 180 * Math.PI;
-			var rotMatrix = new ext.Matrix();
-			rotMatrix.a = Math.cos(rotRad);
-			rotMatrix.b = Math.sin(rotRad);
-			rotMatrix.c = -Math.sin(rotRad);
-			rotMatrix.d = Math.cos(rotRad);
-
-
-			var matrix = element.matrix.concat(invMatrix);
 			var edittedTrans = matrix.transformPoint(transPoint);
 			var rotCos = Math.cos(rotRad) - 1;
 			var rotSin = Math.sin(rotRad);
 			xList.push(this.precision(matrix.tx + transPoint.x * rotCos - transPoint.y * rotSin));
 			yList.push(this.precision(matrix.ty + transPoint.y * rotCos + transPoint.x * rotSin));
 
+
+			var rotMatrix = new ext.Matrix();
+			rotMatrix.a = Math.cos(rotRad);
+			rotMatrix.b = Math.sin(rotRad);
+			rotMatrix.c = -Math.sin(rotRad);
+			rotMatrix.d = Math.cos(rotRad);
+			
 			matrix = matrix.concat(rotMatrix.invert());
+
 			scxList.push(this.precision(matrix.a));
 			scyList.push(this.precision(matrix.d));
 
-			skxList.push(this.precision(-this._getClosestRot(skewX, skxList)));
-			skyList.push(this.precision(-this._getClosestRot(skewY, skyList)));
+			skxList.push(this.precision(-this._getClosestRotList(skewX, skxList)));
+			skyList.push(this.precision(-this._getClosestRotList(skewY, skyList)));
 
 			trxList.push(transPoint.x);
 			tryList.push(transPoint.y);
@@ -1745,21 +1756,24 @@
 				splineList.push(splineList[splineList.length-1]);
 			}
 		},
-		_getClosestRot:function(rot, rotList){
+		_getClosestRotList:function(rot, rotList){
 			if(rotList.length==0){
 				return rot;
 			}else{
 				var prev = rotList[rotList.length-1];
-				var forward = rot+360;
-				var dif = Math.abs(rot - prev);
-				var backward;
-				if(Math.abs(forward - prev)<dif){
-					return forward;
-				}else if(Math.abs((backward = (rot-360)) - prev)<dif){
-					return backward;
-				}else{
-					return rot;
-				}
+				return this._getClosestRot(rot, prev);
+			}
+		},
+		_getClosestRot:function(rot1, rot2){
+			var forward = rot1+360;
+			var dif = Math.abs(rot1 - rot2);
+			var backward;
+			if(Math.abs(forward - rot2)<dif){
+				return forward;
+			}else if(Math.abs((backward = (rot1-360)) - rot2)<dif){
+				return backward;
+			}else{
+				return rot1;
 			}
 		},
 		_getPriorFrame:function(timeline, frame){
