@@ -2676,6 +2676,9 @@
 			if(!controlPoints || controlPoints.length==0){
 				return;
 			}
+
+			var sameStrokes = contour.interior;
+
 			var fills=new ext.Array();
 			var paths=new ext.Array();
 			var interior=false;
@@ -2685,6 +2688,18 @@
 			}	
 			var id,idString;
 			if(contour.interior){//Construct a curve for the enclosed shape if present.
+
+				// If the whole path has the same stroke we only need to create one path element, we work that out here
+				var lastStroke = null;
+				for(i=0;i<controlPoints.length;i++){
+					var edge = controlPoints[i][0].edge;
+					if(!edge.stroke || (i!=0 && !edge.stroke.is(lastStroke))){
+						sameStrokes = false;
+						break;
+					}
+					lastStroke = edge.stroke;
+				}
+
 				interior=true;
 				var fillString='none';
 				var opacityString = "";
@@ -2707,17 +2722,16 @@
 				cdata=this._getCurve(controlPoints,contour.orientation);
 				id=this._uniqueID('path');
 				idString='id="'+id+'" ';
-				paths.push('<path  '+idString+xform+'fill="'+fillString + '"' + opacityString+' d="'+cdata+'"/>\n');
+				var strokeStr = (sameStrokes?" "+this._getStroke(lastStroke,{shape:contour.shape,dom:dom}):"");
+				paths.push('<path  '+idString+xform+'fill="'+fillString + '"' + strokeStr + opacityString+' d="'+cdata+'"/>\n');
 			}
-			var hasStroke=false;
-			if(controlPoints.length>0 && !settings.reversed){
+			if(controlPoints.length>0 && !settings.reversed && !sameStrokes){
 				//Create a contour for each length of contiguous edges w/ the same stroke attributes. 
 				//Skipped for settings.reversed, which is only used for creating hollows.
 				var cp=new ext.Array([]);
 				var stroke=null;
 				var firstEdge=controlPoints[0][0].edge;
 				if(firstEdge.stroke && firstEdge.stroke.style!='noStroke'){
-					hasStroke=true;
 					cp.push(controlPoints[0]);
 					stroke=firstEdge.stroke;
 				}
@@ -2727,6 +2741,7 @@
 						if(stroke!==null && edge.stroke.is(stroke)){
 							cp.push(controlPoints[i]);
 						}else{
+							// next part of path has a dif'rent stroke, finalise the current path and start a new one
 							if(stroke && cp.length>0){
 								id=this._uniqueID('path');
 								idString='id="'+id+'" ';
