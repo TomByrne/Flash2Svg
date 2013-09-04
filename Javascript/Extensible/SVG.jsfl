@@ -1077,7 +1077,7 @@
 
 					symbolIDString += '_f'+settings.startFrame;
 				}else if(settings.timeOffset!=null && settings.timeOffset>0){
-					symbolIDString += '_t'+settings.timeOffset;
+					symbolIDString += '_t'+Math.round(settings.timeOffset * Math.pow(10, this.decimalPointPrecision));
 				}
 			}
 			var isNew,instanceID,boundingBox;
@@ -1266,16 +1266,16 @@
 					}
 					animDur = Math.roundTo(animDur,this.decimalPointPrecision);*/
 
-					// if(settings.totalDuration!=null){
-					// 	animDur = settings.totalDuration;
-					// }else{
+					if(settings.totalDuration!=null){
+						animDur = settings.totalDuration;
+					}else{
 						if(this.repeatCount=="indefinite"){
 							// when looping, we behave as if the timeline is 1 frame shorter so the last KF acts as an end-point (making for seemless loops)
 							animDur = this.precision((totFrames-1)*(1/ext.doc.frameRate));
 						}else{
 							animDur = this.precision(totFrames*(1/ext.doc.frameRate));
 						}
-					// }
+					}
 
 					animNode.@dur = animDur+"s";
 				}
@@ -1293,8 +1293,6 @@
 				for(var i=0;i<layers.length;i++){
 					var layer=layers[i];
 					if(layer.layerType=="guide")continue;
-
-					fl.trace("layer: "+layer.name);
 
 					var layerEnd = settings.endFrame+1;
 					if(layerEnd>layer.frameCount)layerEnd = layer.frameCount;
@@ -1396,13 +1394,14 @@
 							var dur = settings.frameCount - (n - settings.startFrame);
 							if(frame.duration<dur)dur = frame.duration;
 
+							var time = settings.timeOffset+n*(1/ext.doc.frameRate);
 							var elemSettings = {
 										frame:n,
 										dom:dom,
-										timeOffset:settings.timeOffset+n*(1/ext.doc.frameRate),
+										timeOffset:time,
 										frameCount:dur,
-										//totalDuration:animDur,
-										beginAnimation:settings.beginAnimation
+										totalDuration:animDur,
+										beginAnimation:"0s"
 									};
 
 							//if(element.symbolType=="graphic" && !syncedLayers[i]){
@@ -1440,6 +1439,7 @@
 								};
 							}
 						}
+						fl.trace("\tHM: "+doAnim+" "+settings.timeOffset);
 						if(doAnim){
 							
 							var frameEnd = n+1;
@@ -1489,12 +1489,13 @@
 											var nextElem = nextFrame.elements[0];
 											if(nextFrame.elements.length!=1){
 												break; // tweening to incompatible frame
-											}else if(nextElem.libraryItem!=mainElem.libraryItem ||
+											}else if(nextElem.libraryItem!=mainElem.libraryItem || mainElem.symbolType!=nextElem.symbolType || 
 													(mainElem.symbolType=="graphic" &&
 														(nextElem.loop!=mainElem.loop || (nextElem.loop=="single frame" || nextFrame.duration==1) && elemSettings.startFrame!=this._getPriorFrame(nextElem.timeline, nextElem.firstFrame)
 														 || (nextElem.loop!="single frame" && nextFrame.duration>1 && mainElem.firstFrame!=nextElem.firstFrame))/* && !syncedLayers[i]*/)){
 												//tweening to different symbol
 												isLast = true;
+												fl.trace("isLast: "+isLast);
 											}
 
 											var attemptForeRot = true;
@@ -1588,8 +1589,8 @@
 									// this will add in extra time for frames with non changing content (which won't be included as a real frame)
 								}
 							}
-							var frameTimeStart = String(this.precision(n*(1/ext.doc.frameRate)/animDur));
-							var frameTimeEnd = String(this.precision(frameEnd*(1/ext.doc.frameRate)/animDur));
+							var frameTimeStart = String(this.precision((settings.timeOffset + n*(1/ext.doc.frameRate))/animDur));
+							var frameTimeEnd = String(this.precision((settings.timeOffset + frameEnd*(1/ext.doc.frameRate))/animDur));
 							if(frameTimeEnd>1)frameTimeEnd = 1;
 
 							if(frameTimeStart>1)fl.trace("WARNING: "+frameTimeStart+" "+frameTimeEnd+" "+animDur+" - "+(n*(1/ext.doc.frameRate))+" "+(frameEnd*(1/ext.doc.frameRate))+" - "+n+" "+frameEnd);
@@ -1708,7 +1709,7 @@
 			skewY -= rot;
 
 
-			fl.trace("\trot: "+this.precision(rot)+" "+((matrix.b<0) != (matrix.c<0) && (matrix.b<0) && isNaN(element.rotation))+" "+matrix);
+			//fl.trace("\trot: "+this.precision(rot)+" "+((matrix.b<0) != (matrix.c<0) && (matrix.b<0) && isNaN(element.rotation))+" "+matrix);
 			if((matrix.b<0) != (matrix.c<0) && (matrix.b<0 || matrix.d>0) && isNaN(element.rotation)){
 				rot = -rot;
 			}
@@ -2677,7 +2678,7 @@
 				return;
 			}
 
-			var sameStrokes = contour.interior;
+			var sameStrokes = contour.interior && controlPoints.length>1;
 
 			var fills=new ext.Array();
 			var paths=new ext.Array();
@@ -2689,15 +2690,29 @@
 			var id,idString;
 			if(contour.interior){//Construct a curve for the enclosed shape if present.
 
-				// If the whole path has the same stroke we only need to create one path element, we work that out here
-				var lastStroke = null;
-				for(i=0;i<controlPoints.length;i++){
-					var edge = controlPoints[i][0].edge;
-					if(!edge.stroke || (i!=0 && !edge.stroke.is(lastStroke))){
-						sameStrokes = false;
-						break;
+				var tuple = {};
+				var cdata = this._getCurve(controlPoints, contour.orientation, tuple);
+
+				if(sameStrokes){
+					// work out of the path is closed
+					var firstPoint = controlPoints[0][0];
+					var lastCont = controlPoints[controlPoints.length-1];
+					var lastDeg = lastCont.length-1;
+					var lastPoint = lastCont[lastDeg];
+					sameStrokes = lastPoint.is(firstPoint) && !tuple.moved;
+				}
+
+				if(sameStrokes){
+					// If the whole path has the same stroke we only need to create one path element, we work that out here
+					var lastStroke = null;
+					for(i=0;i<controlPoints.length;i++){
+						var edge = controlPoints[i][0].edge;
+						if(!edge.stroke || (i!=0 && !edge.stroke.is(lastStroke)) || edge.stroke.style=="noStroke"){
+							sameStrokes = false;
+							break;
+						}
+						lastStroke = edge.stroke;
 					}
-					lastStroke = edge.stroke;
 				}
 
 				interior=true;
@@ -2718,8 +2733,6 @@
 						fillString='url(#'+String(fill['@id'])+')';
 					}
 				}
-				var cdata;
-				cdata=this._getCurve(controlPoints,contour.orientation);
 				id=this._uniqueID('path');
 				idString='id="'+id+'" ';
 				var strokeStr = (sameStrokes?" "+this._getStroke(lastStroke,{shape:contour.shape,dom:dom}):"");
@@ -2829,7 +2842,7 @@
 		 * @param {Array} controlPoints
 		 * @private {Boolean} close
 		 */
-		_getCurve:function(controlPoints,close){
+		_getCurve:function(controlPoints, close, tuple){
 			if(ext.log){
 				var timer=ext.log.startTimer('extensible.SVG._getCurve()');	
 			}
@@ -2852,23 +2865,22 @@
 			for(var i=1;i<controlPoints.length;i++){
 				var prevdeg=deg;
 				deg=controlPoints[i].length-1;
-				var m=false;
 				if(!controlPoints[i][0].is(controlPoints[i-1][prevdeg])){
-					m=true;
+					prevdeg = (close?"L":"M");
 					curveString.push(
-						(close?"L":"M")+String(controlPoints[i][0].x)+","+
+						prevdeg+String(controlPoints[i][0].x)+","+
 						String(controlPoints[i][0].y)+" "
 					);
+					if(tuple)tuple.moved = true;
 				}
-				if(deg!=prevdeg || m){
+				if(deg!=prevdeg){
 					curveString.push(degPrefix[deg]);
 				}
 				for(var n=1;n<=deg;n++){
 					curveString.push(controlPoints[i][n].x+","+controlPoints[i][n].y+(n==deg?"":" "));
 				}
 				if(
-					close &&
-					controlPoints[i][deg].is(controlPoints[0][0])
+					close && controlPoints[i][deg].is(controlPoints[0][0])
 				){
 					curveString.push('z ');
 					break;

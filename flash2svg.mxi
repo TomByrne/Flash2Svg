@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<macromedia-extension name="flash2svg" version=".1">
-  <author name="David Belais & Tom Byrne"/>
+<macromedia-extension name="flash2svg" version="1.0">
+  <author name="David Belais &amp; Tom Byrne"/>
   <products>
-    <product name="Flash" version="10" primary="true"/>
+    <product name="Flash" version="13"/>
   </products>
-  <ui-access></ui-access>
-  <description></description>
+  <!-- <ui-access></ui-access>
+  <description></description> -->
   <license-agreement>GNU Public License: http://www.gnu.org/licenses/gpl.html</license-agreement> 
   <files>
     <file source="Commands/Export SVG.jsfl" destination="$flash/Commands"/>
