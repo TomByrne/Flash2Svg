@@ -1439,7 +1439,6 @@
 								};
 							}
 						}
-						fl.trace("\tHM: "+doAnim+" "+settings.timeOffset);
 						if(doAnim){
 							
 							var frameEnd = n+1;
@@ -1677,8 +1676,16 @@
 			}
 			instanceXML['@width']=String(Math.ceil(boundingBox.right-boundingBox.left));
 			instanceXML['@height']=String(Math.ceil(boundingBox.bottom-boundingBox.top));
-			instanceXML['@x']=String(Math.floor(boundingBox.left));
-			instanceXML['@y']=String(Math.floor(boundingBox.top));
+			instanceXML['@x']=Math.floor(boundingBox.left);
+			instanceXML['@y']=Math.floor(boundingBox.top);
+			if(boundingBox.left!=instanceXML['@x'] || boundingBox.top!=instanceXML['@y']){
+				// if there are rounding errors we add the dif to the transform (greatly scaled objects can be affected dramatically)
+				// var offset = settings.matrix.transformPoint(boundingBox.left-instanceXML['@x'], boundingBox.top-instanceXML['@y'], false);
+				// settings.matrix.tx += offset.x;
+				// settings.matrix.ty += offset.y;
+
+				// not sure if this is really helping, must test more
+			}
 			instanceXML['@transform'] = this._getMatrix(settings.matrix);
 			// if(settings.isRoot && settings.libraryItem){
 			// 	dom.@viewBox = viewBox;
@@ -2156,7 +2163,7 @@
 								var sy=element.matrix.scaleY;
 
 								var feGaussianBlur=<feGaussianBlur id={this._uniqueID('feGaussianBlur')} />;
-								feGaussianBlur.@stdDeviation=[f.blurX/sx,f.blurY/sy].join(' ');
+								feGaussianBlur.@stdDeviation=[f.blurX, f.blurY].join(' ');
 								feGaussianBlur['@in']=src;
 								feGaussianBlur.@result=src=prefix+'feGaussianBlur';
 								filter.appendChild(feGaussianBlur);
@@ -2187,7 +2194,7 @@
 								filter.appendChild(feComposite);
 
 								var feGaussianBlur=<feGaussianBlur id={this._uniqueID('feGaussianBlur')} />;
-								feGaussianBlur.@stdDeviation=[f.blurX/sx,f.blurY/sy].join(' ');
+								feGaussianBlur.@stdDeviation=[f.blurX,f.blurY].join(' ');
 								feGaussianBlur.@result=src=prefix+'feGaussianBlur';
 								filter.appendChild(feGaussianBlur);
 
@@ -3085,7 +3092,11 @@
 				svg.push('stroke-opacity="'+opacityString+'"');
 			}
 			if(stroke.thickness!=1){
-				svg.push('stroke-width="'+stroke.thickness+'"');
+				if(stroke.thickness<=0.1){
+					svg.push('stroke-width="1"');
+				}else{
+					svg.push('stroke-width="'+stroke.thickness+'"');
+				}
 			}
 			svg.push(
 				'stroke-linecap="'+(stroke.capType=='none'?'round':stroke.capType)+'"',
@@ -3094,7 +3105,7 @@
 			if(stroke.joinType=='miter'){
 				svg.push('stroke-miterlimit="'+stroke.miterLimit+'"');
 			}
-			if(stroke.scaleType=='none'){
+			if(stroke.scaleType=='none' || stroke.thickness<=0.1){
 				svg.push('vector-effect="non-scaling-stroke"');
 			}
 			if(ext.log){
@@ -3528,7 +3539,12 @@
 						var strokeScale=cmx?nmx.concat(strokeX.concat(cmx.invert())):nmx.concat(strokeX);
 						var scaleMult = ((strokeScale.scaleX+strokeScale.scaleY)/2);
 						if(scaleMult!=1){
-							child['@stroke-width'] = Math.roundTo(strokeW*scaleMult,this.decimalPointPrecision);
+							var newThickness = Math.roundTo(strokeW*scaleMult,this.decimalPointPrecision);
+							if(newThickness<=1){
+								newThickness = 1;
+								child['@vector-effect'] = 'non-scaling-stroke';
+							}
+							child['@stroke-width'] = newThickness;
 						}
 					}
 					
