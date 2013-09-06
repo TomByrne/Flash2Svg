@@ -2406,18 +2406,17 @@
 				matrix=matrix.concat(settings.matrix);
 			}else if(shape.isGroup){
 				id=this._uniqueID('group');
-				//descendantMatrix=matrix.invert();
-				matrix=new ext.Matrix();
-				/*var c=shape.center;
+				var c=shape.center;
 				var tr=shape.getTransformationPoint();
+				tr = matrix.transformPoint(tr.x, tr.y, false);
 				var osb=shape.objectSpaceBounds;
 				
 				osb.left=Math.min(osb.left,c.x-tr.x);
 				osb.right=Math.max(osb.right,c.x-tr.x);
 				osb.top=Math.min(osb.top,c.y-tr.y);
-				osb.bottom=Math.max(osb.bottom,c.y-tr.y);*/
+				osb.bottom=Math.max(osb.bottom,c.y-tr.y);
 
-				/*pathMatrix=new ext.Matrix({
+				pathMatrix=new ext.Matrix({
 					tx:(
 						osb.left+
 						osb.right
@@ -2427,12 +2426,9 @@
 						osb.bottom
 					)/2.0
 				});
-				pathMatrix=new ext.Matrix({
-					tx:0,
-					ty:0
-				});
 				pathMatrix=pathMatrix.invert();
-				matrix=matrix.concat(settings.matrix);*/
+				descendantMatrix = matrix.invert();
+				matrix=matrix.concat(settings.matrix);
 			}else{
 				id=this._uniqueID('shape');
 				matrix.tx=shape.left;
