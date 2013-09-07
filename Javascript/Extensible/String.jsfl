@@ -13,7 +13,8 @@
 	String.prototype.__defineGetter__(
 		'extension',
 		function(){
-			return(this.match(/(?:\.)([^\.]*?$)/)[1]||'');
+			var res = this.match(/(?:\.)([^\.]*?$)/);
+			return(res?res[1]||'');
 		}
 	);
 	/**
