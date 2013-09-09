@@ -14,7 +14,7 @@
 		'extension',
 		function(){
 			var res = this.match(/(?:\.)([^\.]*?$)/);
-			return(res?res[1]||'');
+			return(res?res[1]:'');
 		}
 	);
 	/**
