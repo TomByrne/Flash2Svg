@@ -1472,7 +1472,7 @@
 								var time = settings.timeOffset+(n*(1/ext.doc.frameRate))/animDur;
 								this._addAnimFrame(frame, element, invMatrix, time, 0, 0, 0, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, timeList, splineList);
 								
-								var lastRot = rot;
+								var lastRot = 0;
 
 								var lastFrame = frame;
 
@@ -1716,9 +1716,9 @@
 			skewY -= rot;
 
 
-			//fl.trace("\trot: "+this.precision(rot)+" "+((matrix.b<0) != (matrix.c<0) && (matrix.b<0) && isNaN(element.rotation))+" "+matrix);
+			fl.trace("\trot: "+this.precision(rot)+" "+element.rotation+" "+((matrix.b<0) != (matrix.c<0) && (matrix.b<0) && isNaN(element.rotation))+" "+matrix);
 			if((matrix.b<0) != (matrix.c<0) && (matrix.b<0 || matrix.d>0) && isNaN(element.rotation)){
-				rot = -rot;
+				//rot = -rot;
 			}
 			var rotRad = rot / 180 * Math.PI;
 
@@ -2481,31 +2481,32 @@
 						){
 							var deleted=false;
 							for(var n=filled.length-1;n>-1;n-=1){
+								var fillN = filled[n];
 								var noFills=oppositeFill.style=='noFill' && fill.style=='noFill';
-								var insideOut=!noFills && fill.is(validContours[filled[n]].fill);
+								var insideOut=!noFills && fill.is(validContours[fillN].fill);
 								var sameDir=(
 									contours[i].orientation
 									//+Number(contours[i].getControlPoints( {curveDegree:this.curveDegree} ).isReversed)
 									<0
 								)==(
-									validContours[filled[n]].orientation
-									//+Number(validContours[filled[n]].getControlPoints( {curveDegree:this.curveDegree} ).isReversed)
+									validContours[fillN].orientation
+									//+Number(validContours[fillN].getControlPoints( {curveDegree:this.curveDegree} ).isReversed)
 									<0
 								);
 								if(
-									svgArray[filled[n]].path.length()  
-									//&& svgArray[filled[n]].path.fill.length()
-									&& svgArray[filled[n]].path[0].@stroke.length()==0
+									svgArray[fillN].path.length()  
+									//&& svgArray[fillN].path.fill.length()
+									&& svgArray[fillN].path[0].@stroke.length()==0
 									&& (
-										oppositeFill.is(validContours[filled[n]].fill) 
+										oppositeFill.is(validContours[fillN].fill) 
 										|| noFills
 										|| ( 
 											insideOut
 											&& oppositeFill.style=='noFill'
 										) //???
-									) && svgArray[filled[n]].path[0].stroke.length()==0
+									) && svgArray[fillN].path[0].stroke.length()==0
 								){
-									var cutID=String(svgArray[filled[n]].path[0]['@id']);
+									var cutID=String(svgArray[fillN].path[0]['@id']);
 									var rev=( sameDir && !insideOut ) || ( insideOut && !sameDir);
 									if(rev){
 										s=this._getContour(contours[i],{
@@ -2523,9 +2524,9 @@
 											reversed: !rev,
 											matrix: pathMatrix,
 											dom:dom
-										});										
+										});								
 										if(so.path.length()){
-											var f=String(svgArray[filled[n]].path[0]['@d']);
+											var f=String(svgArray[fillN].path[0]['@d']);
 											var fs=f.match(/^[^Zz]*[Zz]?/)[0].trim();
 											var pStr=String(s.path[0]['@d']);
 											var pA=/^[^Zz]*[Zz]?/.exec(pStr)[0].trim();
@@ -2536,22 +2537,28 @@
 											if(
 												fs==pAO || fs==pA
 											){
-													svgArray[filled[n]].path[0]['@d']+=pStr.replace(pA,'').replace(pAO,'');
+													svgArray[fillN].path[0]['@d']+=pStr.replace(pA,'').replace(pAO,'');
 													svgArray[svgArray.length-1].path[0].@d=String(
 														svgArray[svgArray.length-1].path[0].@d
 													).replace(pA,'').replace(pAO,'');
-											}else if(!(
+											}
+
+											/**
+											Can not work out exactly what this is for and it's causing issues
+											Shouldn't it be checking that the paths to be combined have the same fill/stroke?
+											**/
+											/*else if(!(
 												//noFills &&
-												contours[i].edgeIDs.intersect(validContours[filled[n]].edgeIDs).length
+												contours[i].edgeIDs.intersect(validContours[fillN].edgeIDs).length
 											)){
 												if(pA[pA.length-1]!=='z'){pA+='z';}
-												svgArray[filled[n]].path[0]['@d']+=pA;
+												svgArray[fillN].path[0]['@d']+=pA;
 												//if(oppositeFill.style!='noFill' && fill.style!='noFill' && insideOut){
 												if(oppositeFill.style==fill.style!='noFill' && insideOut){
 													delete svgArray[svgArray.length-1].path[0];
 													deleted=true;
 												}
-											}											
+											}*/										
 										}
 										break;
 									}
@@ -2581,7 +2588,7 @@
 						}
 					}
 				}
-			}			
+			}	
 			var svg=new XML('<g id="'+id+'"/>');
 			var matrixStr = this._getMatrix(matrix);
 			if(matrixStr!=this.IDENTITY_MATRIX)svg['@transform']=matrixStr;
@@ -2683,9 +2690,7 @@
 
 			var sameStrokes = contour.interior && controlPoints.length>1;
 
-			var fills=new ext.Array();
 			var paths=new ext.Array();
-			var interior=false;
 			var xform='';
 			if(settings.matrix){
 				xform='transform="'+this._getMatrix(settings.matrix)+'" ';
@@ -2718,7 +2723,6 @@
 					}
 				}
 
-				interior=true;
 				var fillString='none';
 				var opacityString = "";
 				var fill=this._getFill(contour.fill,{
@@ -2795,9 +2799,9 @@
 				if(stroke && cp.length>0){//create the last stroke
 					if(
 						firstEdge.stroke && firstEdge.stroke.style!='noStroke' && stroke.is(firstEdge.stroke)
-						&& ((interior && paths.length>1) || (!interior && paths.length>0))
+						&& ((contour.interior && paths.length>1) || (!contour.interior && paths.length>0))
 					){//if the stroke on the beginning of the contour matches that at the end, connect them
-						var pathID=interior?1:0;
+						var pathID=contour.interior?1:0;
 						var x=new XML(paths[pathID]);
 						var cd1=this._getCurve(cp,contour.orientation).trim();
 						var cd2=x['@d'].trim();
