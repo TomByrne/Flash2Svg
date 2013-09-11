@@ -1387,21 +1387,53 @@
 						}
 
 						var doCollateFrames = (doAnim && !settings.flattenMotion  && items.length==1 && tweenType!="shape" && items[0].$.elementType=="instance");
+						var frameEnd = n+1;
+						if(doCollateFrames){
+							var mainElem = frame.elements[0];
+							while(frameEnd<layerEnd){
+								var nextFrame = layer.frames[frameEnd];
+								if(nextFrame){
+									if(nextFrame.startFrame==frameEnd){
+										// keyframe
+										var nextElem = nextFrame.elements[0];
+										if(nextFrame.elements.length!=1){
+											break; // tweening to incompatible frame
+										}else if(nextElem.libraryItem!=mainElem.libraryItem || mainElem.symbolType!=nextElem.symbolType || 
+												(mainElem.symbolType=="graphic" &&
+													(nextElem.loop!=mainElem.loop || (nextElem.loop=="single frame" || nextFrame.duration==1) && elemSettings.startFrame!=this._getPriorFrame(nextElem.timeline, nextElem.firstFrame)
+													 || (nextElem.loop!="single frame" && nextFrame.duration>1 && mainElem.firstFrame!=nextElem.firstFrame))/* && !syncedLayers[i]*/)){
+											//tweening to different symbol
+											++frameEnd;
+											break;
+										}
+									}
+									++frameEnd;
+								}else{
+									break;
+								}
+							}
+						}else if(tweenType=='none'){
+							while(frameEnd<layer.frames.length && layer.frames[frameEnd].startFrame==n){
+								frameEnd++;
+								// this will add in extra time for frames with non changing content (which won't be included as a real frame)
+							}
+						}
+
 
 						for(var j=0; j<items.length; ++j){
 							var element = items[j];
 							element.timeline = timeline;
 							var elementID=this._uniqueID('element');
 
-							var dur = settings.frameCount - (n - settings.startFrame);
-							if(frame.duration<dur)dur = frame.duration;
+							// var dur = settings.frameCount - (n - settings.startFrame);
+							// if(frame.duration<dur)dur = frame.duration;
 
 							var time = settings.timeOffset+n*(1/ext.doc.frameRate);
 							var elemSettings = {
 										frame:n,
 										dom:dom,
 										timeOffset:time,
-										frameCount:dur,
+										frameCount:(frameEnd - n),
 										totalDuration:animDur,
 										beginAnimation:"0s"
 									};
@@ -1443,12 +1475,7 @@
 						}
 						if(doAnim){
 							
-							var frameEnd = n+1;
 							if(doCollateFrames){
-
-								//var transPoint = element.getTransformationPoint();
-
-								//var rot = (element.skewX+element.skewY)/2;
 								var firstRot = this._getRotation(element);
 								var firstSkX = element.skewX;
 								var firstSkY = element.skewY;
@@ -1482,86 +1509,67 @@
 
 								var mainElem = frame.elements[0];
 								var isLast = false;
-								while(frameEnd<layerEnd && !isLast){
-									var nextFrame = layer.frames[frameEnd];
-									if(nextFrame){
-										if(nextFrame.startFrame==frameEnd){
-											// keyframe
-											var nextElem = nextFrame.elements[0];
-											if(nextFrame.elements.length!=1){
-												break; // tweening to incompatible frame
-											}else if(nextElem.libraryItem!=mainElem.libraryItem || mainElem.symbolType!=nextElem.symbolType || 
-													(mainElem.symbolType=="graphic" &&
-														(nextElem.loop!=mainElem.loop || (nextElem.loop=="single frame" || nextFrame.duration==1) && elemSettings.startFrame!=this._getPriorFrame(nextElem.timeline, nextElem.firstFrame)
-														 || (nextElem.loop!="single frame" && nextFrame.duration>1 && mainElem.firstFrame!=nextElem.firstFrame))/* && !syncedLayers[i]*/)){
-												//tweening to different symbol
-												isLast = true;
-												fl.trace("isLast: "+isLast);
-											}
-
-											var attemptForeRot = true;
-											var attemptBackRot = true;
-											var time = (settings.timeOffset+frameEnd*(1/ext.doc.frameRate))/animDur;
-											if(lastFrame.tweenType=="none"){
-												timeList.push(this.precision(time-0.0000001));
-												longTimeList.push(this.precision(time-0.0000001));
-											}else if(lastFrame.tweenType=="motion"){
-												switch(lastFrame.motionTweenRotate){
-													case "clockwise":
-														if(lastFrame.duration>1)autoRotate += lastFrame.motionTweenRotateTimes*360;
-														attemptBackRot = false;
-														break;
-													case "counter-clockwise":
-														if(lastFrame.duration>1)autoRotate += lastFrame.motionTweenRotateTimes*-360;
-														attemptForeRot = false;
-														break;
-												}
-											}
-
-											var nextElement = nextFrame.elements[0];
-											var rot = this._getRotation(nextElement) - firstRot;
-											var skewX = nextElement.skewX - firstSkX;
-											var skewY = nextElement.skewY - firstSkY;
-
-											while(attemptForeRot && Math.abs(rot-lastRot)>Math.abs(rot+360-lastRot)){
-												rot += 360;
-												skewX += 360;
-												skewY += 360;
-											}
-											while(attemptBackRot && Math.abs(rot-lastRot)>Math.abs(rot-360-lastRot)){
-												rot -= 360;
-												skewX -= 360;
-												skewY -= 360;
-											}
-
-											rot += autoRotate;
-
-											// if there is a rotation tween of up to 45 degrees, we add extra bounds to accomodate it.
-											var rotDif = Math.abs(lastRot - rot)/180*Math.PI;
-											if(rotDif>Math.PI/4)rotDif = Math.PI/4;
-											var swingLeft = nextElement.matrix.tx+(nextElement.left-nextElement.matrix.tx)*Math.cos(rotDif)+(nextElement.top-nextElement.matrix.ty)*Math.sin(rotDif);
-											var swingTop = nextElement.matrix.ty+(nextElement.top-nextElement.matrix.ty)*Math.cos(rotDif)+(nextElement.left-nextElement.matrix.tx)*Math.sin(rotDif);
-											var swingRight = nextElement.matrix.tx+(nextElement.right-nextElement.matrix.tx)*Math.cos(rotDif)+(nextElement.bottom-nextElement.matrix.ty)*Math.sin(rotDif);
-											var swingBottom = nextElement.matrix.ty+(nextElement.bottom-nextElement.matrix.ty)*Math.cos(rotDif)+(nextElement.right-nextElement.matrix.tx)*Math.sin(rotDif);
-											if(boundingBox.left>swingLeft)boundingBox.left = swingLeft;
-											if(boundingBox.top>swingTop)boundingBox.top = swingTop;
-											if(boundingBox.right<swingRight)boundingBox.right = swingRight;
-											if(boundingBox.bottom<swingBottom)boundingBox.bottom = swingBottom;
-
-											this._addAnimFrame(nextFrame, nextElement, invMatrix, time, rot, skewX, skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, timeList, splineList);
-
-											if(nextFrame.tweenType!="none")tweensFound = true;
-
-											if(!isLast)animatedFrames[i+"-"+frameEnd] = true;
-											if(nextFrame.elements.length>1 || nextElement.libraryItem!=element.libraryItem)break;
-
-											lastFrame = nextFrame;
-
-											lastRot = rot;
-
+								for(var nextInd = n+1; nextInd<frameEnd; ++nextInd){
+									var nextFrame = layer.frames[nextInd];
+									var attemptForeRot = true;
+									var attemptBackRot = true;
+									var time = (settings.timeOffset+nextInd*(1/ext.doc.frameRate))/animDur;
+									if(lastFrame.tweenType=="none"){
+										timeList.push(this.precision(time-0.0000001));
+										longTimeList.push(this.precision(time-0.0000001));
+									}else if(lastFrame.tweenType=="motion"){
+										switch(lastFrame.motionTweenRotate){
+											case "clockwise":
+												if(lastFrame.duration>1)autoRotate += lastFrame.motionTweenRotateTimes*360;
+												attemptBackRot = false;
+												break;
+											case "counter-clockwise":
+												if(lastFrame.duration>1)autoRotate += lastFrame.motionTweenRotateTimes*-360;
+												attemptForeRot = false;
+												break;
 										}
 									}
-									if(!isLast)frameEnd++;
+
+									var nextElement = nextFrame.elements[0];
+									var rot = this._getRotation(nextElement) - firstRot;
+									var skewX = nextElement.skewX - firstSkX;
+									var skewY = nextElement.skewY - firstSkY;
+
+									while(attemptForeRot && Math.abs(rot-lastRot)>Math.abs(rot+360-lastRot)){
+										rot += 360;
+										skewX += 360;
+										skewY += 360;
+									}
+									while(attemptBackRot && Math.abs(rot-lastRot)>Math.abs(rot-360-lastRot)){
+										rot -= 360;
+										skewX -= 360;
+										skewY -= 360;
+									}
+
+									rot += autoRotate;
+
+									// if there is a rotation tween of up to 45 degrees, we add extra bounds to accomodate it.
+									var rotDif = Math.abs(lastRot - rot)/180*Math.PI;
+									if(rotDif>Math.PI/4)rotDif = Math.PI/4;
+									var swingLeft = nextElement.matrix.tx+(nextElement.left-nextElement.matrix.tx)*Math.cos(rotDif)+(nextElement.top-nextElement.matrix.ty)*Math.sin(rotDif);
+									var swingTop = nextElement.matrix.ty+(nextElement.top-nextElement.matrix.ty)*Math.cos(rotDif)+(nextElement.left-nextElement.matrix.tx)*Math.sin(rotDif);
+									var swingRight = nextElement.matrix.tx+(nextElement.right-nextElement.matrix.tx)*Math.cos(rotDif)+(nextElement.bottom-nextElement.matrix.ty)*Math.sin(rotDif);
+									var swingBottom = nextElement.matrix.ty+(nextElement.bottom-nextElement.matrix.ty)*Math.cos(rotDif)+(nextElement.right-nextElement.matrix.tx)*Math.sin(rotDif);
+									if(boundingBox.left>swingLeft)boundingBox.left = swingLeft;
+									if(boundingBox.top>swingTop)boundingBox.top = swingTop;
+									if(boundingBox.right<swingRight)boundingBox.right = swingRight;
+									if(boundingBox.bottom<swingBottom)boundingBox.bottom = swingBottom;
+
+									this._addAnimFrame(nextFrame, nextElement, invMatrix, time, rot, skewX, skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, timeList, splineList);
+
+									if(nextFrame.tweenType!="none")tweensFound = true;
+
+									if(!isLast)animatedFrames[i+"-"+nextInd] = true;
+									if(nextFrame.elements.length>1 || nextElement.libraryItem!=element.libraryItem)break;
+
+									lastFrame = nextFrame;
+
+									lastRot = rot;
 								}
 								if(lastFrame.tweenType=="none"){
 									xList.pop();
@@ -1584,12 +1592,12 @@
 
 								elementXML.@transform = this._getMatrix(matrix);
 
-							}else if(tweenType=='none'){
+							}/*else if(tweenType=='none'){
 								while(frameEnd<layer.frames.length && layer.frames[frameEnd].startFrame==n){
 									frameEnd++;
 									// this will add in extra time for frames with non changing content (which won't be included as a real frame)
 								}
-							}
+							}*/
 							var frameTimeStart = String(this.precision((settings.timeOffset + n*(1/ext.doc.frameRate))/animDur));
 							var frameTimeEnd = String(this.precision((settings.timeOffset + frameEnd*(1/ext.doc.frameRate))/animDur));
 							if(frameTimeEnd>1)frameTimeEnd = 1;
@@ -1718,7 +1726,7 @@
 			skewY -= rot;
 
 
-			fl.trace("\trot: "+this.precision(rot)+" "+element.rotation+" "+((matrix.b<0) != (matrix.c<0) && (matrix.b<0) && isNaN(element.rotation))+" "+matrix);
+			//fl.trace("\trot: "+this.precision(rot)+" "+((matrix.b<0) != (matrix.c<0) && (matrix.b<0) && isNaN(element.rotation))+" "+matrix);
 			if((matrix.b<0) != (matrix.c<0) && (matrix.b<0 || matrix.d>0) && isNaN(element.rotation)){
 				//rot = -rot;
 			}
@@ -2552,7 +2560,7 @@
 													pA+='z';
 												}
 												svgArray[fillN].path[0]['@d'] += pA;
-												if(noFills && insideOut){
+												if(oppositeFill.style==fill.style!='noFill' && insideOut){
 													delete svgArray[svgArray.length-1].path[0];
 													deleted=true;
 												}
