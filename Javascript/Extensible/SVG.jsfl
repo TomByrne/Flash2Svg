@@ -1278,6 +1278,8 @@
 					}
 
 					animNode.@dur = animDur+"s";
+				}else{
+					animDur = 0;
 				}
 
 				var animatedFrames = {};
@@ -2541,24 +2543,20 @@
 													svgArray[svgArray.length-1].path[0].@d=String(
 														svgArray[svgArray.length-1].path[0].@d
 													).replace(pA,'').replace(pAO,'');
-											}
-
-											/**
-											Can not work out exactly what this is for and it's causing issues
-											Shouldn't it be checking that the paths to be combined have the same fill/stroke?
-											**/
-											/*else if(!(
-												//noFills &&
-												contours[i].edgeIDs.intersect(validContours[fillN].edgeIDs).length
-											)){
-												if(pA[pA.length-1]!=='z'){pA+='z';}
-												svgArray[fillN].path[0]['@d']+=pA;
-												//if(oppositeFill.style!='noFill' && fill.style!='noFill' && insideOut){
-												if(oppositeFill.style==fill.style!='noFill' && insideOut){
+											}else if(
+												!contours[i].edgeIDs.intersect(validContours[fillN].edgeIDs).length &&
+												oppositeFill.style!="noFill"
+											){
+												// this creates composite paths, where a path makes the hole in another filled path
+												if(pA[pA.length-1]!=='z'){
+													pA+='z';
+												}
+												svgArray[fillN].path[0]['@d'] += pA;
+												if(noFills && insideOut){
 													delete svgArray[svgArray.length-1].path[0];
 													deleted=true;
 												}
-											}*/										
+											}										
 										}
 										break;
 									}
@@ -2608,8 +2606,8 @@
 								ca0.pop();
 								cs0=ca0.join(' ');
 							}
-							var index=0;
-							for(s in svg){
+							var s=0;
+							while(s<svg.length()){
 								if(svg[s].localName()=='path' && svg[s]['@stroke'].length()){
 									var cs1=String(svg[s]['@d']).replace(/[^\d\.\,]/g,' ').replace(/([^\s])(\s\s*?)([^\s])/g,'$1 $3').trim();
 									var ca1=cs1.split(' ');
@@ -2628,8 +2626,10 @@
 									}
 									if(cs0==cs1){
 										delete svg[s];
+										continue;
 									}
 								}
+								++s;
 							}
 						}
 						ii+=1;
