@@ -1179,7 +1179,7 @@
 								(n==frame.startFrame && layer.layerType=="guided" && frame.tweenType!="none") ||
 								(settings.flattenMotion && frame.tweenType=="motion") ||
 								(n==settings.startFrame && start!=n && startFrame.tweenType!='none') || // this backtracks from the first frame if our range starts mid-tween
-								(n==settings.endFrame && start!=n && startFrame.tweenType!='none')// ||// this breaks apart tweens which fall over the end of our range
+								(n==settings.endFrame && start!=n && startFrame.tweenType!='none' && layer.frameCount>settings.endFrame+1)// ||// this breaks apart tweens which fall over the end of our range
 								//(n==frame.startFrame && frame.elements.length==1 && frame.elements[0].symbolType=="graphic"/* && frame.elements[0].loop!="single frame"*/)// graphic runs should be broken down into single frames (but only when the run is out of sync with the master timeline)
 								){
 								breakApart = true;
@@ -1191,6 +1191,7 @@
 								for(var k=0; k<frame.duration; ++k){
 									if(this._getPriorFrame(firstElement.timeline, firstElement.firstFrame + k) != resolvedFrame){
 										breakApart = true;
+										fl.trace("YO");
 										break;
 									}
 								}
@@ -1388,8 +1389,10 @@
 
 						var doCollateFrames = (doAnim && !settings.flattenMotion  && items.length==1 && tweenType!="shape" && items[0].$.elementType=="instance");
 						var frameEnd = n+1;
+						var transToDiff = false;
 						if(doCollateFrames){
 							var mainElem = frame.elements[0];
+							if(mainElem.loop=="single frame")var singleFrameStart = this._getPriorFrame(mainElem.timeline, mainElem.firstFrame)
 							while(frameEnd<layerEnd){
 								var nextFrame = layer.frames[frameEnd];
 								if(nextFrame){
@@ -1400,10 +1403,11 @@
 											break; // tweening to incompatible frame
 										}else if(nextElem.libraryItem!=mainElem.libraryItem || mainElem.symbolType!=nextElem.symbolType || 
 												(mainElem.symbolType=="graphic" &&
-													(nextElem.loop!=mainElem.loop || (nextElem.loop=="single frame" || nextFrame.duration==1) && elemSettings.startFrame!=this._getPriorFrame(nextElem.timeline, nextElem.firstFrame)
+													(nextElem.loop!=mainElem.loop || (nextElem.loop=="single frame" || nextFrame.duration==1) && singleFrameStart!=this._getPriorFrame(nextElem.timeline, nextElem.firstFrame)
 													 || (nextElem.loop!="single frame" && nextFrame.duration>1 && mainElem.firstFrame!=nextElem.firstFrame))/* && !syncedLayers[i]*/)){
 											//tweening to different symbol
 											++frameEnd;
+											transToDiff = true;
 											break;
 										}
 									}
@@ -1425,9 +1429,6 @@
 							element.timeline = timeline;
 							var elementID=this._uniqueID('element');
 
-							// var dur = settings.frameCount - (n - settings.startFrame);
-							// if(frame.duration<dur)dur = frame.duration;
-
 							var time = settings.timeOffset+n*(1/ext.doc.frameRate);
 							var elemSettings = {
 										frame:n,
@@ -1438,7 +1439,6 @@
 										beginAnimation:"0s"
 									};
 
-							//if(element.symbolType=="graphic" && !syncedLayers[i]){
 							if(element.symbolType=="graphic"){
 								if(element.loop=="single frame" || frame.duration==1){
 									elemSettings.frameCount = 1;
@@ -1455,6 +1455,11 @@
 										}
 									}
 								}
+							}else if(element.symbolType=="movie clip" && element.libraryItem.timeline.frameCount<(frameEnd-n)*0.5 && frameEnd>n+1){
+								// if MC play time is shorter than half of it's visible run, we'll treat it as an independant loop
+								elemSettings.timeOffset = 0;
+								elemSettings.frameCount = element.libraryItem.timeline.frameCount;
+								elemSettings.totalDuration = (elemSettings.frameCount-1)*(1/ext.doc.frameRate);
 							}
 
 							if(this._delayedProcessing){
@@ -1491,10 +1496,9 @@
 								var tryList = [];
 
 								var timeList = [];
-								var longTimeList = [];
 								var splineList = [];
 
-								var tweensFound = (frame.tweenType!="none");
+								var tweensFound = (frame.tweenType!="none" && frame.duration>1);
 
 								var matrix = element.matrix.clone();
 								var invMatrix = matrix.invert();
@@ -1508,16 +1512,18 @@
 								var autoRotate = 0;
 
 								var mainElem = frame.elements[0];
-								var isLast = false;
 								for(var nextInd = n+1; nextInd<frameEnd; ++nextInd){
 									var nextFrame = layer.frames[nextInd];
+									if(nextFrame.startFrame!=nextInd)continue;
+
 									var attemptForeRot = true;
 									var attemptBackRot = true;
 									var time = (settings.timeOffset+nextInd*(1/ext.doc.frameRate))/animDur;
-									if(lastFrame.tweenType=="none"){
+									if(lastFrame.tweenType=="none" || lastFrame.duration==1){
 										timeList.push(this.precision(time-0.0000001));
-										longTimeList.push(this.precision(time-0.0000001));
 									}else if(lastFrame.tweenType=="motion"){
+										fl.trace("MOTION");
+										tweensFound = true;
 										switch(lastFrame.motionTweenRotate){
 											case "clockwise":
 												if(lastFrame.duration>1)autoRotate += lastFrame.motionTweenRotateTimes*360;
@@ -1529,6 +1535,7 @@
 												break;
 										}
 									}
+									//if(nextFrame.tweenType!="none" && frame.duration>1)
 
 									var nextElement = nextFrame.elements[0];
 									var rot = this._getRotation(nextElement) - firstRot;
@@ -1562,16 +1569,15 @@
 
 									this._addAnimFrame(nextFrame, nextElement, invMatrix, time, rot, skewX, skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, timeList, splineList);
 
-									if(nextFrame.tweenType!="none")tweensFound = true;
-
-									if(!isLast)animatedFrames[i+"-"+nextInd] = true;
+									if(!transToDiff || nextInd<frameEnd-1)animatedFrames[i+"-"+nextInd] = true;
 									if(nextFrame.elements.length>1 || nextElement.libraryItem!=element.libraryItem)break;
 
 									lastFrame = nextFrame;
 
 									lastRot = rot;
 								}
-								if(lastFrame.tweenType=="none"){
+								if(lastFrame.tweenType=="none" || lastFrame.duration==1){
+									// this code works in tandem with code within _addAnimFrame which adds an 'end-point' to non-tweened frame runs
 									xList.pop();
 									yList.pop();
 									scxList.pop();
@@ -1726,10 +1732,25 @@
 			skewY -= rot;
 
 
-			//fl.trace("\trot: "+this.precision(rot)+" "+((matrix.b<0) != (matrix.c<0) && (matrix.b<0) && isNaN(element.rotation))+" "+matrix);
-			if((matrix.b<0) != (matrix.c<0) && (matrix.b<0 || matrix.d>0) && isNaN(element.rotation)){
-				//rot = -rot;
+			//fl.trace("\trot: "+this.precision(rot)+" "+((matrix.b<0) != (matrix.b<0 || matrix.d>0) && (matrix.b<0) && isNaN(element.rotation))+" "+matrix);
+			//fl.trace("\tcheck: ab:"+(matrix.a*matrix.b)+" ac:"+(matrix.a*matrix.c)+" db:"+(matrix.d*matrix.b)+" dc:"+(matrix.d*matrix.c));
+			//fl.trace("\tcheck: sx:"+element.scaleX+" sy:"+element.scaleY);
+			/*
+			 a:-0.659820556640625, b:0.7513885498046875, c:-0.7513885498046875, d:-0.659820556640625 = flip
+			 ab:-0.4957816111855209 ac:0.4957816111855209 db:-0.4957816111855209 dc:0.4957816111855209
+
+			 a:-0.659820556640625, b:0.7513885498046875, c:-0.7513885498046875, d:-0.659820556640625 = none
+			 ab:-0.4957816111855209 ac:0.4957816111855209 db:-0.4957816111855209 dc:0.4957816111855209
+
+			 rot: 185.325 false ({a:0.9940643310546875, b:0.0926361083984375, c:0.0926361083984375, d:-0.9940643310546875, tx:7.6, ty:24.4})
+			 sx:0.1128082275390625 sy:0.1128082275390625
+			 */
+			//if((matrix.b<0) != (matrix.c<0) && (matrix.b<0 || matrix.d>0) && isNaN(element.rotation)){
+			if(rot * matrix.a * matrix.c * matrix.d > 0){
+				rot = -rot;
+				fl.trace("FLIP");
 			}
+
 			var rotRad = rot / 180 * Math.PI;
 
 			rotList.push(this.precision(rot));
@@ -1761,7 +1782,7 @@
 			splineList.push(this._getSplineData(frame));
 			timeList.push(this.precision(time));
 
-			if(frame.tweenType=="none"){
+			if(frame.tweenType=="none" || frame.duration==1){
 				xList.push(xList[xList.length-1]);
 				yList.push(yList[yList.length-1]);
 				scxList.push(scxList[scxList.length-1]);
@@ -1994,7 +2015,7 @@
 				libraryItem:instance.libraryItem
 			});
 			settings.extend(options);
-			ext.message("\n_getSymbolInstance: "+instance.libraryItem.name+" - loop:"+instance.loop+" frameCount:"+settings.frameCount+" startFrame:"+settings.startFrame);
+			ext.message("\n_getSymbolInstance: "+instance.libraryItem.name+" - loop:"+instance.loop+" frameCount:"+settings.frameCount+" startFrame:"+settings.startFrame+" animDur:"+settings.animDur);
 			var dom = settings.dom;
 			settings.matrix = instance.matrix.concat(settings.matrix);
 			var xml = this._getTimeline(instance.timeline,settings);
