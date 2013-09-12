@@ -1392,7 +1392,7 @@
 						var transToDiff = false;
 						if(doCollateFrames){
 							var mainElem = frame.elements[0];
-							if(mainElem.loop=="single frame")var singleFrameStart = this._getPriorFrame(mainElem.timeline, mainElem.firstFrame)
+							if(mainElem.loop=="single frame" || frame.duration==1)var singleFrameStart = this._getPriorFrame(mainElem.timeline, mainElem.firstFrame)
 							while(frameEnd<layerEnd){
 								var nextFrame = layer.frames[frameEnd];
 								if(nextFrame){
@@ -1403,7 +1403,8 @@
 											break; // tweening to incompatible frame
 										}else if(nextElem.libraryItem!=mainElem.libraryItem || mainElem.symbolType!=nextElem.symbolType || 
 												(mainElem.symbolType=="graphic" &&
-													(nextElem.loop!=mainElem.loop || (nextElem.loop=="single frame" || nextFrame.duration==1) && singleFrameStart!=this._getPriorFrame(nextElem.timeline, nextElem.firstFrame)
+													    ((nextElem.loop!=mainElem.loop && !((mainElem.loop=="single frame" || frame.duration==1) && (nextElem.loop=="single frame" || nextFrame.duration==1)))
+													 || ((nextElem.loop=="single frame" || nextFrame.duration==1) && singleFrameStart!=this._getPriorFrame(nextElem.timeline, nextElem.firstFrame))
 													 || (nextElem.loop!="single frame" && nextFrame.duration>1 && mainElem.firstFrame!=nextElem.firstFrame))/* && !syncedLayers[i]*/)){
 											//tweening to different symbol
 											++frameEnd;
@@ -1522,7 +1523,6 @@
 									if(lastFrame.tweenType=="none" || lastFrame.duration==1){
 										timeList.push(this.precision(time-0.0000001));
 									}else if(lastFrame.tweenType=="motion"){
-										fl.trace("MOTION");
 										tweensFound = true;
 										switch(lastFrame.motionTweenRotate){
 											case "clockwise":
