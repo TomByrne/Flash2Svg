@@ -313,7 +313,8 @@
 						libraryItem:timeline.libraryItem,
 						isRoot:true,
 						flattenMotion:this.flattenMotion,
-						beginAnimation:this.beginAnimation
+						beginAnimation:this.beginAnimation,
+						repeatCount:this.repeatCount
 					}
 				);
 				xml.appendChild(x);
@@ -1258,7 +1259,7 @@
 								      attributeName="display"/>;
 
 					animNode.@begin = settings.beginAnimation;
-					animNode.@repeatCount = this.repeatCount;
+					animNode.@repeatCount = settings.repeatCount;
 
 
 					/*var animDur = totFrames*(1/ext.doc.frameRate);
@@ -1430,14 +1431,15 @@
 							element.timeline = timeline;
 							var elementID=this._uniqueID('element');
 
-							var time = settings.timeOffset+n*(1/ext.doc.frameRate);
+							var time = settings.timeOffset+(n - settings.startFrame)*(1/ext.doc.frameRate);
 							var elemSettings = {
 										frame:n,
 										dom:dom,
 										timeOffset:time,
 										frameCount:(frameEnd - n),
 										totalDuration:animDur,
-										beginAnimation:"0s"
+										beginAnimation:"0s",
+										repeatCount:settings.repeatCount
 									};
 
 							if(element.symbolType=="graphic"){
@@ -1461,6 +1463,7 @@
 								elemSettings.timeOffset = 0;
 								elemSettings.frameCount = element.libraryItem.timeline.frameCount;
 								elemSettings.totalDuration = (elemSettings.frameCount-1)*(1/ext.doc.frameRate);
+								elemSettings.repeatCount = "indefinite";
 							}
 
 							if(this._delayedProcessing){
@@ -1590,11 +1593,11 @@
 									splineList.pop();
 								}
 								// // the ordering of these animation nodes is important
-								this._addAnimationNode(elementXML, "translate", [xList, yList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)
-								this._addAnimationNode(elementXML, "rotate", [rotList, trxList, tryList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, rotList.length>1)
-								this._addAnimationNode(elementXML, "skewX", [skxList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)
-								this._addAnimationNode(elementXML, "skewY", [skyList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation)
-								this._addAnimationNode(elementXML, "scale", [scxList, scyList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation, scxList.length>1)
+								this._addAnimationNode(elementXML, "translate", [xList, yList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount)
+								this._addAnimationNode(elementXML, "rotate", [rotList, trxList, tryList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, rotList.length>1)
+								this._addAnimationNode(elementXML, "skewX", [skxList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount)
+								this._addAnimationNode(elementXML, "skewY", [skyList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount)
+								this._addAnimationNode(elementXML, "scale", [scxList, scyList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, scxList.length>1)
 
 								elementXML.@transform = this._getMatrix(matrix);
 
@@ -1604,11 +1607,12 @@
 									// this will add in extra time for frames with non changing content (which won't be included as a real frame)
 								}
 							}*/
-							var frameTimeStart = String(this.precision((settings.timeOffset + n*(1/ext.doc.frameRate))/animDur));
-							var frameTimeEnd = String(this.precision((settings.timeOffset + frameEnd*(1/ext.doc.frameRate))/animDur));
+							var frameTimeStart = String(this.precision((settings.timeOffset + (n - settings.startFrame)*(1/ext.doc.frameRate))/animDur));
+							var frameTimeEnd = String(this.precision((settings.timeOffset + ((transToDiff?frameEnd-1:frameEnd) - settings.startFrame)*(1/ext.doc.frameRate))/animDur));
 							if(frameTimeEnd>1)frameTimeEnd = 1;
 
-							if(frameTimeStart>1)fl.trace("WARNING: "+frameTimeStart+" "+frameTimeEnd+" "+animDur+" - "+(n*(1/ext.doc.frameRate))+" "+(frameEnd*(1/ext.doc.frameRate))+" - "+n+" "+frameEnd);
+							if(frameTimeStart>1)fl.trace("START TIME WARNING: "+frameTimeStart+" "+settings.timeOffset+" "+animDur+" "+n+" "+settings.startFrame+" "+((n - settings.startFrame)*(1/ext.doc.frameRate)));
+							if(frameTimeEnd>1)fl.trace("END TIME WARNING: "+frameTimeEnd);
 
 							if(items.length>0 && (frameTimeStart!=0 || frameTimeEnd!=1)){ // don't bother if element is always there
 								var fAnimNode = animNode.copy();
@@ -1860,7 +1864,7 @@
 			xml.appendChild(mg);
 			masked.clear();
 		},
-		_addAnimationNode:function(toNode, type, valueLists, times, totalTime, splineList, tweensFound, defaultValue, beginAnimation, force){
+		_addAnimationNode:function(toNode, type, valueLists, times, totalTime, splineList, tweensFound, defaultValue, beginAnimation, repeatCount, force){
 
 			if(defaultValue==null)defaultValue = 0;
 
@@ -1939,7 +1943,7 @@
 
 			animNode.@begin = beginAnimation;
 			animNode.@type = type;
-			animNode.@repeatCount = this.repeatCount;
+			animNode.@repeatCount = repeatCount;
 
 			animNode.@dur = totalTime+"s";
 			animNode.@keyTimes = validT.join(";");
@@ -2015,7 +2019,7 @@
 				libraryItem:instance.libraryItem
 			});
 			settings.extend(options);
-			ext.message("\n_getSymbolInstance: "+instance.libraryItem.name+" - loop:"+instance.loop+" frameCount:"+settings.frameCount+" startFrame:"+settings.startFrame+" animDur:"+settings.animDur);
+			ext.message("\n_getSymbolInstance: "+instance.libraryItem.name+" - loop:"+instance.loop+" frameCount:"+settings.frameCount+" startFrame:"+settings.startFrame);
 			var dom = settings.dom;
 			settings.matrix = instance.matrix.concat(settings.matrix);
 			var xml = this._getTimeline(instance.timeline,settings);
@@ -2686,7 +2690,8 @@
 							timeOffset:settings.timeOffset,
 							frameCount:settings.frameCount,
 							//totalDuration:settings.totalDuration,
-							beginAnimation:settings.beginAnimation
+							beginAnimation:settings.beginAnimation,
+							repeatCount:settings.repeatCount
 						}
 					);
 					if(e){svg.appendChild(e);}
