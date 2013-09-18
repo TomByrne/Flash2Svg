@@ -959,7 +959,8 @@
 				includeMotionTweens:true,
 				includeHiddenLayers:ext.includeHiddenLayers,
 				includeGuides:false,
-				includeGuidedTweens:false
+				includeGuidedTweens:false,
+				includeGraphicChanges:false
 			});
 			settings.extend(options);
 			var f=new ext.Array();
@@ -971,7 +972,7 @@
 					( layer.layerType!='guide' || settings.includeGuides) &&
 					  layer.layerType!="folder"
 				){
-					var layerEnd = settings.endFrame;
+					var layerEnd = settings.endFrame+1;
 					if(layerEnd>layer.frameCount)layerEnd = layer.frameCount;
 
 					for(var i=settings.startFrame;i<layerEnd;i++){ // check for tweens
@@ -984,6 +985,15 @@
 							) && settings.frame!=frame.startFrame
 						){
 							return true;
+						}
+						if(settings.includeGraphicChanges && frame.duration>1){
+							var elems = frame.elements;
+							for(var j=0; j<elems.length; ++j){
+								var elem = elems[j];
+								if(elem.symbolType=="graphic" && elem.loop!="single frame"){
+									return true;
+								}
+							}
 						}
 					}
 				}
@@ -1102,45 +1112,16 @@
 						includeHiddenLayers:this.includeHiddenLayers,
 						includeGuides:this.includeGuides,
 						includeMotionTweens:true,
-						includeGuidedTweens:true
+						includeGuidedTweens:true,
+						includeGraphicChanges:true
 					});
-
-				 /**
-					If a graphic layer is completely in sync with the root timeline it gets exported as a whole timeline (like an MC).
-					Otherwise, it is exported frame by frame, which can be reused elsewhere (but is bigger).
-				 */
-				/*var syncedLayers = {};
-				layers = timeline.getLayers();
-				var frameOffset = settings.timeOffset/(1/ext.doc.frameRate);
-				for(var i=0;i<layers.length;i++){
-					var layer=layers[i];
-					var synced = true;
-					var lastElement;
-
-					var layerEnd = settings.endFrame+1;
-					if(layerEnd>layer.frameCount)layerEnd = layer.frameCount;
-
-					for(var n=settings.startFrame; n<layerEnd; ++n){
-						var frame=layer.frames[n];
-						if(frame.startFrame!=n)continue;
-						var element = frame.elements[0];
-						if(frame.elements.length!=1 || element.symbolType!="graphic" || frameOffset!=element.firstFrame || (lastElement && element.libraryItem!=lastElement.libraryItem) || (element.loop=="single frame" && frame.duration>1)){
-							synced = false;
-							break;
-						}
-						lastElement = element;
-					}
-					if(synced && lastElement){
-						fl.trace("in sync: "+layer.name);
-						syncedLayers[i] = true;
-					}
-				}*/
 
 				/*
 				 * Create temporary timelines where tweens exist & convert to
 				 * keyframes.
 				 */
 				var originalScene,timelines;
+								fl.trace("hasTweens: "+hasTweens);
 				if(hasTweens){
 					if(settings.libraryItem==undefined){
 						originalScene=timeline.name;
@@ -1192,7 +1173,6 @@
 								for(var k=0; k<frame.duration; ++k){
 									if(this._getPriorFrame(firstElement.timeline, firstElement.firstFrame + k) != resolvedFrame){
 										breakApart = true;
-										fl.trace("YO");
 										break;
 									}
 								}
@@ -1406,7 +1386,8 @@
 												(mainElem.symbolType=="graphic" &&
 													    ((nextElem.loop!=mainElem.loop && !((mainElem.loop=="single frame" || frame.duration==1) && (nextElem.loop=="single frame" || nextFrame.duration==1)))
 													 || ((nextElem.loop=="single frame" || nextFrame.duration==1) && singleFrameStart!=this._getPriorFrame(nextElem.timeline, nextElem.firstFrame))
-													 || (nextElem.loop!="single frame" && nextFrame.duration>1 && mainElem.firstFrame!=nextElem.firstFrame))/* && !syncedLayers[i]*/)){
+													 || (nextElem.loop!="single frame" && (frame.duration!=1 || mainElem.firstFrame!=nextElem.firstFrame)))
+													    )){
 											//tweening to different symbol
 											++frameEnd;
 											transToDiff = true;
@@ -1830,7 +1811,7 @@
 				if(thisFrame){
 					for(var j=0; j<thisFrame.elements.length; j++){
 						var element = thisFrame.elements[j];
-						if(element.symbolType=="graphics" && element.loop!="single frame"){
+						if(element.symbolType=="graphic" && element.loop!="single frame"){
 							failed = true;
 							break;
 						}
