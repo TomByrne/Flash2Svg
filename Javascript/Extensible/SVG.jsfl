@@ -453,9 +453,9 @@
 					if(isNaN(element.childIndex())){
 						// symbol was swapped in for use node
 						element = symbol;
-						fl.trace("switch: "+element.localName());
+						//fl.trace("switch: "+element.localName());
 					}
-					fl.trace("Ex: "+id+" "+element.childIndex());
+					//fl.trace("Ex: "+id+" "+element.childIndex());
 				}
 
 			}
@@ -468,14 +468,14 @@
 				return;
 			}
 
-			if(!element.parent())return; // empty root?
+			if(!element.parent() || !element.parent().length())return; // empty root?
 
 			var siblings = element.parent().children();
 			var index = element.childIndex();
 			//fl.trace("> "+element.parent().localName()+" "+element.localName()+" "+index+" "+index);
 			while(index==siblings.length()-1){
 				element = element.parent();
-				if(!element.parent() || element==root)return; // finished
+				if(!element.parent() || !element.parent().length() || element==root)return; // finished
 
 				//fl.trace("\t\tUp:"+element.@id+" "+element.parent().@id+" "+index+" "+siblings.length());
 				siblings = element.parent().children();
@@ -483,7 +483,7 @@
 
 			}
 			// goto next sibling (of self or first ancestor with a next sibling)
-			//fl.trace("\tNext:"+element.localName()+" "+element.@id+" "+siblings[index+1].localName()+" "+siblings[index+1].@id+" "+index+" "+siblings.length()+" "+(element==siblings[index+1])+" "+(element==siblings[index]));
+			//fl.trace("\tNext:"+element.localName()+" "+element.@id+" "+siblings[index+1].localName()+" "+siblings[index+1].@id+" "+index+" "+siblings[index+1].childIndex());
 			this.qData.unshift(closure(this.checkExpand, [siblings[index+1], defs, root, onceUsed, nested], this));
 		},
 		/*processRemoveUnused:function(){
@@ -715,11 +715,8 @@
 					doRemove = false;
 				}else{
 					var symCopy = symbol[0].copy();
-					this.copyNodeContents(useNode, symCopy);
+					this.copyNodeContents(symCopy, useNode);
 					useNode.setName('g');
-					for each(var child in symCopy.*){
-						useNode.appendChild(child);
-					}
 					useNode['@id']=this._uniqueID(String(symbol['@id'])+'_1');
 					delete useNode['@xlink-href'];
 					delete useNode['@width'];
@@ -760,7 +757,7 @@
 							}
 						}
 					}
-					fl.trace("expand: "+id);
+					//fl.trace("expand: "+id);
 				}
 			}
 			if(doRemove)delete symbol.parent().children()[symbol.childIndex()];
