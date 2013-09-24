@@ -469,18 +469,17 @@
 			}
 
 			if(!element.parent() || !element.parent().length())return; // empty root?
-
+			
 			var siblings = element.parent().children();
 			var index = element.childIndex();
-			//fl.trace("> "+element.parent().localName()+" "+element.localName()+" "+index+" "+index);
+			//fl.trace("> "+element.parent().localName()+" "+element.localName()+" "+index);
 			while(index==siblings.length()-1){
 				element = element.parent();
 				if(!element.parent() || !element.parent().length() || element==root)return; // finished
 
-				//fl.trace("\t\tUp:"+element.@id+" "+element.parent().@id+" "+index+" "+siblings.length());
 				siblings = element.parent().children();
 				index = element.childIndex();
-
+				//fl.trace("\t\tUp:"+element.@id+" "+element.parent().@id+" "+index+" "+siblings.length()+" "+(index==siblings.length()-1));
 			}
 			// goto next sibling (of self or first ancestor with a next sibling)
 			//fl.trace("\tNext:"+element.localName()+" "+element.@id+" "+siblings[index+1].localName()+" "+siblings[index+1].@id+" "+index+" "+siblings[index+1].childIndex());
@@ -1173,13 +1172,15 @@
 										break;
 									}
 								}
-								if(!breakApart){
+								// This screws up chained keyframes
+								/*if(!breakApart){
 									firstElement.loop = "single frame";
-								}
+								}*/
 							}
 							if(breakApart){
 								var end = start+frame.duration;
 								timeline.$.convertToKeyframes(start, end);
+								fl.trace("convertToKeyframes: "+start+" "+end);
 								n = end-1;
 							}
 
@@ -1380,10 +1381,10 @@
 										if(nextFrame.elements.length!=1){
 											break; // tweening to incompatible frame
 										}else if(nextElem.libraryItem!=mainElem.libraryItem || mainElem.symbolType!=nextElem.symbolType || 
-												(mainElem.symbolType=="graphic" &&
+														(mainElem.symbolType=="graphic" &&
 													    ((nextElem.loop!=mainElem.loop && !((mainElem.loop=="single frame" || frame.duration==1) && (nextElem.loop=="single frame" || nextFrame.duration==1)))
-													 || ((nextElem.loop=="single frame" || nextFrame.duration==1) && singleFrameStart!=this._getPriorFrame(nextElem.timeline, nextElem.firstFrame))
-													 || (nextElem.loop!="single frame" && (frame.duration!=1 || mainElem.firstFrame!=nextElem.firstFrame)))
+													 || (nextElem.loop!="single frame" && nextFrame.duration!=1) 
+													 || (singleFrameStart!=this._getPriorFrame(nextElem.timeline, nextElem.firstFrame)))
 													    )){
 											//tweening to different symbol
 											++frameEnd;
@@ -1421,10 +1422,10 @@
 									};
 
 							if(element.symbolType=="graphic"){
-								if(element.loop=="single frame" || frame.duration==1){
+								//if(element.loop=="single frame" || frame.duration==1){
 									elemSettings.frameCount = 1;
 									elemSettings.startFrame = this._getPriorFrame(element.timeline, element.firstFrame);
-								}else{
+								/*}else{
 									elemSettings.startFrame = element.firstFrame + (n - frame.startFrame);
 									var maxCount = (settings.endFrame + 1) - n;
 									if(maxCount<elemSettings.frameCount)elemSettings.frameCount = maxCount;
@@ -1435,7 +1436,7 @@
 											elemSettings.startFrame = element.libraryItem.timeline.frameCount-1;
 										}
 									}
-								}
+								}*/
 							}else if(element.symbolType=="movie clip" && element.libraryItem.timeline.frameCount<(frameEnd-n)*0.5 && frameEnd>n+1){
 								// if MC play time is shorter than half of it's visible run, we'll treat it as an independant loop
 								elemSettings.timeOffset = 0;
@@ -1714,21 +1715,13 @@
 			skewY -= rot;
 
 
-			//fl.trace("\trot: "+this.precision(rot)+" "+((matrix.b<0) != (matrix.b<0 || matrix.d>0) && (matrix.b<0) && isNaN(element.rotation))+" "+matrix);
-			//fl.trace("\tcheck: ab:"+(matrix.a*matrix.b)+" ac:"+(matrix.a*matrix.c)+" db:"+(matrix.d*matrix.b)+" dc:"+(matrix.d*matrix.c));
-			//fl.trace("\tcheck: sx:"+element.scaleX+" sy:"+element.scaleY);
-			/*
-			 a:-0.659820556640625, b:0.7513885498046875, c:-0.7513885498046875, d:-0.659820556640625 = flip
-			 ab:-0.4957816111855209 ac:0.4957816111855209 db:-0.4957816111855209 dc:0.4957816111855209
-
-			 a:-0.659820556640625, b:0.7513885498046875, c:-0.7513885498046875, d:-0.659820556640625 = none
-			 ab:-0.4957816111855209 ac:0.4957816111855209 db:-0.4957816111855209 dc:0.4957816111855209
-
-			 rot: 185.325 false ({a:0.9940643310546875, b:0.0926361083984375, c:0.0926361083984375, d:-0.9940643310546875, tx:7.6, ty:24.4})
-			 sx:0.1128082275390625 sy:0.1128082275390625
-			 */
+			fl.trace("\trot: "+this.precision(rot)+" "+(rot * matrix.a * matrix.c * matrix.d > 0)+" "+matrix);
+			// fl.trace("\tcheck: ad:"+(matrix.a*matrix.d)+" bc:"+(matrix.b*matrix.c));
+			// fl.trace("\tcheck: sx:"+element.scaleX+" sy:"+element.scaleY);
+			// fl.trace("\tcheck: det:"+matrix.determinant());
+			// fl.trace("\tskew: x:"+element.skewX+" y:"+element.skewY+" r:"+element.rotation);
 			//if((matrix.b<0) != (matrix.c<0) && (matrix.b<0 || matrix.d>0) && isNaN(element.rotation)){
-			if(rot * matrix.a * matrix.c * matrix.d > 0){
+			if(element.skewX * matrix.a * matrix.c * matrix.d > 0){
 				rot = -rot;
 				fl.trace("FLIP");
 			}
@@ -2430,23 +2423,26 @@
 				var tr=shape.getTransformationPoint();
 				tr = matrix.transformPoint(tr.x, tr.y, false);
 				var osb=shape.objectSpaceBounds;
+
+				//c = matrix.transformPoint(c.x, c.y, false);
 				
-				osb.left=Math.min(osb.left,c.x-tr.x);
-				osb.right=Math.max(osb.right,c.x-tr.x);
-				osb.top=Math.min(osb.top,c.y-tr.y);
-				osb.bottom=Math.max(osb.bottom,c.y-tr.y);
+				osb.left=Math.min(osb.left,c.x+tr.x/2);
+				osb.right=Math.max(osb.right,c.x+tr.x/2);
+				osb.top=Math.min(osb.top,c.y+tr.y/2);
+				osb.bottom=Math.max(osb.bottom,c.y+tr.y/2);
 
 				pathMatrix=new ext.Matrix({
-					tx:(
-						osb.left+
-						osb.right
-					)/2.0,
-					ty:(
-						osb.top+
-						osb.bottom
-					)/2.0
+					tx:-(osb.left+osb.right)/2,
+					ty:-(osb.top+osb.bottom)/2
 				});
-				pathMatrix=pathMatrix.invert();
+				/*fl.trace("skew: "+shape.skewX+" "+shape.skewY);
+				fl.trace("shape.m: "+shape.matrix.tx+" "+shape.matrix.ty);
+				fl.trace("met: "+matrix.tx+" "+matrix.ty);
+				fl.trace("tr: "+tr.x+" "+tr.y);
+				fl.trace("c: "+c.x+" "+c.y);
+				fl.trace("pat: "+pathMatrix.tx+" "+pathMatrix.ty);
+				fl.trace("bounds: "+osb.left+" "+osb.right+" - "+osb.top+" "+osb.bottom);
+				fl.trace("bound.c: "+((osb.left+osb.right)/2)+" - "+((osb.top+osb.bottom)/2));*/
 				descendantMatrix = matrix.invert();
 				matrix=matrix.concat(settings.matrix);
 			}else{

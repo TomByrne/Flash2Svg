@@ -113,6 +113,9 @@
 		},
 		clone:function (x, y, doTranslate) {
 		    return new ext.Matrix([this.a, this.b, this.c, this.d, this.tx, this.ty]);
+		},
+		determinant:function() {
+			return this.a * this.d - this.b * this.c;
 		}
 	}
 	ext.extend({Matrix:ExtensibleMatrix});
