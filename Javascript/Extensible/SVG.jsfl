@@ -1123,7 +1123,6 @@
 				 * keyframes.
 				 */
 				var originalScene,timelines;
-								fl.trace("hasTweens: "+hasTweens);
 				if(hasTweens){
 					if(settings.libraryItem==undefined){
 						originalScene=timeline.name;
@@ -1140,11 +1139,14 @@
 							ext.lib.addNewItem('folder',tempName.dir);
 						}
 						ext.lib.selectItem(settings.libraryItem.name);
-						ext.lib.duplicateItem();
-						ext.lib.moveToFolder(tempName.dir);
-						ext.lib.renameItem(tempName.basename);
-						
-						timeline=new ext.Timeline(ext.lib.getSelectedItems()[0].timeline);
+						if(ext.lib.duplicateItem()){
+							ext.lib.moveToFolder(tempName.dir);
+							ext.lib.renameItem(tempName.basename);
+							
+							timeline=new ext.Timeline(ext.lib.getSelectedItems()[0].timeline);
+						}else{
+							fl.trace("Error: Couldn't copy item "+settings.libraryItem.name);
+						}
 					}
 					layers = timeline.getLayers();
 					for(var i=0;i<layers.length;i++){
@@ -1377,7 +1379,7 @@
 						var transToDiff = false;
 						if(doCollateFrames){
 							var mainElem = frame.elements[0];
-							if(mainElem.loop=="single frame" || frame.duration==1)var singleFrameStart = this._getPriorFrame(mainElem.timeline, mainElem.firstFrame)
+							if(mainElem.loop=="single frame" || frame.duration==1)var singleFrameStart = this._getPriorFrame(mainElem.timeline, mainElem.firstFrame + (n - frame.startFrame))
 							while(frameEnd<layerEnd){
 								var nextFrame = layer.frames[frameEnd];
 								if(nextFrame){
@@ -1430,7 +1432,7 @@
 							if(element.symbolType=="graphic"){
 								//if(element.loop=="single frame" || frame.duration==1){
 									elemSettings.frameCount = 1;
-									elemSettings.startFrame = this._getPriorFrame(element.timeline, element.firstFrame);
+									elemSettings.startFrame = this._getPriorFrame(element.timeline, element.firstFrame + (n - frame.startFrame));
 								/*}else{
 									elemSettings.startFrame = element.firstFrame + (n - frame.startFrame);
 									var maxCount = (settings.endFrame + 1) - n;
