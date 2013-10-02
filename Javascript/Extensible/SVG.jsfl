@@ -127,6 +127,12 @@
 		this._delayedProcessing=true;// If true, a timeline is processed one level deep in it's entirety before progressing to descendants.
 		this.currentState=0;
 
+		var versionParser = /\w* (\d+),.*/g;
+		var result = versionParser.exec(fl.version);
+		if(result){
+			this._appVersion = parseInt(result[1]);
+		}
+
 		if(this.startFrame!=undefined){
 			if(
 				this.endFrame==undefined ||
@@ -1715,13 +1721,14 @@
 			skewY -= rot;
 
 
-			fl.trace("\trot: "+this.precision(rot)+" "+(rot * matrix.a * matrix.c * matrix.d > 0)+" "+matrix);
+			// fl.trace("\trot: "+this.precision(rot)+" "+(rot * matrix.a * matrix.c * matrix.d > 0)+" "+matrix);
 			// fl.trace("\tcheck: ad:"+(matrix.a*matrix.d)+" bc:"+(matrix.b*matrix.c));
 			// fl.trace("\tcheck: sx:"+element.scaleX+" sy:"+element.scaleY);
 			// fl.trace("\tcheck: det:"+matrix.determinant());
 			// fl.trace("\tskew: x:"+element.skewX+" y:"+element.skewY+" r:"+element.rotation);
 			//if((matrix.b<0) != (matrix.c<0) && (matrix.b<0 || matrix.d>0) && isNaN(element.rotation)){
-			if(element.skewX * matrix.a * matrix.c * matrix.d > 0){
+			//if(element.skewX * matrix.a * matrix.c * matrix.d > 0 && isNaN(element.rotation)){
+			if(matrix.c < 0 && isNaN(element.rotation)){
 				rot = -rot;
 				fl.trace("FLIP");
 			}
@@ -2419,30 +2426,35 @@
 				matrix=matrix.concat(settings.matrix);
 			}else if(shape.isGroup){
 				id=this._uniqueID('group');
-				var c=shape.center;
-				var tr=shape.getTransformationPoint();
-				tr = matrix.transformPoint(tr.x, tr.y, false);
-				var osb=shape.objectSpaceBounds;
 
-				//c = matrix.transformPoint(c.x, c.y, false);
-				
-				osb.left=Math.min(osb.left,c.x+tr.x/2);
-				osb.right=Math.max(osb.right,c.x+tr.x/2);
-				osb.top=Math.min(osb.top,c.y+tr.y/2);
-				osb.bottom=Math.max(osb.bottom,c.y+tr.y/2);
+				if(this._appVersion<12){
+					// an issue before CS6 resulted in groups having incorrect transforms
+					var c=shape.center;
+					var tr=shape.getTransformationPoint();
+					tr = matrix.transformPoint(tr.x, tr.y, false);
+					var osb=shape.objectSpaceBounds;
 
-				pathMatrix=new ext.Matrix({
-					tx:-(osb.left+osb.right)/2,
-					ty:-(osb.top+osb.bottom)/2
-				});
-				/*fl.trace("skew: "+shape.skewX+" "+shape.skewY);
-				fl.trace("shape.m: "+shape.matrix.tx+" "+shape.matrix.ty);
-				fl.trace("met: "+matrix.tx+" "+matrix.ty);
-				fl.trace("tr: "+tr.x+" "+tr.y);
-				fl.trace("c: "+c.x+" "+c.y);
-				fl.trace("pat: "+pathMatrix.tx+" "+pathMatrix.ty);
-				fl.trace("bounds: "+osb.left+" "+osb.right+" - "+osb.top+" "+osb.bottom);
-				fl.trace("bound.c: "+((osb.left+osb.right)/2)+" - "+((osb.top+osb.bottom)/2));*/
+					//c = matrix.transformPoint(c.x, c.y, false);
+					
+					osb.left=Math.min(osb.left,c.x+tr.x/2);
+					osb.right=Math.max(osb.right,c.x+tr.x/2);
+					osb.top=Math.min(osb.top,c.y+tr.y/2);
+					osb.bottom=Math.max(osb.bottom,c.y+tr.y/2);
+
+					pathMatrix=new ext.Matrix({
+						tx:-(osb.left+osb.right)/2,
+						ty:-(osb.top+osb.bottom)/2
+					});
+
+					/*fl.trace("skew: "+shape.skewX+" "+shape.skewY);
+					fl.trace("shape.m: "+shape.matrix.tx+" "+shape.matrix.ty);
+					fl.trace("met: "+matrix.tx+" "+matrix.ty);
+					fl.trace("tr: "+tr.x+" "+tr.y);
+					fl.trace("c: "+c.x+" "+c.y);
+					fl.trace("pat: "+pathMatrix.tx+" "+pathMatrix.ty);
+					fl.trace("bounds: "+osb.left+" "+osb.right+" - "+osb.top+" "+osb.bottom);
+					fl.trace("bound.c: "+((osb.left+osb.right)/2)+" - "+((osb.top+osb.bottom)/2));*/
+				}
 				descendantMatrix = matrix.invert();
 				matrix=matrix.concat(settings.matrix);
 			}else{
@@ -2572,7 +2584,7 @@
 							if(oppositeFill.style=='noFill' && fill.style=='noFill' && !deleted){
 								//delete svgArray[svgArray.length-1].path[0];
 							}
-							if(
+							/*if(
 								fill.style=='noFill' || (
 									insideOut && oppositeFill.style=='noFill'
 								) 
@@ -2586,7 +2598,7 @@
 									ii+=1;
 								}
 								delete sa;
-							}
+							}*/
 						}
 						if(contours[i].fill.style!='noFill'){
 							filled.push(svgArray.length-1);
