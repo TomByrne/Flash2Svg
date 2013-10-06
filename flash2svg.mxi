@@ -2,7 +2,7 @@
 <macromedia-extension name="flash2svg" version="1.0">
   <author name="David Belais &amp; Tom Byrne"/>
   <products>
-    <product name="Flash" version="13"/>
+    <product name="Flash" version="11"/>
   </products>
   <!-- <ui-access></ui-access>
   <description></description> -->

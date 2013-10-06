@@ -1558,13 +1558,12 @@
 									if(boundingBox.bottom<swingBottom)boundingBox.bottom = swingBottom;
 
 									this._addAnimFrame(nextFrame, nextElement, invMatrix, time, rot, skewX, skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, timeList, splineList);
+								
+									lastFrame = nextFrame;
+									lastRot = rot;
 
 									if(!transToDiff || nextInd<frameEnd-1)animatedFrames[i+"-"+nextInd] = true;
 									if(nextFrame.elements.length>1 || nextElement.libraryItem!=element.libraryItem)break;
-
-									lastFrame = nextFrame;
-
-									lastRot = rot;
 								}
 								if(lastFrame.tweenType=="none" || lastFrame.duration==1){
 									// this code works in tandem with code within _addAnimFrame which adds an 'end-point' to non-tweened frame runs
