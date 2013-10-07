@@ -1525,7 +1525,6 @@
 												break;
 										}
 									}
-									//if(nextFrame.tweenType!="none" && frame.duration>1)
 
 									var nextElement = nextFrame.elements[0];
 									var rot = this._getRotation(nextElement) - firstRot;
@@ -1756,8 +1755,8 @@
 			scxList.push(this.precision(matrix.a));
 			scyList.push(this.precision(matrix.d));
 
-			skxList.push(this.precision(-this._getClosestRotList(skewX, skxList)));
-			skyList.push(this.precision(-this._getClosestRotList(skewY, skyList)));
+			skxList.push(this.precision(this._getClosestRotList(-skewX, skxList)));
+			skyList.push(this.precision(this._getClosestRotList(-skewY, skyList)));
 
 			trxList.push(transPoint.x);
 			tryList.push(transPoint.y);
