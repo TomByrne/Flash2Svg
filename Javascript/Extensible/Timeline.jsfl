@@ -351,7 +351,7 @@
 			var result;
 			var success=true;
 			var e;
-			for(var i=0;this.getSelectedLayers().indexOf(index)<0 && i<100;i++){
+			for(var i=0;this.getSelectedLayers().indexOf(index)<0 && i<1;i++){
 				try{
 					result=this.$.setSelectedLayers(index,bReplaceCurrentSelection);
 					success=true;

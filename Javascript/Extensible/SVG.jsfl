@@ -126,6 +126,7 @@
 		this._origSelection=new ext.Selection([]);
 		this._delayedProcessing=true;// If true, a timeline is processed one level deep in it's entirety before progressing to descendants.
 		this.currentState=0;
+		this._timelineCopies = {};
 
 		var versionParser = /\w* (\d+),.*/g;
 		var result = versionParser.exec(fl.version);
@@ -214,6 +215,10 @@
 		 * 
 		 */
 		begin:function(){
+			if(this.log && typeof(this.log)=='string'){
+				ext.startLog({url:this.log});
+				this._timer=ext.log.startTimer('extensible.SVG()');
+			}
 			this.qData = [];
 			this.doState();
 		},
@@ -281,10 +286,8 @@
 		},
 		doInit:function(){
 			fl.showIdleMessage(false);
-			if(this.log && typeof(this.log)=='string'){
-				ext.startLog({url:this.log});
-				this._timer=ext.log.startTimer('extensible.SVG()');
-				var timer=ext.log.startTimer('extensible.SVG.begin()');
+			if(this.log){
+				var timer=ext.log.startTimer('extensible.SVG.doInit()');
 			}
 			var i,n;
 			this._origSelection=ext.sel;
@@ -436,6 +439,9 @@
 			return false;
 		},
 		checkExpand:function(element, defs, root, onceUsed, nested){
+			if(ext.log){
+				var timer=ext.log.startTimer('extensible.SVG.checkExpand()');	
+			}
 			//fl.trace("checkExpand:"+element.localName()+" "+element.@id+" "+element.childIndex());
 			var id;
 			if(element.localName()=="use" && (id = element['@xlink-href'])){
@@ -490,6 +496,9 @@
 			// goto next sibling (of self or first ancestor with a next sibling)
 			//fl.trace("\tNext:"+element.localName()+" "+element.@id+" "+siblings[index+1].localName()+" "+siblings[index+1].@id+" "+index+" "+siblings[index+1].childIndex());
 			this.qData.unshift(closure(this.checkExpand, [siblings[index+1], defs, root, onceUsed, nested], this));
+			if(ext.log){
+				ext.log.pauseTimer(timer);
+			}
 		},
 		/*processRemoveUnused:function(){
 			var onceUsed = this.expandSymbols=='usedOnce';
@@ -522,6 +531,9 @@
 			this.qData.unshift(closure(this.checkUnused, [siblings[index+1], root, useNodes], this));
 		},*/
 		processFinaliseDocuments:function(){
+			if(ext.log){
+				var timer=ext.log.startTimer('extensible.SVG.processFinaliseDocuments()');	
+			}
 			for(var k=0; k<this.timelines.length;k++){
 				var timeline = this.timelines[k];
 				var dom = this.doms[k];
@@ -565,26 +577,53 @@
 					}
 				}
 			}
+			if(ext.log){
+				ext.log.pauseTimer(timer);
+			}
 		},
 		processFixUseLinks:function(outputObj){
+			if(ext.log){
+				var timer=ext.log.startTimer('extensible.SVG.processFixUseLinks()');	
+			}
 			outputObj.string = outputObj.string.replace(
 									/(<[^>]*?)xlink-(.*?)="/g,
 									'$1xlink:$2="'
 								);
+			if(ext.log){
+				ext.log.pauseTimer(timer);
+			}
 		},
 		processCompactColours:function(outputObj){
+			if(ext.log){
+				var timer=ext.log.startTimer('extensible.SVG.processCompactColours()');	
+			}
 			outputObj.string = outputObj.string.replace(
 									/#([0-9A-F])\1([0-9A-F])\2([0-9A-F])\3/gi,
 									'#$1$2$3'
 								);
+			if(ext.log){
+				ext.log.pauseTimer(timer);
+			}
 		},
 		processRemoveIdentMatrices:function(outputObj){
+			if(ext.log){
+				var timer=ext.log.startTimer('extensible.SVG.processRemoveIdentMatrices()');	
+			}
 			outputObj.string = outputObj.string.replace(' transform="matrix(1 0 0 1 0 0)"','');
 			outputObj.string = outputObj.string.replace(" transform='matrix(1 0 0 1 0 0)'",'');
+			if(ext.log){
+				ext.log.pauseTimer(timer);
+			}
 		},
 		processConvertHairlineStrokes:function(outputObj){
+			if(ext.log){
+				var timer=ext.log.startTimer('extensible.SVG.processConvertHairlineStrokes()');	
+			}
 			outputObj.string = outputObj.string.replace(' stroke="0"',' stroke="0.1"');
 			outputObj.string = outputObj.string.replace(" stroke='0'",' stroke="0.1"');
+			if(ext.log){
+				ext.log.pauseTimer(timer);
+			}
 		},
 		processSaveFile:function(documents, outputObj){
 			if(documents.length==1){
@@ -628,6 +667,19 @@
 			if(this.log){
 				ext.stopLog();
 			}
+
+			/*
+			 * cleanup temporary scenes
+			 */
+			for(var i=0; i<this._timelineCopies.length; i++){
+				var pack = this._timelineCopies[i];
+				if(!pack.clone.libraryItem){
+					var sceneIndex = ext.doc.timeslines.indexOf(pack.clone);
+					ext.doc.editScene(sceneIndex);
+					ext.doc.deleteScene();
+				}
+			}
+			this._timelineCopies = {};
 			/*
 			 * cleanup temporary items
 			 */
@@ -650,6 +702,9 @@
 		 * @parameter {XML} defs
 		 */
 		expandUseNow:function( xml, within, onlyOnceUsed, recursive, defs ){
+			if(ext.log){
+				var timer=ext.log.startTimer('extensible.SVG.executeExpandUse()');	
+			}
 			defs = defs||xml.defs;
 			if(recursive==undefined){
 				recursive=true;
@@ -690,9 +745,15 @@
 			if( rootIsUse && recursive ){
 				this.expandUseNow( xml, within, onlyOnceUsed, recursive, defs );
 			}
+			if(ext.log){
+				ext.log.pauseTimer(timer);
+			}
 			return xml;
 		},
 		executeExpandUse:function(id, symbol, useList, defs){
+			if(ext.log){
+				var timer=ext.log.startTimer('extensible.SVG.executeExpandUse()');	
+			}
 
 			var doRemove =  true;
 			for(var i=0; i<useList.length; ++i){
@@ -764,6 +825,9 @@
 					}
 					//fl.trace("expand: "+id);
 				}
+			}
+			if(ext.log){
+				ext.log.pauseTimer(timer);
 			}
 			if(doRemove)delete symbol.parent().children()[symbol.childIndex()];
 		},
@@ -966,7 +1030,7 @@
 			});
 			settings.extend(options);
 			var f=new ext.Array();
-			var layers=settings.timeline.layers;
+			var layers=settings.timeline.$.layers;
 			for(var l=0;l<layers.length;l++){
 				var layer = layers[l];
 				if(
@@ -1038,12 +1102,13 @@
 			 */
 			//var selection=settings.selection.byFrame({stacked:true});
 			var xml,instanceXML,id;
+			var frameCount = timeline.$.frameCount;
 
-			if(settings.startFrame>timeline.frameCount-1){
-				settings.startFrame = timeline.frameCount-1;
+			if(settings.startFrame>frameCount-1){
+				settings.startFrame = frameCount-1;
 			}
-			if(settings.endFrame > timeline.frameCount-1){
-				settings.endFrame = timeline.frameCount-1;
+			if(settings.endFrame > frameCount-1){
+				settings.endFrame = frameCount-1;
 			}
 
 			if(settings.frameCount==null){
@@ -1058,36 +1123,8 @@
 			if(settings.color){
 				symbolIDString += '_'+settings.color.idString; //should factor this out and use a transform
 			}
-			if(timeline.frameCount>1){
+			if(frameCount>1){
 				if(settings.startFrame==settings.endFrame){
-					// // check whether we can use a previous frame
-					// var failed = false;
-					// var lastPrior = settings.startFrame;
-					// var layers = timeline.getLayers();
-					// for(var i=0; i<layers.length && !failed; i++){
-					// 	var layer=layers[i];
-					// 	var thisFrame = layer.frames[settings.startFrame];
-					// 	if(thisFrame){
-					// 		for(var j=0; j<thisFrame.elements.length; j++){
-					// 			var element = thisFrame.elements[j];
-					// 			if(element.symbolType=="graphics" && element.loop!="single frame"){
-					// 				failed = true;
-					// 				break;
-					// 			}
-					// 		}
-					// 		if(thisFrame.startFrame>lastPrior){
-					// 			lastPrior = thisFrame.startFrame;
-					// 		}
-					// 	}else if(layer.frames.length-1>lastPrior){
-					// 		lastPrior = layer.frames.length-1;
-					// 	}
-					// }
-					// if(!failed){
-					// 	fl.trace("use earlier frame: "+settings.startFrame+" "+ lastPrior+" "+(this._symbols[symbolIDString]!=null));
-					// 	settings.startFrame = lastPrior;
-					// 	settings.endFrame = lastPrior;
-					// }
-
 					symbolIDString += '_f'+settings.startFrame;
 				}else if(settings.timeOffset!=null && settings.timeOffset>0){
 					symbolIDString += '_t'+Math.round(settings.timeOffset * Math.pow(10, this.decimalPointPrecision));
@@ -1102,7 +1139,6 @@
 			}else{
 				isNew=true;
 				id = this._uniqueID(symbolIDString);
-				var layers = timeline.getLayers();
 
 				/*
 				 * Check to see if the timeline has tweens that we need to resolve.
@@ -1126,35 +1162,21 @@
 				if(hasTweens){
 					if(settings.libraryItem==undefined){
 						originalScene=timeline.name;
-
-						ext.doc.editScene(ext.doc.timelines.indexOf(timeline.$));
-						ext.doc.duplicateScene();
-						//ext.doc.editScene(ext.doc.timelines.indexOf(timeline.$)+1); // edit new scene (after duplication current scene changes to last scene)
-
-						timelines=ext.doc.timelines;
-						timeline=new ext.Timeline(timelines[ext.doc.timelines.indexOf(timeline.$)+1]);
-					}else{
-						var tempName=this._tempFolder+'/'+settings.libraryItem.name;
-						if(!ext.lib.itemExists(tempName.dir)){
-							ext.lib.addNewItem('folder',tempName.dir);
-						}
-						ext.lib.selectItem(settings.libraryItem.name);
-						if(ext.lib.duplicateItem()){
-							ext.lib.moveToFolder(tempName.dir);
-							ext.lib.renameItem(tempName.basename);
-							
-							timeline=new ext.Timeline(ext.lib.getSelectedItems()[0].timeline);
-						}else{
-							fl.trace("Error: Couldn't copy item "+settings.libraryItem.name);
-						}
 					}
-					layers = timeline.getLayers();
+					timeline = this._getTimelineCopy(settings.libraryItem, timeline, settings.startFrame, settings.endFrame);
+					var layers = timeline.$.layers;
+
+					if(ext.log){
+						var timer2=ext.log.startTimer('extensible.SVG._getTimeline() >> Check break apart tweens');	
+					}
 					for(var i=0;i<layers.length;i++){
 						var layer=layers[i];
+						if(layer.layerType=="guide" || layer.layerType=="folder")continue;
+
 						var layerEnd = settings.endFrame+1;
 						if(layerEnd>layer.frameCount)layerEnd = layer.frameCount;
 
-						timeline.setSelectedLayers(layer.index);
+						var layerSelected = false;
 						for(var n=settings.startFrame; n<layerEnd; ++n){
 							var frame=layer.frames[n];
 							var start=frame.startFrame;
@@ -1173,9 +1195,9 @@
 							}else if(n==frame.startFrame && frame.duration>1 && frame.elements.length==1 && firstElement.symbolType=="graphic" && firstElement.loop!="single frame"){
 								// if all frames in a graphic run resolve to the same frame then don't break it apart.
 								// Otherwise break it apart so graphic frames can be referrenced
-								var resolvedFrame = this._getPriorFrame(firstElement.timeline, firstElement.firstFrame);
+								var resolvedFrame = this._getPriorFrame(firstElement.libraryItem.timeline, firstElement.firstFrame);
 								for(var k=0; k<frame.duration; ++k){
-									if(this._getPriorFrame(firstElement.timeline, firstElement.firstFrame + k) != resolvedFrame){
+									if(this._getPriorFrame(firstElement.libraryItem.timeline, firstElement.firstFrame + k) != resolvedFrame){
 										breakApart = true;
 										break;
 									}
@@ -1186,14 +1208,22 @@
 								}*/
 							}
 							if(breakApart){
+								if(!layerSelected){
+									layerSelected = true;
+									timeline.$.setSelectedLayers(i);
+								}
 								var end = start+frame.duration;
 								timeline.$.convertToKeyframes(start, end);
-								fl.trace("convertToKeyframes: "+start+" "+end);
 								n = end-1;
 							}
 
 						}
 					}
+					if(ext.log){
+						ext.log.pauseTimer(timer2);
+					}
+				}else{
+					var layers = timeline.$.layers;
 				}
 				/*
 				 * Retrieve elements in the current frames, get bounding box
@@ -1215,7 +1245,7 @@
 						includeGuides:this.includeGuides,
 						frames:frames
 					};
-					var items =timeline.getElements(options);
+					var items = timeline.getElements(options);
 					boundingBox =this._getBoundingBox(items);
 				}else{
 					boundingBox = this._getBoundingBox(settings.selection);
@@ -1321,11 +1351,14 @@
 								(layer.parentLayer.layerType!='guide' || this.includeGuides))){
 						isMasked = true; 
 					}
-					var frames = layer.getFrames();
+					var frames = layer.frames;
 					for(var n=settings.startFrame; n<layerEnd; ++n){
+
+						if(ext.log){
+							var timer2=ext.log.startTimer('extensible.SVG._getTimeline() >> Get frame items');	
+						}
 						var frame = new ext.Frame(frames[n]);
 						var tweenType = frame.tweenType;
-
 
 						var items = this._getItemsByFrame(frame, settings.selection);
 						if(items.length==0)continue;
@@ -1373,13 +1406,20 @@
 						}else{
 							frameXML=new XML('<g id="'+layerFrameId+'" />');
 						}
+						if(ext.log){
+							ext.log.pauseTimer(timer2);
+						}
 
 						var doCollateFrames = (doAnim && !settings.flattenMotion  && items.length==1 && tweenType!="shape" && items[0].$.elementType=="instance");
 						var frameEnd = n+1;
 						var transToDiff = false;
 						if(doCollateFrames){
+							if(ext.log){
+								var timer2=ext.log.startTimer('extensible.SVG._getTimeline() >> Collate frames');	
+							}
 							var mainElem = frame.elements[0];
-							if(mainElem.loop=="single frame" || frame.duration==1)var singleFrameStart = this._getPriorFrame(mainElem.timeline, mainElem.firstFrame + (n - frame.startFrame))
+							var childFrame = mainElem.firstFrame;
+							if(mainElem.loop=="single frame" || frame.duration==1)var singleFrameStart = this._getPriorFrame(mainElem.libraryItem.timeline, mainElem.firstFrame);
 							while(frameEnd<layerEnd){
 								var nextFrame = layer.frames[frameEnd];
 								if(nextFrame){
@@ -1392,7 +1432,7 @@
 														(mainElem.symbolType=="graphic" &&
 													    ((nextElem.loop!=mainElem.loop && !((mainElem.loop=="single frame" || frame.duration==1) && (nextElem.loop=="single frame" || nextFrame.duration==1)))
 													 || (nextElem.loop!="single frame" && nextFrame.duration!=1) 
-													 || (singleFrameStart!=this._getPriorFrame(nextElem.timeline, nextElem.firstFrame)))
+													 || (singleFrameStart!=this._getPriorFrame(nextElem.libraryItem.timeline, nextElem.firstFrame)))
 													    )){
 											//tweening to different symbol
 											++frameEnd;
@@ -1404,6 +1444,9 @@
 								}else{
 									break;
 								}
+							}
+							if(ext.log){
+								ext.log.pauseTimer(timer2);
 							}
 						}else if(tweenType=='none'){
 							while(frameEnd<layer.frames.length && layer.frames[frameEnd].startFrame==n){
@@ -1432,7 +1475,9 @@
 							if(element.symbolType=="graphic"){
 								//if(element.loop=="single frame" || frame.duration==1){
 									elemSettings.frameCount = 1;
-									elemSettings.startFrame = this._getPriorFrame(element.timeline, element.firstFrame + (n - frame.startFrame));
+									var childFrame = element.firstFrame;
+									if(element.loop!="single frame")childFrame += (n - frame.startFrame);
+									elemSettings.startFrame = this._getPriorFrame(element.timeline, childFrame);
 								/*}else{
 									elemSettings.startFrame = element.firstFrame + (n - frame.startFrame);
 									var maxCount = (settings.endFrame + 1) - n;
@@ -1472,6 +1517,10 @@
 						if(doAnim){
 							
 							if(doCollateFrames){
+								if(ext.log){
+									var timer2=ext.log.startTimer('extensible.SVG._getTimeline() >> Get keyframes');	
+								}
+
 								var firstRot = this._getRotation(element);
 								var firstSkX = element.skewX;
 								var firstSkY = element.skewY;
@@ -1586,6 +1635,10 @@
 
 								elementXML.@transform = this._getMatrix(matrix);
 
+								if(ext.log){
+									ext.log.pauseTimer(timer2);
+								}
+
 							}/*else if(tweenType=='none'){
 								while(frameEnd<layer.frames.length && layer.frames[frameEnd].startFrame==n){
 									frameEnd++;
@@ -1647,7 +1700,7 @@
 			/*
 			 *  If this is a temporary scene, delete it and return to the original.
 			 */
-			if(originalScene!=undefined){
+			/*if(originalScene!=undefined){
 				var timelines=ext.timelines;
 				ext.doc.deleteScene();
 				for(i=0;i<ext.timelines.length;i++){
@@ -1661,7 +1714,7 @@
 				if(ext.lib.itemExists(tempName)){
 					ext.lib.deleteItem(tempName);	
 				}
-			}
+			}*/
 			if(isNew){ // set the viewBox
 				if(settings.isRoot && this.clipToScalingGrid && settings.libraryItem){
 					boundingBox=settings.libraryItem.scalingGridRect;
@@ -1703,6 +1756,59 @@
 			}
 			return instanceXML;
 		},
+		_timelineCopies:null,
+		_getTimelineCopy:function(libraryItem, timeline, startFrame, endFrame){
+			var list = this._timelineCopies[timeline.name];
+			if(!list){
+				list = [];
+				this._timelineCopies[timeline.name] = list;
+			}else{
+				for(var i=0; i<list.length; ++i){
+					var pack = list[i];
+					var collides = false;
+					for(var j=0; j<pack.ranges.length; j++){
+						var range = pack.ranges[j];
+						if(!(range[0]>endFrame || range[1]<startFrame)){
+							collides = true;
+							break;
+						}
+					}
+					if(!collides){
+						pack.ranges.push([startFrame, endFrame]);
+						return pack.clone;
+					}
+				}
+			}
+
+			if(libraryItem==undefined){
+				originalScene=timeline.name;
+
+				ext.doc.editScene(ext.doc.timelines.indexOf(timeline.$));
+				ext.doc.duplicateScene();
+				//ext.doc.editScene(ext.doc.timelines.indexOf(timeline.$)+1); // edit new scene (after duplication current scene changes to last scene)
+
+				timelines=ext.doc.timelines;
+				timeline = new ext.Timeline(timelines[ext.doc.timelines.indexOf(timeline.$)+1]);
+			}else{
+				var tempName=this._tempFolder+'/'+libraryItem.name;
+				if(!ext.lib.itemExists(tempName.dir)){
+					ext.lib.addNewItem('folder',tempName.dir);
+				}
+				ext.lib.selectItem(libraryItem.name);
+				if(ext.lib.duplicateItem()){
+					ext.lib.moveToFolder(tempName.dir);
+					ext.lib.renameItem(tempName.basename);
+					
+					timeline = new ext.Timeline(ext.lib.getSelectedItems()[0].timeline);
+				}else{
+					fl.trace("Error: Couldn't copy item "+libraryItem.name);
+				}
+			}
+			if(timeline){
+				list.push({clone:timeline, ranges:[[startFrame, endFrame]]});
+			}
+			return timeline;
+		},
 		_getRotation:function(element){
 			if(isNaN(element.rotation) || element.rotation==0){
 				return element.skewX;
@@ -1712,8 +1818,7 @@
 		},
 		_addAnimFrame:function(frame, element, invMatrix, time, rot, skewX, skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, timeList, splineList){
 
-
-			var matrix = element.matrix.concat(invMatrix);
+			var matrix = fl.Math.concatMatrix(element.matrix, invMatrix);
 			var transPoint = element.getTransformationPoint();
 
 
@@ -1728,16 +1833,16 @@
 			// fl.trace("\tskew: x:"+element.skewX+" y:"+element.skewY+" r:"+element.rotation);
 			//if((matrix.b<0) != (matrix.c<0) && (matrix.b<0 || matrix.d>0) && isNaN(element.rotation)){
 			//if(element.skewX * matrix.a * matrix.c * matrix.d > 0 && isNaN(element.rotation)){
-			if(matrix.c < 0 && isNaN(element.rotation)){
+			//if(element.skewY < 0 && isNaN(element.rotation)){
+			if(Math.abs(element.skewY - element.skewX) > 90 && isNaN(element.rotation)){
 				rot = -rot;
-				fl.trace("FLIP");
+				//fl.trace("FLIP");
 			}
 
 			var rotRad = rot / 180 * Math.PI;
 
 			rotList.push(this.precision(rot));
 
-			var edittedTrans = matrix.transformPoint(transPoint);
 			var rotCos = Math.cos(rotRad) - 1;
 			var rotSin = Math.sin(rotRad);
 			xList.push(this.precision(matrix.tx + transPoint.x * rotCos - transPoint.y * rotSin));
@@ -1750,7 +1855,8 @@
 			rotMatrix.c = -Math.sin(rotRad);
 			rotMatrix.d = Math.cos(rotRad);
 			
-			matrix = matrix.concat(rotMatrix.invert());
+			//matrix = matrix.concat(rotMatrix.invert());
+			matrix = fl.Math.concatMatrix(matrix, rotMatrix.invert());
 
 			scxList.push(this.precision(matrix.a));
 			scyList.push(this.precision(matrix.d));
@@ -1798,10 +1904,11 @@
 			}
 		},
 		_getPriorFrame:function(timeline, frame){
+			if(timeline.$)timeline = timeline.$;
 			// check whether we can use a previous frame
 			var failed = false;
 			var lastPrior = -1;
-			var layers = timeline.getLayers();
+			var layers = timeline.layers;
 			for(var i=0; i<layers.length && !failed; i++){
 				var layer=layers[i];
 				var thisFrame = layer.frames[frame];
@@ -1999,7 +2106,8 @@
 			settings.extend(options);
 			ext.message("\n_getSymbolInstance: "+instance.libraryItem.name+" - loop:"+instance.loop+" frameCount:"+settings.frameCount+" startFrame:"+settings.startFrame);
 			var dom = settings.dom;
-			settings.matrix = instance.matrix.concat(settings.matrix);
+			//settings.matrix = instance.matrix.concat(settings.matrix);
+			settings.matrix = fl.Math.concatMatrix(instance.matrix, settings.matrix);
 			var xml = this._getTimeline(instance.timeline,settings);
 			var filterID=this._getFilters(instance, options, dom.defs);
 			if(filterID && dom.defs.filter.(@id==filterID).length()){
@@ -2386,7 +2494,7 @@
 		 */
 		_getShape:function(shape,options){
 			if(ext.log){
-				var timer=ext.log.startTimer('extensible.SVG._getShape() >> 1');	
+				var timer=ext.log.startTimer('extensible.SVG._getShape()');	
 			}
 			var settings=new ext.Object({
 				matrix:new ext.Matrix(),
@@ -2414,7 +2522,8 @@
 				}).transform(matrix);
 				matrix.tx=origin.x;
 				matrix.ty=origin.y;
-				matrix=matrix.concat(settings.matrix);
+				//matrix=matrix.concat(settings.matrix);
+				matrix=fl.Math.concatMatrix(matrix, settings.matrix);
 				if(shape.objectSpaceBounds.left!=0 || shape.objectSpaceBounds.top!=0){
 					pathMatrix=new ext.Matrix({
 						tx:-shape.objectSpaceBounds.left,
@@ -2423,7 +2532,8 @@
 				}
 			}else if(shape.isDrawingObject){
 				id=this._uniqueID('drawingObject');
-				matrix=matrix.concat(settings.matrix);
+				//matrix=matrix.concat(settings.matrix);
+				matrix=fl.Math.concatMatrix(matrix, settings.matrix);
 			}else if(shape.isGroup){
 				id=this._uniqueID('group');
 
@@ -2431,7 +2541,9 @@
 					// an issue before CS6 resulted in groups having incorrect transforms
 					var c=shape.center;
 					var tr=shape.getTransformationPoint();
-					tr = matrix.transformPoint(tr.x, tr.y, false);
+					//tr = matrix.transformPoint(tr.x, tr.y, false);
+					tr = ext.MathUtils.transformPoint(matrix, tr.x, tr.y, false);
+
 					var osb=shape.objectSpaceBounds;
 
 					//c = matrix.transformPoint(c.x, c.y, false);
@@ -2456,12 +2568,14 @@
 					fl.trace("bound.c: "+((osb.left+osb.right)/2)+" - "+((osb.top+osb.bottom)/2));*/
 				}
 				descendantMatrix = matrix.invert();
-				matrix=matrix.concat(settings.matrix);
+				//matrix=matrix.concat(settings.matrix);
+				matrix=fl.Math.concatMatrix(matrix, settings.matrix);
 			}else{
 				id=this._uniqueID('shape');
 				matrix.tx=shape.left;
 				matrix.ty=shape.top;
-				matrix=matrix.concat(settings.matrix);
+				//matrix=matrix.concat(settings.matrix);
+				matrix=fl.Math.concatMatrix(matrix, settings.matrix);
 				if(
 					shape.objectSpaceBounds &&
 					(
@@ -3248,7 +3362,8 @@
 					}catch(e){}
 				}
 				ext.doc.union();
-				options.matrix=matrix.concat(tempMatrix.invert()).concat(options.matrix);
+				//options.matrix=matrix.concat(tempMatrix.invert()).concat(options.matrix);
+				options.matrix = fl.Math.concatMatrix(fl.Math.concatMatrix(matrix, tempMatrix.invert()), options.matrix);
 				var xml=this._getShape(currentTimeline.layers[tempLayerIndex].elements[0],options);
 				currentTimeline.deleteLayer(tempLayerIndex);
 				element.removePersistentData(id);
@@ -3355,6 +3470,9 @@
 		 * @parameter {XML} xml An SVG graphic element or an SVG document. 
 		 */
 		applyMatrices:function(xml,defs,strokeX){
+			if(ext.log){
+				var timer=ext.log.startTimer('extensible.SVG.applyMatrices()');	
+			}
 			strokeX=strokeX||new ext.Matrix();
 			if(typeof xml=='string'){
 				xml=new XML(xml);
@@ -3577,9 +3695,15 @@
 					this.applyMatrices(child,defs,strokeX?(cmx?strokeX.concat(cmx.invert()):strokeX):undefined);
 				}
 			}
+			if(ext.log){
+				ext.log.pauseTimer(timer);
+			}
 			return xml;
 		},
 		_applyColorEffects:function(xml,defs,colorX){
+			if(ext.log){
+				var timer=ext.log.startTimer('extensible.SVG._applyColorEffects()');	
+			}
 			var name=xml.localName();
 			if( name=='filter' || /Gradient/.test(name) || /Color/.test(name)){
 				return;	
@@ -3694,6 +3818,9 @@
 			}
 			for each(var element in xml.*){
 				this._applyColorEffects(element,defs,color);
+			}
+			if(ext.log){
+				ext.log.pauseTimer(timer);
 			}
 		},
 		_colorFromEffect:function(filter){

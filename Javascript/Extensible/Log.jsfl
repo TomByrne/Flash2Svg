@@ -13,7 +13,7 @@
 		});
 		settings.extend(options);
 		if(settings.url && !settings.append){
-			FLfile.write(settings.url,'Operation,Total Time,Average Time\n');
+			FLfile.write(settings.url,'Operation,Total Time,Average Time,Run Count\n');
 		}
 		delete settings.append;
 		ext.Object.apply(this,[settings]);
@@ -24,6 +24,7 @@
 		__proto__:ext.Object.prototype,
 		type:Log,
 		append:function(s){
+			fl.trace("write: "+s);
 			FLfile.write(this.url,s,'append');
 		},
 		pauseTimer:function(id){
@@ -58,7 +59,7 @@
 				var time=t.elapsed;
 				var runs=t.runs;
 				if(t.startTime){time+=(new Date()).getTime()-t.startTime;}
-				this.append(id+','+String(time)+','+String((time/runs))+'\n');
+				this.append(id+','+String(time)+','+String((time/runs))+','+String(runs)+'\n');
 				delete(this.timers[id]);
 			}
 		}

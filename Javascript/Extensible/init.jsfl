@@ -221,7 +221,8 @@ extensible.load(
 		'Log',
 		'Que',
 		'Timer',
-		'Function'
+		'Function',
+		'MathUtils'
 	],
 	true
 );

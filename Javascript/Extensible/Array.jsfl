@@ -277,9 +277,6 @@
 			if(this.length!=array.length){
 				return false;
 			}
-			if(ext.log){
-				var timer=ext.log.startTimer('extensible.Array.is');
-			}
 			for(var i=0;i<this.length;i++){
 				try{
 					if(this[i]!=array[i] && !(this[i]['is'] && this[i].is(array[i],options))){
@@ -293,9 +290,6 @@
 						'extensible.Array.is() - 1 - '+String(e)
 					);	
 				}
-			}
-			if(ext.log){
-				ext.log.pauseTimer(timer);	
 			}
 			return true;
 		},
