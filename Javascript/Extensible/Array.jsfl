@@ -280,9 +280,6 @@
 			for(var i=0;i<this.length;i++){
 				try{
 					if(this[i]!=array[i] && !(this[i]['is'] && this[i].is(array[i],options))){
-						if(ext.log){
-							ext.log.pauseTimer(timer);
-						}
 						return false;
 					}
 				}catch(e){
