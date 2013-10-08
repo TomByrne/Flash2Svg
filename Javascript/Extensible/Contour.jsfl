@@ -197,7 +197,7 @@
 							cp=new ext.Curve([e.getControl(0),e.getControl(1),e.getControl(2)]);
 						}
 					}
-					if(cp.length>0 && (points.length==0 || !cp.is(points[points.length-1]))){				
+					if(cp.length>0 && (points.length==0 || !ext.ArrayUtils.is(cp, points[points.length-1]))){			
 						cp.edge=e;
 						points.push(cp);
 					}
@@ -211,7 +211,10 @@
 				this.cache.edgeIDs=edgeIDs;
 				if(points.length==0){return;}
 				controlPoints=new ext.Array([]);
-				points[points.length-1].remove();
+
+				//points[points.length-1].remove();
+				//points.splice(points.length-1, 1);
+
 				var deg=points[points.length-1].length-1;
 				var edges=new ext.Array([]);
 				if(ext.log){
@@ -226,7 +229,10 @@
 					var next=i<points.length-1?i+1:0;
 					var prevdegree=points[prev].length-1;
 					var nextdegree=points[next].length-1;
-					points[i].remove();
+
+					//points[i].remove();
+					//points.splice(i, 1);
+
 					deg=points[i].length-1;
 					if( // an edge needs 2 points !
 						points[i].length<2 ||
@@ -243,22 +249,22 @@
 						if(
 							points[i][deg].is(points[prev][0]) 
 						){
-							points[prev].reverse();
-							points[i].reverse();
+							ext.ArrayUtils.reverse(points[prev]);
+							ext.ArrayUtils.reverse(points[i]);
 						}else if(
 							points[i][0].is(points[prev][0])
 						){
-							points[prev].reverse();
+							ext.ArrayUtils.reverse(points[prev]);
 						}else if(
 							points[i][deg].is(points[prev][prevdegree])
 						){
-							points[i].reverse();
+							ext.ArrayUtils.reverse(points[i]);
 						}
 						if(points[prev][prevdegree].indexOfClosestTo(points[i])==deg){
-							points[i].reverse();
+							ext.ArrayUtils.reverse(points[i]);
 						}
 						if(points[i][0].indexOfClosestTo(points[prev])==0){
-							points[prev].reverse();
+							ext.ArrayUtils.reverse(points[prev]);
 						}
 					}
 					if(controlPoints.length && controlPoints[0][0].is(points[i][0][0])){ // safegaurd
@@ -270,7 +276,8 @@
 						nextIsLine=points[next].isLine;
 						var folded=(
 							i>0 &&
-							points[i].is(points[prev].reversed) || 
+							ext.ArrayUtils.is(points[i], points[prev].reversed) ||
+							//points[i].is(points[prev].reversed) || 
 							(
 								isLine && 
 								prevIsLine && 
@@ -279,7 +286,8 @@
 							)
 						);
 						var overlapped=(points.length>1 && 
-							(points[i].is(points[next]) || 
+							(ext.ArrayUtils.is(points[i], points[next]) ||
+							//(points[i].is(points[next]) || 
 							(
 								isLine && 
 								nextIsLine && 
@@ -339,7 +347,8 @@
 						])
 					]);
 					for(var i=1;i<controlPoints.length;i++){
-						if(controlPoints[i-1].at(-1).is(controlPoints[i][0])){
+						//if(controlPoints[i-1].at(-1).is(controlPoints[i][0])){
+						if(ext.ArrayUtils.is(ext.ArrayUtils.at(controlPoints[i-1]),controlPoints[i][0])){
 							segments[segments.length-1].push(controlPoints[i]);
 						}else{
 							segments.push(new ext.Array([controlPoints[i]]));
@@ -351,22 +360,25 @@
 					while(segments.length>0 && success){
 						success=false;
 						var start=controlPoints[0][0];
-						var end=controlPoints.at(-1).at(-1);
+						//var end=controlPoints.at(-1).at(-1);
+						var end=ext.ArrayUtils.at(controlPoints.at(-1));
 						for(i=0;i<segments.length;i++){
-							if(end.is(segments[i][0][0])){
+							var seg = segments[i];
+							if(end.is(seg[0][0])){
 								controlPoints.extend(segments.splice(i,1)[0]);
 								success=true;
 								break;
-							}else if(end.is(segments[i].at(-1).at(-1))){
+							//}else if(end.is(seg.at(-1).at(-1))){
+							}else if(end.is(seg.at(-1).at(-1))){
 								segments[i].reverse(true);
 								controlPoints.extend(segments.splice(i,1)[0]);
 								success=true;
 								break;
-							}else if(start.is(segments[i].at(-1).at(-1))){
+							}else if(start.is(seg.at(-1).at(-1))){
 								controlPoints.prepend(segments.splice(i,1)[0]);
 								success=true;
 								break;
-							}else if(start.is(segments[i][0][0])){
+							}else if(start.is(seg[0][0])){
 								segments[i].reverse(true);
 								controlPoints.prepend(segments.splice(i,1)[0]);
 								success=true;
@@ -377,7 +389,8 @@
 					while(segments.length>0){
 						var rev=false;
 						var start=controlPoints[0][0];
-						var end=controlPoints.at(-1).at(-1);
+						//var end=controlPoints.at(-1).at(-1);
+						var end=ext.ArrayUtils.at(controlPoints.at(-1));
 						var dist=99999999999999;//end.distanceTo(segments[0][0][0]);
 						var closest=0;
 						var pre=false;

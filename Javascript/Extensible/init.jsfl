@@ -222,7 +222,8 @@ extensible.load(
 		'Que',
 		'Timer',
 		'Function',
-		'MathUtils'
+		'MathUtils',
+		'ArrayUtils'
 	],
 	true
 );

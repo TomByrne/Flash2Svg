@@ -3,6 +3,7 @@
 		ext.Array.apply(this,arguments);
 		for(var i=0;i<this.length;i++){
 			if(!this[i] instanceof ext.Point){
+							fl.trace("new ext.Point");
 				this[i]=new ext.Point(this[i]);
 			}
 		}
@@ -11,7 +12,7 @@
 	Curve.prototype={
 		__proto__:ext.Array.prototype,
 		type:Curve,
-		get isLine(){
+		/*get isLine(){
 			this.removeDuplicates();
 			if(this.length<3){
 				return true;
@@ -56,7 +57,7 @@
 			if(this.isLine){
 				this.splice(1,this.length-2);
 			}	
-		}
+		}*/
 	}
 	ext.extend({
 		Curve:Curve
