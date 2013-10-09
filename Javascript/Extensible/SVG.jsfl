@@ -759,7 +759,7 @@
 			for(var i=0; i<useList.length; ++i){
 				var useNode = useList[i];
 				if(i==0 && useList.length==1){
-					delete symbol.parent().children()[symbol.childIndex()];
+					if(symbol.parent())delete symbol.parent().children()[symbol.childIndex()];
 					useNode.parent().insertChildAfter(useNode, symbol);
 					symbol.setName('g');
 					//if(useNode.@id)symbol.@id = useNode.@id;
@@ -829,7 +829,9 @@
 			if(ext.log){
 				ext.log.pauseTimer(timer);
 			}
-			if(doRemove)delete symbol.parent().children()[symbol.childIndex()];
+			if(doRemove && symbol.parent()){
+				delete symbol.parent().children()[symbol.childIndex()];
+			}
 		},
 		/**
 		 * Deletes unreferenced defs.
