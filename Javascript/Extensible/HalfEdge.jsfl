@@ -34,19 +34,21 @@
 			return;
 		},
 		getEdge:function(){
-			if(ext.log){
-				var timer=ext.log.startTimer('HalfEdge getEdge.');	
-			}
-			var e=new ext.Edge(
-				this.$.getEdge(),
-				{
-					shape:this.shape
+			if(this._edge==null){
+				if(ext.log){
+					var timer=ext.log.startTimer('HalfEdge getEdge.');	
 				}
-			);
-			if(ext.log){
-				ext.log.pauseTimer(timer);
+				this._edge=new ext.Edge(
+					this.$.getEdge(),
+					{
+						shape:this.shape
+					}
+				);
+				if(ext.log){
+					ext.log.pauseTimer(timer);
+				}
 			}
-			return e;
+			return this._edge;
 		},
 		getNext:function(){
 			if(ext.log){

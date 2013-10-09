@@ -1,7 +1,7 @@
 (function(ext){
 	function ExtensibleShape(shape,options){
 		ext.Element.apply(this,arguments);
-		this.cache.cubicSegmentPoints=this.cache.cubicSegmentPoints||new ext.Array();
+		this._cubicSegmentPoints = this._cubicSegmentPoints||{};
 		return this;
 	}
 	ExtensibleShape.prototype={
@@ -12,29 +12,29 @@
 		endEdit:function(){return this.$.endEdit();},
 		getCubicSegmentPoints:function(cubicSegmentIndex,options){
 			if(cubicSegmentIndex){
-				if(ext.log){
-					var timerCSPL=ext.log.startTimer('Extensible.Shape.getCubicSegmentPoints()');
-				}
+				if(ext.log)var timerCSPL=ext.log.startTimer('Extensible.Shape.getCubicSegmentPoints()');
 				var settings=new ext.Object({
 					shape:this,
 					edge:undefined
 				});
 				settings.extend(options);
-				var cachePoints;
-				cachePoints=this.cache.cubicSegmentPoints[cubicSegmentIndex];
-				if(cachePoints && cachePoints.length){
-					if(ext.log){ext.log.pauseTimer(timerCSPL);}
-					return this.cache.cubicSegmentPoints[cubicSegmentIndex];
+				var cachePoints = this._cubicSegmentPoints[cubicSegmentIndex];
+				if(cachePoints){
+					if(ext.log)ext.log.pauseTimer(timerCSPL);
+					return cachePoints;
 				}
-				var csp=this.$.getCubicSegmentPoints(cubicSegmentIndex);
+
+				var csp = this.$.getCubicSegmentPoints(cubicSegmentIndex);
 				var points=new ext.Curve();
 				for(var i=0;i<csp.length;i++){
 					points.push(
 						new ext.Point(csp[i],settings)
 					);
 				}
-				this.cache.cubicSegmentPoints[cubicSegmentIndex]=new ext.Array(points);
-				if(ext.log){ext.log.pauseTimer(timerCSPL);}
+				this._cubicSegmentPoints[cubicSegmentIndex] = points;
+
+				if(ext.log)ext.log.pauseTimer(timerCSPL);
+
 				return points;
 			}else{
 				return;

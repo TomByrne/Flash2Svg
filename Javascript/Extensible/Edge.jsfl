@@ -61,7 +61,12 @@
 			return this.$.splitEdge(t);
 		},
 		get cubicSegmentIndex(){
-			return this.$.cubicSegmentIndex;
+			if(this._cubicSegmentIndex==null){
+				if(ext.log)var timer=ext.log.startTimer('Extensible.Edge.get cubicSegmentIndex');
+				this._cubicSegmentIndex = this.$.cubicSegmentIndex;
+				if(ext.log)ext.log.pauseTimer(timer);
+			}
+			return this._cubicSegmentIndex;
 		},
 		get id(){
 			return this.$.id;
