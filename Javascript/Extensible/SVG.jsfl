@@ -311,6 +311,7 @@
 				xml.appendChild(new XML('<defs/>'));
 
 				var timeline = this.timelines[i];
+				if(timeline.timeline.$.layers.length)ext.message("hmm: "+timeline.timeline.name+" "+timeline.timeline.$.layers[0].layerType);
 				var x=this._getTimeline(
 					timeline.timeline,
 					{
@@ -545,13 +546,10 @@
 				for(var i=0;i<documents.length;i++){
 					var document = documents[i];
 
-					ext.message("this.applyTransformations: "+this.applyTransformations);
 					if(this.applyTransformations){
 						this.applyMatrices(document);
 					}
-					ext.message("this._applyColorEffects: ");
 					this._applyColorEffects(document,document.defs);
-					//ext.message("this.deleteUnusedReferences: ");
 					//this.deleteUnusedReferences(document);
 					document['@xmlns']="http://www.w3.org/2000/svg";
 
@@ -671,12 +669,15 @@
 			/*
 			 * cleanup temporary scenes
 			 */
-			for(var i=0; i<this._timelineCopies.length; i++){
-				var pack = this._timelineCopies[i];
-				if(!pack.clone.libraryItem){
-					var sceneIndex = ext.doc.timeslines.indexOf(pack.clone);
-					ext.doc.editScene(sceneIndex);
-					ext.doc.deleteScene();
+			for(var i in this._timelineCopies){
+				var list = this._timelineCopies[i];
+				for(var j=0; j<list.length; ++j){
+					var pack = list[j];
+					if(!pack.clone.libraryItem){
+						var sceneIndex = fl.getDocumentDOM().timelines.indexOf(pack.clone.$);
+						ext.doc.editScene(sceneIndex);
+						ext.doc.deleteScene();
+					}
 				}
 			}
 			this._timelineCopies = {};
@@ -1254,7 +1255,7 @@
 				}
 				this._symbolBounds[symbolIDString] = boundingBox;
 			}
-			ext.message("getTimeline: "+symbolIDString+" "+settings.startFrame+" "+settings.endFrame+" "+settings.frameCount+" "+isNew+" "+settings.timeOffset);
+			//ext.message("getTimeline: "+symbolIDString+" "+settings.startFrame+" "+settings.endFrame+" "+settings.frameCount+" "+isNew+" "+settings.timeOffset+" "+layers.length);
 			var instanceID=this._uniqueID(id);	
 			instanceXML=new XML('<use xlink-href="#'+id+'" id="'+instanceID+'" />');
 			if(isNew){
@@ -1301,7 +1302,6 @@
 				}else{
 					animDur = 0;
 				}
-
 				var animatedFrames = {};
 
 				/*
@@ -1456,6 +1456,7 @@
 								// this will add in extra time for frames with non changing content (which won't be included as a real frame)
 							}
 						}
+						fl.trace("frameEnd: "+n+" "+frameEnd);
 
 
 						for(var j=0; j<items.length; ++j){
@@ -1797,10 +1798,11 @@
 					ext.lib.addNewItem('folder',tempName.dir);
 				}
 				ext.lib.selectItem(libraryItem.name);
+
 				if(ext.lib.duplicateItem()){
 					ext.lib.moveToFolder(tempName.dir);
 					ext.lib.renameItem(tempName.basename);
-					
+
 					timeline = new ext.Timeline(ext.lib.getSelectedItems()[0].timeline);
 				}else{
 					fl.trace("Error: Couldn't copy item "+libraryItem.name);
@@ -1911,15 +1913,24 @@
 			var failed = false;
 			var lastPrior = -1;
 			var layers = timeline.layers;
+			if(frame>timeline.frameCount-1)frame = timeline.frameCount-1;
+			
 			for(var i=0; i<layers.length && !failed; i++){
 				var layer=layers[i];
 				var thisFrame = layer.frames[frame];
 				if(thisFrame){
 					for(var j=0; j<thisFrame.elements.length; j++){
 						var element = thisFrame.elements[j];
-						if(element.symbolType=="graphic" && element.loop!="single frame"){
+						/*if(element.symbolType=="graphic" && element.loop!="single frame" && element.libraryItem.timeline.frameCount>1){
 							failed = true;
 							break;
+						}*/
+						if(element.symbolType=="graphic" && element.loop!="single frame" && element.libraryItem.timeline.frameCount>1){
+							var priorFrame = this._getPriorFrame(element.libraryItem.timeline, element.firstFrame + (frame - thisFrame.startFrame));
+							var dif = priorFrame - element.firstFrame;
+							if(thisFrame.startFrame + dif>lastPrior){
+								lastPrior = thisFrame.startFrame + dif;
+							}
 						}
 					}
 					if(thisFrame.startFrame>lastPrior){
@@ -2106,7 +2117,7 @@
 				libraryItem:instance.libraryItem
 			});
 			settings.extend(options);
-			ext.message("\n_getSymbolInstance: "+instance.libraryItem.name+" - loop:"+instance.loop+" frameCount:"+settings.frameCount+" startFrame:"+settings.startFrame);
+			ext.message("_getSymbolInstance: "+instance.libraryItem.name+" - loop:"+instance.loop+" frameCount:"+settings.frameCount+" startFrame:"+settings.startFrame);
 			var dom = settings.dom;
 			//settings.matrix = instance.matrix.concat(settings.matrix);
 			settings.matrix = fl.Math.concatMatrix(instance.matrix, settings.matrix);
@@ -2539,9 +2550,11 @@
 			}else if(shape.isGroup){
 				id=this._uniqueID('group');
 
+				descendantMatrix = matrix.invert();
+				matrix = new ext.Matrix();
 				if(this._appVersion<12){
 					// an issue before CS6 resulted in groups having incorrect transforms
-					var c=shape.center;
+					/*var c=shape.center;
 					var tr=shape.getTransformationPoint();
 					//tr = matrix.transformPoint(tr.x, tr.y, false);
 					tr = ext.MathUtils.transformPoint(matrix, tr.x, tr.y, false);
@@ -2558,7 +2571,7 @@
 					pathMatrix=new ext.Matrix({
 						tx:-(osb.left+osb.right)/2,
 						ty:-(osb.top+osb.bottom)/2
-					});
+					});*/
 
 					/*fl.trace("skew: "+shape.skewX+" "+shape.skewY);
 					fl.trace("shape.m: "+shape.matrix.tx+" "+shape.matrix.ty);
@@ -2568,10 +2581,10 @@
 					fl.trace("pat: "+pathMatrix.tx+" "+pathMatrix.ty);
 					fl.trace("bounds: "+osb.left+" "+osb.right+" - "+osb.top+" "+osb.bottom);
 					fl.trace("bound.c: "+((osb.left+osb.right)/2)+" - "+((osb.top+osb.bottom)/2));*/
+				}else{
+					matrix=fl.Math.concatMatrix(matrix, settings.matrix);
 				}
-				descendantMatrix = matrix.invert();
 				//matrix=matrix.concat(settings.matrix);
-				matrix=fl.Math.concatMatrix(matrix, settings.matrix);
 			}else{
 				id=this._uniqueID('shape');
 				matrix.tx=shape.left;
@@ -2661,27 +2674,27 @@
 											reversed: !rev,
 											matrix: pathMatrix,
 											dom:dom
-										});								
+										});			
 										if(so.path.length()){
 											var f=String(svgArray[fillN].path[0]['@d']);
 											var fs=f.match(/^[^Zz]*[Zz]?/)[0].trim();
 											var pStr=String(s.path[0]['@d']);
 											var pA=/^[^Zz]*[Zz]?/.exec(pStr)[0].trim();
+
 											if(pA[pA.length-1]!=='z'){pA+='z';}
+
 											var pStrO=String(so.path[0]['@d']).trim();
 											var pAO=/^[^Zz]*[Zz]?/.exec(pStrO)[0].trim();
+
 											if(pAO[pAO.length-1]!=='z'){pAO+='z';}
-											if(
-												fs==pAO || fs==pA
-											){
+
+											if(fs==pAO || fs==pA){
 													svgArray[fillN].path[0]['@d']+=pStr.replace(pA,'').replace(pAO,'');
 													svgArray[svgArray.length-1].path[0].@d=String(
 														svgArray[svgArray.length-1].path[0].@d
 													).replace(pA,'').replace(pAO,'');
-											}else if(
-												!contours[i].edgeIDs.intersect(validContours[fillN].edgeIDs).length &&
-												oppositeFill.style!="noFill"
-											){
+
+											}else if(!contours[i].edgeIDs.intersect(validContours[fillN].edgeIDs).length/* && oppositeFill.style!="noFill"*/){
 												// this creates composite paths, where a path makes the hole in another filled path
 												if(pA[pA.length-1]!=='z'){
 													pA+='z';
