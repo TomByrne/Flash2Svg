@@ -1661,14 +1661,17 @@
 									fAnimNode.@keyTimes = frameTimeStart+";"+frameTimeEnd+";1";
 									fAnimNode.@values="inline;none;none";
 
-								}else if(frameTimeEnd==1){
-									fAnimNode.@keyTimes = "0;"+frameTimeStart+";"+frameTimeEnd;
-									fAnimNode.@values="none;inline;none";
-
 								}else{
-									fAnimNode.@keyTimes = "0;"+frameTimeStart+";"+frameTimeEnd+";1";
-									fAnimNode.@values="none;inline;none;none";
+									if(frameTimeEnd==1){
+										fAnimNode.@keyTimes = "0;"+frameTimeStart+";"+frameTimeEnd;
+										fAnimNode.@values="none;inline;none";
 
+									}else{
+										fAnimNode.@keyTimes = "0;"+frameTimeStart+";"+frameTimeEnd+";1";
+										fAnimNode.@values="none;inline;none;none";
+
+									}
+									frameXML.@style = "display:none;";
 								}
 								frameXML.appendChild(fAnimNode);
 							}
@@ -2674,7 +2677,7 @@
 											reversed: !rev,
 											matrix: pathMatrix,
 											dom:dom
-										});			
+										});	
 										if(so.path.length()){
 											var f=String(svgArray[fillN].path[0]['@d']);
 											var fs=f.match(/^[^Zz]*[Zz]?/)[0].trim();
@@ -2694,7 +2697,7 @@
 														svgArray[svgArray.length-1].path[0].@d
 													).replace(pA,'').replace(pAO,'');
 
-											}else if(!contours[i].edgeIDs.intersect(validContours[fillN].edgeIDs).length/* && oppositeFill.style!="noFill"*/){
+											}else if(!contours[i].edgeIDs.intersect(validContours[fillN].edgeIDs).length && validContours[fillN].fill.is(fill)/* && oppositeFill.style!="noFill"*/){
 												// this creates composite paths, where a path makes the hole in another filled path
 												if(pA[pA.length-1]!=='z'){
 													pA+='z';
