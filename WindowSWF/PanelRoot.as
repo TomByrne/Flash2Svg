@@ -117,6 +117,7 @@ package{
 			_exportSettings.addSetting(controlsLayout.curvesRow.input, "selectedIndex", "curveDegree", 2, true, comboGetter, comboSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.expandRow.input, "selectedIndex", "expandSymbols", "usedOnce", true, comboGetter, comboSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.beginRow.input, "selectedIndex", "beginAnimation", "0s", true, comboGetter, comboSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.showFrameRow.input, "selectedIndex", "nonAnimatingShow", "start", true, comboGetter, comboSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.renderingRow.input, "selectedIndex", "rendering", "auto", true, comboGetter, comboSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.applyTransformationsCheckBox, "selected", "applyTransformations", true, true, radioGetter, radioSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.convertPatternsToSymbolsCheckBox, "selected", "convertPatternsToSymbols", true, true, radioGetter, radioSetter, Event.CHANGE);
@@ -378,6 +379,7 @@ package{
 
 			var isAnim:Boolean = (this.controlsLayout.outputRow.input.selectedItem && this.controlsLayout.outputRow.input.selectedItem.showFlattenMotion);
 			this.controlsLayout.beginRow.visible = isAnim;
+			this.controlsLayout.showFrameRow.visible = isAnim;
 			this.controlsLayout.flattenMotionCheckBox.visible = isAnim;
 			this.controlsLayout.loopCheckBox.visible = isAnim;
 			controlsLogic.update();
