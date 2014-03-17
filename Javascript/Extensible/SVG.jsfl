@@ -61,7 +61,8 @@
 			clipToScalingGrid:false, // only relevant when source=='Selected Library Items'
 			clipToBoundingBox:false, // only relevant when source=='Selected Library Items'
 			beginAnimation:"0s",
-			repeatCount:"indefinite"
+			repeatCount:"indefinite",
+			nonAnimatingShow:"start"
 		});
 		if(options instanceof XML || typeof(options)=='string'){
 			ext.Task.apply(this,[settings]);
@@ -107,6 +108,12 @@
 		}
 		if(this.repeatCount==true)this.repeatCount = "indefinite";
 		else if(this.repeatCount==false)this.repeatCount = "1";
+
+		if(this.nonAnimatingShow=="start"){
+			this.showStartFrame = true;
+		}else if(this.nonAnimatingShow=="end"){
+			this.showEndFrame = true;
+		}
 
 		if(this.output=='animation'){
 			this.animated = true;
@@ -1314,7 +1321,7 @@
 				var maskId = null;
 				for(var i=0;i<layers.length;i++){
 					var layer=layers[i];
-					if(layer.layerType=="guide")continue;
+					if(layer.layerType=="guide" || layer.layerType=="folder")continue;
 
 					var layerEnd = settings.endFrame+1;
 					if(layerEnd>layer.frameCount)layerEnd = layer.frameCount;
@@ -1456,7 +1463,6 @@
 								// this will add in extra time for frames with non changing content (which won't be included as a real frame)
 							}
 						}
-						fl.trace("frameEnd: "+n+" "+frameEnd);
 
 
 						for(var j=0; j<items.length; ++j){
@@ -1661,17 +1667,23 @@
 									fAnimNode.@keyTimes = frameTimeStart+";"+frameTimeEnd+";1";
 									fAnimNode.@values="inline;none;none";
 
+									if(!this.showStartFrame){
+										frameXML.@style = "display:none;";
+									}
 								}else{
 									if(frameTimeEnd==1){
 										fAnimNode.@keyTimes = "0;"+frameTimeStart+";"+frameTimeEnd;
 										fAnimNode.@values="none;inline;none";
 
+										if(!this.showEndFrame){
+											frameXML.@style = "display:none;";
+										}
 									}else{
 										fAnimNode.@keyTimes = "0;"+frameTimeStart+";"+frameTimeEnd+";1";
 										fAnimNode.@values="none;inline;none;none";
 
+										frameXML.@style = "display:none;";
 									}
-									frameXML.@style = "display:none;";
 								}
 								frameXML.appendChild(fAnimNode);
 							}
@@ -1721,6 +1733,7 @@
 					ext.lib.deleteItem(tempName);	
 				}
 			}*/
+						fl.trace("isNew: "+timeline.name+" "+isNew);
 			if(isNew){ // set the viewBox
 				if(settings.isRoot && this.clipToScalingGrid && settings.libraryItem){
 					boundingBox=settings.libraryItem.scalingGridRect;
@@ -2697,7 +2710,7 @@
 														svgArray[svgArray.length-1].path[0].@d
 													).replace(pA,'').replace(pAO,'');
 
-											}else if(!contours[i].edgeIDs.intersect(validContours[fillN].edgeIDs).length && validContours[fillN].fill.is(fill)/* && oppositeFill.style!="noFill"*/){
+											}else if(!contours[i].edgeIDs.intersect(validContours[fillN].edgeIDs).length && (validContours[fillN].fill.is(fill) || fill.style=="noFill")/* && oppositeFill.style!="noFill"*/){
 												// this creates composite paths, where a path makes the hole in another filled path
 												if(pA[pA.length-1]!=='z'){
 													pA+='z';
