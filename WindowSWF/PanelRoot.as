@@ -140,7 +140,8 @@ package{
 																			{label:'Custom Range', showFrameInput:true, 			data:"custom"}]);
 
 			this.controlsLayout.outputRow.input.dataProvider = new DataProvider([{label:'Animated SVG', showFlattenMotion:true, 	data:"animation"},
-																			{label:'SVG Images', showFlattenMotion:false, 			data:"images"}]);
+																				{label:'Adobe Edge Symbol', showFlattenMotion:false,data:"edgeSymbol"},
+																				{label:'SVG Images', showFlattenMotion:false, 		data:"images"}]);
 
 			this.controlsLayout.masksRow.input.dataProvider = new DataProvider([{label:'Clipping', 			data:"clipping"},
 																				{label:'Alpha', 			data:"alpha"},

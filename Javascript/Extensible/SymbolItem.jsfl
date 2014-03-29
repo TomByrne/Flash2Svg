@@ -54,7 +54,7 @@
 		get sourceFilePath(){
 			return this.$.sourceFilePath;	
 		},
-		set sourceFilePath(uri){
+		set sourceFilePath(uri){zz
 			this.$.sourceFilePath=uri;	
 		},
 		get sourceLibraryName(){

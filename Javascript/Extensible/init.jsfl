@@ -4,6 +4,7 @@
  */
  
 (function(dom){
+	
 	function Extensible(options){
 		BridgeTalk.apply(this,[]);
 		this._modules=[];
@@ -223,7 +224,11 @@ extensible.load(
 		'Timer',
 		'Function',
 		'MathUtils',
-		'ArrayUtils'
+		'ArrayUtils',
+		'AdobeEdgeExporter',
+		'TemplateReplacer',
+		'Closure',
+		'TimelineAnalyser'
 	],
 	true
 );

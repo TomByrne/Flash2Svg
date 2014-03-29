@@ -1,0 +1,20 @@
+{
+
+$$timelineStart
+
+	"HTMLFileName":"$docTitle.an.html",
+	"symbol_$timelineTitle":{
+
+		$$layerStart
+		"element_${$layerTitle}":{
+			"timelineColor2":"$layerColour",
+			"timelineColor3":"$layerColour",
+			"animationEnabled":"true",
+			"timelineColor":"$layerColour"
+		}
+		$$layerEnd
+	}
+
+$$timelineEnd
+
+}

@@ -16,13 +16,11 @@
 
 		// Processing states
 		this.STATE_PRE_INIT = 0;
-		this.STATE_ELEMENT_READING = 1;
-		this.STATE_DELETE_EXISTING_FILES = 2;
-		this.STATE_EXPANDING_USE_NODES = 3;
-		this.STATE_REMOVING_UNUSED_SYMBOLS = 4;
-		this.STATE_FINALISING_FILES = 5;
-		this.STATE_CLEANUP = 6;
-		this.STATE_DONE = 7;
+		this.STATE_DELETE_EXISTING_FILES = 1;
+		this.STATE_EXPANDING_USE_NODES = 2;
+		this.STATE_FINALISING_FILES = 3;
+		this.STATE_CLEANUP = 4;
+		this.STATE_DONE = 5;
 
 		var settings=new ext.Object({
 			file:undefined,
@@ -64,64 +62,67 @@
 			repeatCount:"indefinite",
 			nonAnimatingShow:"start"
 		});
+		this.settings = settings;
+
 		if(options instanceof XML || typeof(options)=='string'){
-			ext.Task.apply(this,[settings]);
-			this.loadSettings(options);
+			this.loadSettings(settings, options);
 		}else{
 			settings.extend(options);
-			ext.Task.apply(this,[settings]);
 		}
+
 		if(!options && ext.doc.documentHasData(this.DOCUMENT_DATA)
 		){
-			this.settingsXML=this.loadSettings(ext.doc.getDataFromDocument(this.DOCUMENT_DATA));
+			this.settingsXML=this.loadSettings(this, ext.doc.getDataFromDocument(this.DOCUMENT_DATA));
 		}
 		if(
-			this.file &&
-			!/^file\:/.test(this.file)
+			this.settings.file &&
+			!/^file\:/.test(this.settings.file)
 		){
-			this.file=this.file.absoluteURI(ext.doc.pathURI.dir);			
+			this.settings.file=this.settings.file.absoluteURI(ext.doc.pathURI.dir);			
 		}
 		var timeline;
-		if(this.frames=='current'){
-			this.frames=new ext.Array([]);
-			if(this.source=='current'){
-				this.startFrame=ext.frame;
-				this.endFrame=ext.frame;
+		if(settings.frames=='current'){
+			settings.frames=new ext.Array([]);
+			if(settings.source=='current'){
+				settings.startFrame=ext.frame;
+				settings.endFrame=ext.frame;
 			}else{
-				this.startFrame=0;
-				this.endFrame=1;
+				settings.startFrame=0;
+				settings.endFrame=1;
 			}
-		}else if(this.frames=='all'){
-			this.startFrame=0;
+		}else if(settings.frames=='all'){
+			settings.startFrame=0;
 
-			if(this.source=='current'){
-				this.endFrame = ext.timeline.$.frameCount-1;
-			}else if(this.source=='libraryItems'){
-				this.endFrame=0;
+			if(settings.source=='current'){
+				settings.endFrame = ext.timeline.$.frameCount-1;
+			}else if(settings.source=='libraryItems'){
+				settings.endFrame=0;
 				for(var i=0;i<selectedItems.length;i++){
 					timeline=selectedItems[i].timeline;
-					if(timeline.$.frameCount-1>this.endFrame){
-						this.endFrame = timeline.$.frameCount-1;
+					if(timeline.$.frameCount-1>this.settings.endFrame){
+						settings.endFrame = timeline.$.frameCount-1;
 					}
 				}
 			}
 		}
-		if(this.repeatCount==true)this.repeatCount = "indefinite";
-		else if(this.repeatCount==false)this.repeatCount = "1";
+		if(settings.repeatCount==true)settings.repeatCount = "indefinite";
+		else if(settings.repeatCount==false)settings.repeatCount = "1";
 
-		if(this.nonAnimatingShow=="start"){
+		if(this.settings.nonAnimatingShow=="start"){
 			this.showStartFrame = true;
-		}else if(this.nonAnimatingShow=="end"){
+		}else if(this.settings.nonAnimatingShow=="end"){
 			this.showEndFrame = true;
 		}
 
-		if(this.output=='animation'){
+		if(settings.output=='animation'){
 			this.animated = true;
+		}else if(settings.output=="edgeSymbol"){
+			this._exporter = new ext.AdobeEdgeExporter(settings);
 		}
-		if(typeof(this.curveDegree)=='string'){
-			this.curveDegree=['','','Quadratic','Cubic'].indexOf(this.curveDegree);
+		if(typeof(this.settings.curveDegree)=='string'){
+			this.settings.curveDegree=['','','Quadratic','Cubic'].indexOf(this.settings.curveDegree);
 		}
-		this.swfPanel=ext.swfPanel(this.swfPanelName); // the swfPanel
+		this.swfPanel=ext.swfPanel(settings.swfPanelName); // the swfPanel
 		this._timer=undefined;
 		this._symbols={};
 		this._symbolBounds={};
@@ -141,23 +142,23 @@
 			this._appVersion = parseInt(result[1]);
 		}
 
-		if(this.startFrame!=undefined){
+		if(this.settings.startFrame!=undefined){
 			if(
-				this.endFrame==undefined ||
-				this.endFrame<=this.startFrame
+				this.settings.endFrame==undefined ||
+				this.settings.endFrame<=this.settings.startFrame
 			){
-				this.endFrame=this.startFrame+1;
+				this.settings.endFrame=this.settings.startFrame+1;
 			}
-			this.frames=new ext.Array();
+			settings.frames=new ext.Array();
 			for(
-				var i=this.startFrame;
-				i<this.endFrame;
+				var i=this.settings.startFrame;
+				i<this.settings.endFrame;
 				i++
 			){
-				this.frames.push(i);
+				settings.frames.push(i);
 			}
 		}
-		if(this.source=='current'){
+		if(settings.source=='current'){
 			timeline={
 				timeline:ext.timeline,
 				matrix:ext.viewMatrix,
@@ -166,28 +167,28 @@
 				height:ext.doc.height,
 				libraryItem:ext.timeline.libraryItem
 			};
-			if(this.frames.length){
-				timeline.frames.extend(this.frames);
+			if(settings.frames.length){
+				timeline.frames.extend(settings.frames);
 			}else{
 				timeline.frames.push(ext.frame);
 			}
-			this.timelines.push(timeline);
-		}else if(this.source=='libraryItems'){
-			this.timelines.clear();
+			settings.timelines.push(timeline);
+		}else if(settings.source=='libraryItems'){
+			settings.timelines.clear();
 			var selectedItems=ext.lib.getSelectedItems();
 			var width,height;
 			for(var i=0;i<selectedItems.length;i++){
 				if(selectedItems[i] instanceof ext.SymbolItem){
 					timeline=selectedItems[i].timeline;
-					if(timeline){selectedItems[i]
+					if(timeline){
 						var timeline={
 							timeline:timeline,
 							matrix:new ext.Matrix(),
-							frames:this.frames,
+							frames:settings.frames,
 							libraryItem:selectedItems[i]
 						};
 						if(
-							this.clipToScalingGrid &&
+							settings.clipToScalingGrid &&
 							selectedItems[i].scalingGrid
 						){
 							var rect=selectedItems[i].scalingGridRect;
@@ -199,11 +200,12 @@
 							timeline.width=ext.doc.width;
 							timeline.height=ext.doc.height;
 						}
-						this.timelines.push(timeline);
+						settings.timelines.push(timeline);
 					}
 				}
 			}
 		}
+		ext.Task.apply(this,[settings]);
 		return this;
 	}
 	SVG.prototype={
@@ -222,12 +224,18 @@
 		 * 
 		 */
 		begin:function(){
+
 			if(this.log && typeof(this.log)=='string'){
 				ext.startLog({url:this.log});
 				this._timer=ext.log.startTimer('extensible.SVG()');
 			}
-			this.qData = [];
-			this.doState();
+			if(this._exporter){
+				this._exporter.begin();
+				this.qData = this._exporter.callQueue;
+			}else{
+				this.qData = [];
+				this.doState();
+			}
 		},
 		/**
 		 * This method processes data incrementally, providing the
@@ -257,12 +265,24 @@
 		 * Moves process to next state processing.
 		 */
 		nextState:function(){
-			this.currentState++;
-			this.doState();
+			if(this._exporter){
+				this._exporter.nextState();
+			}else{
+				this.currentState++;
+				this.doState();
+			}
+			if(this.qData.length==0)this.end();
 		},
 		end:function(){
-			this.currentState = STATE_DONE;
-			this.qData = [];
+			if(this._exporter){
+				this._exporter.end();
+			}else{
+				this.currentState = this.STATE_DONE;
+				this.qData = [];
+			}
+			if(this.swfPanel){
+				epSuccess=this.swfPanel.call('endProgress');	
+			}
 		},
 		doState:function(){
 			switch(this.currentState){
@@ -275,21 +295,14 @@
 				case this.STATE_EXPANDING_USE_NODES:
 					this.qData.push(closure(this.processExpandUseNodes, [], this));
 					break;
-				case this.STATE_REMOVING_UNUSED_SYMBOLS:
-					//this.qData.push(closure(this.processRemoveUnused, [], this));
-					break;
 				case this.STATE_FINALISING_FILES:
 					this.qData.push(closure(this.processFinaliseDocuments, [], this));
 					break;
 				case this.STATE_CLEANUP:
 					this.qData.push(closure(this.processCleanup, [], this));
 					break;
-				default:
-					// done all
-					return true;
 			}
-
-			return true;
+			fl.trace("doState: "+this.currentState+" "+this.qData.length);
 		},
 		doInit:function(){
 			fl.showIdleMessage(false);
@@ -304,7 +317,7 @@
 
 				var xml=new XML('<svg xmlns:xlink="http://www.w3.org/1999/xlink"/>');
 				xml['@id']=this.id;
-				xml['@image-rendering']=this.rendering;
+				xml['@image-rendering']=this.settings.rendering;
 				xml['@baseProfile']=this.baseProfile;
 				xml['@version']=this.version;
 				if(this.includeBackground){
@@ -318,20 +331,19 @@
 				xml.appendChild(new XML('<defs/>'));
 
 				var timeline = this.timelines[i];
-				if(timeline.timeline.$.layers.length)ext.message("hmm: "+timeline.timeline.name+" "+timeline.timeline.$.layers[0].layerType);
 				var x=this._getTimeline(
 					timeline.timeline,
 					{
 						dom:xml,
 						matrix:timeline.matrix,
-						startFrame:this.startFrame,
-						endFrame:this.endFrame,
+						startFrame:this.settings.startFrame,
+						endFrame:this.settings.endFrame,
 						//selection:this.selection,
 						libraryItem:timeline.libraryItem,
 						isRoot:true,
 						flattenMotion:this.flattenMotion,
 						beginAnimation:this.beginAnimation,
-						repeatCount:this.repeatCount
+						repeatCount:this.settings.repeatCount
 					}
 				);
 				xml.appendChild(x);
@@ -347,9 +359,9 @@
 		 * and vice-versa.
 		 */
 		deleteExistingFiles:function(){
-			var fileExists=FLfile.exists(this.file);
+			var fileExists=FLfile.exists(this.settings.file);
 			if(
-				this.file && 
+				this.settings.file && 
 				fileExists && (
 					(
 						(
@@ -357,7 +369,7 @@
 							this.frames.length > 1
 						) && (
 							FLfile.getAttributes(
-								this.file
+								this.settings.file
 							).indexOf("D")<0
 						)
 					)||(
@@ -366,34 +378,34 @@
 							this.frames.length==1
 						) && (
 							FLfile.getAttributes(
-								this.file
+								this.settings.file
 							).indexOf("D")>-1
 						)
 					)
 				)
 			){
-				FLfile.remove(this.file);
+				FLfile.remove(this.settings.file);
 				fileExists=false;
 			}
 
 			if(this.frames.length==1 || this.animated){
 
-				if(this.file && fileExists){
-					success = FLfile.remove(this.file);
+				if(this.settings.file && fileExists){
+					success = FLfile.remove(this.settings.file);
 				}
 			}else{
 
-				if(this.file && !fileExists){
-					if(!FLfile.createFolder(this.file))
+				if(this.settings.file && !fileExists){
+					if(!FLfile.createFolder(this.settings.file))
 						throw new Error('Problem creating folder.');
 				}
 			}
 		},
 		processExpandUseNodes:function(){
-			if(this.expandSymbols=="none")return;
+			if(this.settings.expandSymbols=="none")return;
 
 
-			// if(this.expandSymbols=='usedOnce'){
+			// if(this.settings.expandSymbols=='usedOnce'){
 			// 	for(var i in this._symbols){
 			// 		var useList = this._symbolToUseNodes[i];
 			// 		if(useList.length==1){
@@ -402,7 +414,7 @@
 			// 		}
 			// 	}
 			// }
-			// else if(this.expandSymbols=='nested'){
+			// else if(this.settings.expandSymbols=='nested'){
 			// 	for(var i in this._symbols){
 			// 		var useList = this._symbolToUseNodes[i];
 			// 		var j=0;
@@ -430,8 +442,8 @@
 			// }
 
 
-			var onceUsed = this.expandSymbols=='usedOnce';
-			var nested = this.expandSymbols=='nested';
+			var onceUsed = this.settings.expandSymbols=='usedOnce';
+			var nested = this.settings.expandSymbols=='nested';
 			for(var i=0; i<this.doms.length; ++i){
 				var dom = this.doms[i];
 				this.qData.push(closure(this.checkExpand, [dom, dom.defs, dom, onceUsed, nested], this));
@@ -509,7 +521,7 @@
 			}
 		},
 		/*processRemoveUnused:function(){
-			var onceUsed = this.expandSymbols=='usedOnce';
+			var onceUsed = this.settings.expandSymbols=='usedOnce';
 			for(var i=0; i<this.doms.length; ++i){
 				var dom = this.doms[i];
 				this.qData.push(closure(this.checkUnused, [dom.defs.symbol[0], dom, dom..use], this));
@@ -570,7 +582,7 @@
 						document['@enable-background']='new '+document['@viewBox'];
 					}
 
-					if(this.file){
+					if(this.settings.file){
 						var outputObject = {};
 						outputObject.string= this.docString + document.toXMLString();
 
@@ -632,7 +644,7 @@
 		},
 		processSaveFile:function(documents, outputObj){
 			if(documents.length==1){
-				success=FLfile.write(this.file,outputObj.string);
+				success=FLfile.write(this.settings.file,outputObj.string);
 			}else{
 				var rPath=decodeURIComponent(
 					String(
@@ -651,11 +663,11 @@
 				if(rPathArray.length>1){
 					var rDir=rPath.dir;
 					if(!FLfile.exists(rDir)){
-						FLfile.createFolder(this.file+'/'+rDir);
+						FLfile.createFolder(this.settings.file+'/'+rDir);
 					}
 				}
 				var outputPath=(
-					this.file+'/'+
+					this.settings.file+'/'+
 					rPath+'.svg'
 				);
 				success=FLfile.write(
@@ -664,7 +676,7 @@
 				);
 			}
 			if(!success){
-				ext.warn('Problem writing '+outputPath||this.file);
+				ext.warn('Problem writing '+outputPath||this.settings.file);
 			}
 		},
 		processCleanup:function(){
@@ -696,11 +708,8 @@
 			}
 			ext.sel=this._origSelection;
 			var epSuccess=true;
-			if(this.swfPanel){
-				epSuccess=this.swfPanel.call('endProgress');	
-			}
 			if(epSuccess){
-				ext.message('Export Successful: '+this.file);
+				ext.message('Export Successful: '+this.settings.file);
 			}
 		},
 		/**
@@ -910,7 +919,7 @@
 		 * Loads an xml settings file.
 		 * @parameter {String} uri The location of the settings file.
 		 */
-		loadSettings:function(xml){
+		loadSettings:function(into, xml){
 			if(typeof(xml)=='string'){
 				xml=new XML(xml);
 			}
@@ -919,7 +928,7 @@
 				if(
 					['true','false','True','False'].indexOf(String(x))>-1
 				){
-					this[key]=(
+					into[key]=(
 						String(x)!=='false' &&
 						String(x)!=='False' &&
 						String(x)!=='0'
@@ -927,9 +936,9 @@
 				}else if(
 					String(x).replace(/[^\d\.\-\W]/g,'')==String(x)
 				){
-					this[key]=Number(x);
+					into[key]=Number(x);
 				}else{
-					this[key]=String(x);
+					into[key]=String(x);
 				}
 			}
 			return xml;
@@ -1137,7 +1146,7 @@
 				if(settings.startFrame==settings.endFrame){
 					symbolIDString += '_f'+settings.startFrame;
 				}else if(settings.timeOffset!=null && settings.timeOffset>0){
-					symbolIDString += '_t'+Math.round(settings.timeOffset * Math.pow(10, this.decimalPointPrecision));
+					symbolIDString += '_t'+Math.round(settings.timeOffset * Math.pow(10, this.settings.decimalPointPrecision));
 				}
 			}
 			var isNew,instanceID,boundingBox;
@@ -1292,7 +1301,7 @@
 					if(settings.totalDuration<animDur){
 						animDur = settings.totalDuration;
 					}
-					animDur = Math.roundTo(animDur,this.decimalPointPrecision);*/
+					animDur = Math.roundTo(animDur,this.settings.decimalPointPrecision);*/
 
 					if(settings.totalDuration!=null){
 						animDur = settings.totalDuration;
@@ -1733,9 +1742,9 @@
 					ext.lib.deleteItem(tempName);	
 				}
 			}*/
-						fl.trace("isNew: "+timeline.name+" "+isNew);
+			//fl.trace("isNew: "+timeline.name+" "+isNew);
 			if(isNew){ // set the viewBox
-				if(settings.isRoot && this.clipToScalingGrid && settings.libraryItem){
+				if(settings.isRoot && this.settings.clipToScalingGrid && settings.libraryItem){
 					boundingBox=settings.libraryItem.scalingGridRect;
 				}
 				dom.defs.appendChild(xml);
@@ -2133,7 +2142,7 @@
 				libraryItem:instance.libraryItem
 			});
 			settings.extend(options);
-			ext.message("_getSymbolInstance: "+instance.libraryItem.name+" - loop:"+instance.loop+" frameCount:"+settings.frameCount+" startFrame:"+settings.startFrame);
+			//ext.message("_getSymbolInstance: "+instance.libraryItem.name+" - loop:"+instance.loop+" frameCount:"+settings.frameCount+" startFrame:"+settings.startFrame);
 			var dom = settings.dom;
 			//settings.matrix = instance.matrix.concat(settings.matrix);
 			settings.matrix = fl.Math.concatMatrix(instance.matrix, settings.matrix);
@@ -2465,17 +2474,17 @@
 			var bitmapURI=this._bitmaps[item.name];
 			if(!bitmapURI){
 				if(this.timelines.length==1 && (this.timelines[0].frames.length==1 || this.animated)){
-					bitmapURI=this.file.dir+'/'+item.name.basename;
+					bitmapURI=this.settings.file.dir+'/'+item.name.basename;
 				}else{
-					bitmapURI=this.file+'/'+item.name;
+					bitmapURI=this.settings.file+'/'+item.name;
 					if(
-						FLfile.exists(this.file) &&
-						FLfile.getAttributes(this.file).indexOf("D")<0
+						FLfile.exists(this.settings.file) &&
+						FLfile.getAttributes(this.settings.file).indexOf("D")<0
 					){
-						FLfile.remove(this.file);
+						FLfile.remove(this.settings.file);
 					}
-					if(!FLfile.exists(this.file)){
-						FLfile.createFolder(this.file);
+					if(!FLfile.exists(this.settings.file)){
+						FLfile.createFolder(this.settings.file);
 					}
 				}
 				var ext=item.sourceFilePath.extension;
@@ -2506,7 +2515,7 @@
 				}else{
 					item.exportToFile(bitmapURI);	
 				}
-				bitmapURI=bitmapURI.relativeTo(this.file.dir);
+				bitmapURI=bitmapURI.relativeTo(this.settings.file.dir);
 				this._bitmaps[item.name]=bitmapURI;
 			}
 			return bitmapURI;
@@ -2652,11 +2661,11 @@
 								var insideOut=!noFills && fill.is(validContours[fillN].fill);
 								var sameDir=(
 									contours[i].orientation
-									//+Number(contours[i].getControlPoints( {curveDegree:this.curveDegree} ).isReversed)
+									//+Number(contours[i].getControlPoints( {curveDegree:this.settings.curveDegree} ).isReversed)
 									<0
 								)==(
 									validContours[fillN].orientation
-									//+Number(validContours[fillN].getControlPoints( {curveDegree:this.curveDegree} ).isReversed)
+									//+Number(validContours[fillN].getControlPoints( {curveDegree:this.settings.curveDegree} ).isReversed)
 									<0
 								);
 								if(
@@ -2846,7 +2855,7 @@
 			var dom = settings.dom;
 
 			var controlPoints=contour.getControlPoints({
-				curveDegree:this.curveDegree,
+				curveDegree:this.settings.curveDegree,
 				reversed:settings.reversed
 			});
 			if(!controlPoints || controlPoints.length==0){
@@ -3118,7 +3127,7 @@
 						stop['@stop-color']=c.hex;
 						stop['@stop-opacity']=c.opacity;
 						if(i<fillObj.posArray.length){
-							stop['@offset']=String(Math.roundTo((fillObj.posArray[i]/255.0),this.decimalPointPrecision+2));
+							stop['@offset']=String(Math.roundTo((fillObj.posArray[i]/255.0),this.settings.decimalPointPrecision+2));
 						}
 						xml.appendChild(stop);
 					}
@@ -3494,7 +3503,7 @@
 			}
 		},
 		precision:function(num){
-			return Math.roundTo(num,this.decimalPointPrecision);
+			return Math.roundTo(num,this.settings.decimalPointPrecision);
 		},
 		/**
 		 * Applies transformation matrices recursively given an SVG graphic element.
@@ -3628,11 +3637,11 @@
 										tx:gmx.tx,
 										ty:gmx.ty
 									});
-									fp=fp.transform(mx).roundTo(this.decimalPointPrecision);
-									cp=cp.transform(mx).roundTo(this.decimalPointPrecision);
-									rp=rp.transform(mx).roundTo(this.decimalPointPrecision);
-									gmx=mx.invert().concat(gmx).roundTo(this.decimalPointPrecision);
-									gradient['@r']=String(Math.roundTo(cp.distanceTo(rp),this.decimalPointPrecision));
+									fp=fp.transform(mx).roundTo(this.settings.decimalPointPrecision);
+									cp=cp.transform(mx).roundTo(this.settings.decimalPointPrecision);
+									rp=rp.transform(mx).roundTo(this.settings.decimalPointPrecision);
+									gmx=mx.invert().concat(gmx).roundTo(this.settings.decimalPointPrecision);
+									gradient['@r']=String(Math.roundTo(cp.distanceTo(rp),this.settings.decimalPointPrecision));
 									gradient['@cx']=String(cp.x);
 									gradient['@cy']=String(cp.y);
 									gradient['@fx']=String(fp.x);
@@ -3653,8 +3662,8 @@
 										x:Number(gradient['@x2']),
 										y:Number(gradient['@y2'])
 									});
-									p1=p1.transform(nmx).roundTo(this.decimalPointPrecision);
-									p2=p2.transform(nmx).roundTo(this.decimalPointPrecision);
+									p1=p1.transform(nmx).roundTo(this.settings.decimalPointPrecision);
+									p2=p2.transform(nmx).roundTo(this.settings.decimalPointPrecision);
 									gradient['@x1']=String(p1.x);
 									gradient['@y1']=String(p1.y);
 									gradient['@x2']=String(p2.x);
@@ -3685,7 +3694,7 @@
 							for(var i=0;i<points.length;i++){
 								if(points[i].trim()==''){continue;}
 								var point=new ext.Point(points[i]);
-								point=point.transform(nmx).roundTo(this.decimalPointPrecision);
+								point=point.transform(nmx).roundTo(this.settings.decimalPointPrecision);
 								var pointString=String(point.x)+','+String(point.y);
 								var prefix=/^[A-Za-z]/.exec(points[i]);
 								if(prefix){
@@ -3712,7 +3721,7 @@
 						var strokeScale=cmx?nmx.concat(strokeX.concat(cmx.invert())):nmx.concat(strokeX);
 						var scaleMult = ((strokeScale.scaleX+strokeScale.scaleY)/2);
 						if(scaleMult!=1){
-							var newThickness = Math.roundTo(strokeW*scaleMult,this.decimalPointPrecision);
+							var newThickness = this.precision(strokeW*scaleMult);
 							if(newThickness<=1){
 								newThickness = 1;
 								child['@vector-effect'] = 'non-scaling-stroke';
