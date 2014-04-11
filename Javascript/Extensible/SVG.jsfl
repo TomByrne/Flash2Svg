@@ -334,12 +334,25 @@
 						repeatCount:this.repeatCount
 					}
 				);
-				xml.appendChild(x);
+				//xml.appendChild(x);
+				this._explodeNode(x, xml);
 
 				this.doms[i] = xml;
 			}
 			if(ext.log){
 				ext.log.pauseTimer(timer);	
+			}
+		},
+		_explodeNode:function(node, intoNode){
+			var atts = node.attributes();
+			for(var i=0; i<atts.length(); i++){
+				var att = atts[i];
+				intoNode.@[att.name()] = att.toXMLString();
+			}
+			var children = node.children();
+			for(var i=children.length()-1; i>=0; i--){
+				var child = children[i];
+				intoNode.appendChild(child);
 			}
 		},
 		/*
@@ -573,6 +586,7 @@
 					if(this.file){
 						var outputObject = {};
 						outputObject.string= this.docString + document.toXMLString();
+						outputObject.id = document.@id;
 
 						this.qData.push(closure(this.processFixUseLinks, [outputObject], this));
 						this.qData.push(closure(this.processCompactColours, [outputObject], this));
@@ -636,13 +650,14 @@
 			}else{
 				var rPath=decodeURIComponent(
 					String(
-						documents[i].@id
+						outputObj.id
 					).replace(
 						this.MODULO_STAND_IN,
 						'%',
 						'g'
 					)
 				);
+				fl.trace("id: "+rPath);
 				var rPathArray=rPath.split('/');
 				for(var n=0;n<rPathArray.length;n++){
 					rPathArray[n]=rPathArray[n].safeFileName();
@@ -766,6 +781,7 @@
 			var doRemove =  true;
 			for(var i=0; i<useList.length; ++i){
 				var useNode = useList[i];
+				fl.trace("useNode: "+(useNode.parent()==useNode.root()));
 				if(i==0 && useList.length==1){
 					if(symbol.parent())delete symbol.parent().children()[symbol.childIndex()];
 					useNode.parent().insertChildAfter(useNode, symbol);
@@ -1275,8 +1291,10 @@
 				xml=new XML('<symbol/>');
 				xml['@id']=id;
 
-				this._symbols[symbolIDString] = xml;
-				this._symbolToUseNodes[symbolIDString] = [instanceXML];
+				if(!settings.isRoot){
+					this._symbols[symbolIDString] = xml;
+					this._symbolToUseNodes[symbolIDString] = [instanceXML];
+				}
 
 				if(this.animated){
 					var totFrames = (settings.endFrame-settings.startFrame+1);
@@ -1733,12 +1751,11 @@
 					ext.lib.deleteItem(tempName);	
 				}
 			}*/
-						fl.trace("isNew: "+timeline.name+" "+isNew);
 			if(isNew){ // set the viewBox
 				if(settings.isRoot && this.clipToScalingGrid && settings.libraryItem){
 					boundingBox=settings.libraryItem.scalingGridRect;
 				}
-				dom.defs.appendChild(xml);
+				if(!settings.isRoot)dom.defs.appendChild(xml);
 			}
 			var viewBox=(
 				String(boundingBox.left)+' '+
@@ -1751,29 +1768,34 @@
 			}else{
 				instanceXML['@viewBox'] = viewBox;
 			}
-			instanceXML['@width']=String(Math.ceil(boundingBox.right-boundingBox.left));
-			instanceXML['@height']=String(Math.ceil(boundingBox.bottom-boundingBox.top));
-			instanceXML['@x']=Math.floor(boundingBox.left);
-			instanceXML['@y']=Math.floor(boundingBox.top);
-			if(boundingBox.left!=instanceXML['@x'] || boundingBox.top!=instanceXML['@y']){
-				// if there are rounding errors we add the dif to the transform (greatly scaled objects can be affected dramatically)
-				// var offset = settings.matrix.transformPoint(boundingBox.left-instanceXML['@x'], boundingBox.top-instanceXML['@y'], false);
-				// settings.matrix.tx += offset.x;
-				// settings.matrix.ty += offset.y;
+			if(settings.isRoot){
+				if(ext.log) ext.log.pauseTimer(timer);
+				xml.setName('g');
+				delete xml['@xlink-href'];
+				return xml;
+			}else{
+				instanceXML['@width']=String(Math.ceil(boundingBox.right-boundingBox.left));
+				instanceXML['@height']=String(Math.ceil(boundingBox.bottom-boundingBox.top));
+				instanceXML['@x']=Math.floor(boundingBox.left);
+				instanceXML['@y']=Math.floor(boundingBox.top);
+				if(boundingBox.left!=instanceXML['@x'] || boundingBox.top!=instanceXML['@y']){
+					// if there are rounding errors we add the dif to the transform (greatly scaled objects can be affected dramatically)
+					// var offset = settings.matrix.transformPoint(boundingBox.left-instanceXML['@x'], boundingBox.top-instanceXML['@y'], false);
+					// settings.matrix.tx += offset.x;
+					// settings.matrix.ty += offset.y;
 
-				// not sure if this is really helping, must test more
-			}
-			instanceXML['@transform'] = this._getMatrix(settings.matrix);
-			// if(settings.isRoot && settings.libraryItem){
-			// 	dom.@viewBox = viewBox;
-			// 	dom.@width = instanceXML.@width;
-			// 	dom.@height = instanceXML.@height;
-			// }
+					// not sure if this is really helping, must test more
+				}
+				instanceXML['@transform'] = this._getMatrix(settings.matrix);
+				// if(settings.isRoot && settings.libraryItem){
+				// 	dom.@viewBox = viewBox;
+				// 	dom.@width = instanceXML.@width;
+				// 	dom.@height = instanceXML.@height;
+				// }
 
-			if(ext.log){
-				ext.log.pauseTimer(timer);	
+				if(ext.log) ext.log.pauseTimer(timer);
+				return instanceXML;
 			}
-			return instanceXML;
 		},
 		_timelineCopies:null,
 		_getTimelineCopy:function(libraryItem, timeline, startFrame, endFrame){
@@ -3430,9 +3452,9 @@
 			var emptyXML=inputXML.copy();
 			delete emptyXML.use;
 			delete emptyXML.g;
-			for each(var e in inputXML.use+inputXML.g){
-				var xml=emptyXML.copy();
-				element=e.copy();
+			for each(var e in (inputXML.use + inputXML.g)){
+				var xml = emptyXML.copy();
+				element = e.copy();
 				if(element.localName()=='use'){
 					var id=String(element['@xlink-href']).slice(1);
 					var symbol=xml.defs.symbol.(@id==id)[0];
@@ -3458,6 +3480,7 @@
 					xml.@id=element.@id;	
 				}
 				xml.appendChild(element);
+				fl.trace("split: "+xml.@id);
 				documents.push(xml);
 			}
 			if(ext.log){
