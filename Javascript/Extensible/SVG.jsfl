@@ -318,7 +318,6 @@
 				xml.appendChild(new XML('<defs/>'));
 
 				var timeline = this.timelines[i];
-				if(timeline.timeline.$.layers.length)ext.message("hmm: "+timeline.timeline.name+" "+timeline.timeline.$.layers[0].layerType);
 				var x=this._getTimeline(
 					timeline.timeline,
 					{
@@ -352,7 +351,7 @@
 			var children = node.children();
 			for(var i=children.length()-1; i>=0; i--){
 				var child = children[i];
-				intoNode.appendChild(child);
+				intoNode.prependChild(child);
 			}
 		},
 		/*
@@ -1351,9 +1350,6 @@
 					if(!lVisible){layer.visible=true;}
 					if(lLocked){layer.locked=false;}
 
-					//var layerId = this._uniqueID(layer.name);
-					var layerId = id
-
 					if(masked.length && layer.layerType!='masked'){
 						// masked layers have ended group
 						this._doMask(xml, masked, maskId);
@@ -1364,7 +1360,6 @@
 					var isMask = false;
 					var isMasked = false;
 					if(layer.layerType=='mask'){
-						maskId = layerId;
 						isMask = true;
 						if(this.maskingType=='alpha'){
 							colorX=new ext.Color('#FFFFFF00');
@@ -1415,6 +1410,7 @@
 						var filtered;
 						if(isMask){
 							frameXML=<mask id={layerFrameId}/>;
+							maskId = layerFrameId;
 							if(colorX){
 								filtered=<g id={this._uniqueID('g')} />;
 								frameXML.appendChild(filtered);
@@ -1456,7 +1452,7 @@
 										if(nextFrame.elements.length!=1){
 											break; // tweening to incompatible frame
 										}else if(nextElem.libraryItem!=mainElem.libraryItem || mainElem.symbolType!=nextElem.symbolType || 
-														(mainElem.symbolType=="graphic" &&
+														(mainElem.symbolType=="graphic" && mainElem.libraryItem.timeline.frameCount>1 &&
 													    ((nextElem.loop!=mainElem.loop && !((mainElem.loop=="single frame" || frame.duration==1) && (nextElem.loop=="single frame" || nextFrame.duration==1)))
 													 || (nextElem.loop!="single frame" && nextFrame.duration!=1) 
 													 || (singleFrameStart!=this._getPriorFrame(nextElem.libraryItem.timeline, nextElem.firstFrame)))
@@ -2712,7 +2708,7 @@
 											reversed: !rev,
 											matrix: pathMatrix,
 											dom:dom
-										});	
+										});
 										if(so.path.length()){
 											var f=String(svgArray[fillN].path[0]['@d']);
 											var fs=f.match(/^[^Zz]*[Zz]?/)[0].trim();
@@ -3040,7 +3036,8 @@
 			if(ext.log){
 				var timer=ext.log.startTimer('extensible.SVG._getCurve()');	
 			}
-			close=close!==undefined?close:true;
+			close=(close!==undefined?close:true);
+			close = (close!==undefined?close==-1:true);
 			if(controlPoints.length==0){
 				return;	
 			}
@@ -3056,6 +3053,7 @@
 			if(deg>2){
 				curveString.push(controlPoints[0][3].x+","+controlPoints[0][3].y+" ");
 			}
+					fl.trace("begin: "+curveString.join(" ")+" - "+close);
 			for(var i=1;i<controlPoints.length;i++){
 				var prevdeg=deg;
 				deg=controlPoints[i].length-1;
@@ -3085,6 +3083,7 @@
 			if(ext.log){
 				ext.log.pauseTimer(timer);	
 			}
+					fl.trace("end: "+curveString.join(" "));
 			return curveString.join('');
 		},
 		/**
