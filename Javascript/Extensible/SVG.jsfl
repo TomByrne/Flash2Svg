@@ -780,7 +780,6 @@
 			var doRemove =  true;
 			for(var i=0; i<useList.length; ++i){
 				var useNode = useList[i];
-				fl.trace("useNode: "+(useNode.parent()==useNode.root()));
 				if(i==0 && useList.length==1){
 					if(symbol.parent())delete symbol.parent().children()[symbol.childIndex()];
 					useNode.parent().insertChildAfter(useNode, symbol);
@@ -1414,14 +1413,16 @@
 							if(colorX){
 								filtered=<g id={this._uniqueID('g')} />;
 								frameXML.appendChild(filtered);
-								var f=this._getFilters(
-									null,{
-										color:colorX,
-										boundingBox:boundingBox
-									}, dom.defs
-								);
-								if(f){
-									filtered.@filter="url(#"+f+")";
+								if(!this._maskFilter){
+									this._maskFilter=this._getFilters(
+										null,{
+											color:colorX,
+											boundingBox:boundingBox
+										}, dom.defs
+									);
+								}
+								if(this._maskFilter){
+									filtered.@filter="url(#"+this._maskFilter+")";
 								}
 							}
 						}else if(isMasked){
@@ -2428,6 +2429,7 @@
 						*/
 					}else{
 						if(!color.percent.is([100,100,100,100])){
+								fl.trace("FILTER 2");
 							feColorMatrix=<feColorMatrix id={this._uniqueID('feColorMatrix')} />;
 							feColorMatrix.@type="matrix";
 							feColorMatrix['@in']=src;
@@ -3053,7 +3055,6 @@
 			if(deg>2){
 				curveString.push(controlPoints[0][3].x+","+controlPoints[0][3].y+" ");
 			}
-					fl.trace("begin: "+curveString.join(" ")+" - "+close);
 			for(var i=1;i<controlPoints.length;i++){
 				var prevdeg=deg;
 				deg=controlPoints[i].length-1;
@@ -3083,7 +3084,6 @@
 			if(ext.log){
 				ext.log.pauseTimer(timer);	
 			}
-					fl.trace("end: "+curveString.join(" "));
 			return curveString.join('');
 		},
 		/**
@@ -3479,7 +3479,6 @@
 					xml.@id=element.@id;	
 				}
 				xml.appendChild(element);
-				fl.trace("split: "+xml.@id);
 				documents.push(xml);
 			}
 			if(ext.log){
@@ -3847,7 +3846,7 @@
 						}
 					}
 				}
-				if(
+				/*if(
 					!painted &&
 					xml.*.length()==(
 						xml.animate?xml.animate.length():0+
@@ -3867,7 +3866,7 @@
 					}else{
 						xml.@filter='url(#'+f+')';	
 					}
-				}
+				}*/
 			}
 			for each(var element in xml.*){
 				this._applyColorEffects(element,defs,color);
