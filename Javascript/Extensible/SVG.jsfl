@@ -16,13 +16,14 @@
 
 		// Processing states
 		this.STATE_PRE_INIT = 0;
-		this.STATE_ELEMENT_READING = 1;
-		this.STATE_DELETE_EXISTING_FILES = 2;
-		this.STATE_EXPANDING_USE_NODES = 3;
-		this.STATE_REMOVING_UNUSED_SYMBOLS = 4;
-		this.STATE_FINALISING_FILES = 5;
-		this.STATE_CLEANUP = 6;
-		this.STATE_DONE = 7;
+		this.STATE_TIMELINES = 1;
+		this.STATE_ELEMENT_READING = 2;
+		this.STATE_DELETE_EXISTING_FILES = 3;
+		this.STATE_EXPANDING_USE_NODES = 4;
+		this.STATE_REMOVING_UNUSED_SYMBOLS = 5;
+		this.STATE_FINALISING_FILES = 6;
+		this.STATE_CLEANUP = 7;
+		this.STATE_DONE = 8;
 
 		var settings=new ext.Object({
 			file:undefined,
@@ -79,8 +80,13 @@
 			this.file &&
 			!/^file\:/.test(this.file)
 		){
-			this.file=this.file.absoluteURI(ext.doc.pathURI.dir);			
+			this.file = this.file.absoluteURI(ext.doc.pathURI.dir);			
 		}
+		var extIndex = this.file.indexOf(".svg");
+		if(extIndex==this.file.length - 4){
+			this.file = this.file.substr(0, this.file.length - 4);
+		}
+
 		var timeline;
 		if(this.frames=='current'){
 			this.frames=new ext.Array([]);
@@ -123,17 +129,13 @@
 		}
 		this.swfPanel=ext.swfPanel(this.swfPanelName); // the swfPanel
 		this._timer=undefined;
-		this._symbols={};
-		this._symbolBounds={};
-		this._symbolToUseNodes={};
+		//this._symbolToUseNodes={};
 		this._bitmaps={};
 		//this._rootItem={};
 		this._tempFolder=ext.lib.uniqueName('temp'); // Library folder holding temporary symbols.
-		this._ids={}; // Used by uniqueID() for cross-checking IDs.
 		this._origSelection=new ext.Selection([]);
 		this._delayedProcessing=true;// If true, a timeline is processed one level deep in it's entirety before progressing to descendants.
 		this.currentState=0;
-		this._timelineCopies = {};
 
 		var versionParser = /\w* (\d+),.*/g;
 		var result = versionParser.exec(fl.version);
@@ -142,35 +144,27 @@
 		}
 
 		if(this.startFrame!=undefined){
-			if(
-				this.endFrame==undefined ||
-				this.endFrame<=this.startFrame
-			){
-				this.endFrame=this.startFrame+1;
+			if(this.endFrame==undefined || this.endFrame<this.startFrame){
+				this.endFrame=this.startFrame;
 			}
-			this.frames=new ext.Array();
-			for(
-				var i=this.startFrame;
-				i<this.endFrame;
-				i++
-			){
+			this.frames = [];
+			for(var i=this.startFrame; i<this.endFrame+1; i++){
 				this.frames.push(i);
 			}
+		}
+		if(!this.frames.length){
+			this.frames.push(ext.frame);
 		}
 		if(this.source=='current'){
 			timeline={
 				timeline:ext.timeline,
 				matrix:ext.viewMatrix,
-				frames:new ext.Array([]),
+				frames:this.frames,
 				width:ext.doc.width,
 				height:ext.doc.height,
-				libraryItem:ext.timeline.libraryItem
+				libraryItem:ext.timeline.libraryItem,
+				filePath:this.file+".svg"
 			};
-			if(this.frames.length){
-				timeline.frames.extend(this.frames);
-			}else{
-				timeline.frames.push(ext.frame);
-			}
 			this.timelines.push(timeline);
 		}else if(this.source=='libraryItems'){
 			this.timelines.clear();
@@ -179,13 +173,18 @@
 			for(var i=0;i<selectedItems.length;i++){
 				if(selectedItems[i] instanceof ext.SymbolItem){
 					timeline=selectedItems[i].timeline;
-					if(timeline){selectedItems[i]
+					if(timeline){
 						var timeline={
 							timeline:timeline,
 							matrix:new ext.Matrix(),
 							frames:this.frames,
 							libraryItem:selectedItems[i]
 						};
+						if(selectedItems.length>1){
+							timeline.filePath = this.file+"/"+timeline.name+".svg";
+						}else{
+							timeline.filePath = this.file+".svg";
+						}
 						if(
 							this.clipToScalingGrid &&
 							selectedItems[i].scalingGrid
@@ -203,6 +202,29 @@
 					}
 				}
 			}
+		}
+		if(!this.animated && this.frames.length){
+			var splitTimelines = [];
+			for(var i=0;i<this.timelines.length;i++){
+				var timeline = this.timelines[i];
+				for(var j=0;j<this.frames.length;j++){
+					var timelineClone = {
+						timeline:timeline.timeline,
+						matrix:timeline.matrix,
+						frames:[this.frames[j]],
+						libraryItem:timeline.libraryItem,
+						width:timeline.width,
+						height:timeline.height
+					}
+					if(this.timelines.length>1){
+						timelineClone.filePath = this.file+"/"+timeline.timeline.name+"_"+this.frames[j]+".svg";
+					}else{
+						timelineClone.filePath = this.file+"/"+this.frames[j]+".svg";
+					}
+					splitTimelines.push(timelineClone);
+				}
+			}
+			this.timelines = splitTimelines;
 		}
 		return this;
 	}
@@ -246,7 +268,11 @@
 				}
 			}else{
 				try{
-					return this.nextState();
+					if(this.currentState==this.STATE_TIMELINES && ++this._timelineIndex<this.timelines.length){
+						this.qData.push(closure(this.doNextTimeline, [], this));
+					}else{
+						return this.nextState();
+					}
 				}catch(e){
 					ext.message(e);
 				}
@@ -268,6 +294,9 @@
 			switch(this.currentState){
 				case this.STATE_PRE_INIT:
 					this.qData.push(closure(this.doInit, [], this));
+					break;
+				case this.STATE_TIMELINES:
+					this.qData.push(closure(this.doNextTimeline, [], this));
 					break;
 				case this.STATE_DELETE_EXISTING_FILES:
 					this.qData.push(closure(this.deleteExistingFiles, [], this));
@@ -296,48 +325,72 @@
 			if(this.log){
 				var timer=ext.log.startTimer('extensible.SVG.doInit()');
 			}
-			var i,n;
 			this._origSelection=ext.sel;
 			ext.doc.selectNone(); // selection slows performance & can cause crashes
 			this.doms = [];
-			for(i=0;i<this.timelines.length;i++){
-
-				var xml=new XML('<svg xmlns:xlink="http://www.w3.org/1999/xlink"/>');
-				xml['@id']=this.id;
-				xml['@image-rendering']=this.rendering;
-				xml['@baseProfile']=this.baseProfile;
-				xml['@version']=this.version;
-				if(this.includeBackground){
-					xml['@style']="background-color:"+this.backgroundColor;
-				}
-				xml['@x']=String(this.x)+'px';
-				xml['@y']=String(this.y)+'px';
-				xml['@width']=String(this.width)+'px';
-				xml['@height']=String(this.height)+'px';
-				xml['@xml:space']='preserve';
-				xml.appendChild(new XML('<defs/>'));
-
-				var timeline = this.timelines[i];
-				var x=this._getTimeline(
-					timeline.timeline,
-					{
-						dom:xml,
-						matrix:timeline.matrix,
-						startFrame:this.startFrame,
-						endFrame:this.endFrame,
-						//selection:this.selection,
-						libraryItem:timeline.libraryItem,
-						isRoot:true,
-						flattenMotion:this.flattenMotion,
-						beginAnimation:this.beginAnimation,
-						repeatCount:this.repeatCount
-					}
-				);
-				//xml.appendChild(x);
-				this._explodeNode(x, xml);
-
-				this.doms[i] = xml;
+			if(ext.log){
+				ext.log.pauseTimer(timer);	
 			}
+			this._timelineIndex = 0;
+			this.nextState();
+		},
+		doNextTimeline:function(){
+			fl.showIdleMessage(false);
+			if(this.log){
+				var timer=ext.log.startTimer('extensible.SVG.doNextTimeline()');
+			}
+
+			/*
+			 * cleanup temporary items
+			 */
+			if(ext.lib.itemExists(this._tempFolder)){
+				ext.lib.deleteItem(this._tempFolder);	
+			}
+			this._ids={}; // Used by uniqueID() for cross-checking IDs.
+			this._timelineCopies = {};
+			this._symbols={};
+			this._symbolBounds={};
+			this._maskFilter = null;
+
+			var timelineIndex = this._timelineIndex;
+
+
+			var timeline = this.timelines[timelineIndex];
+			fl.trace("\ndoNextTimeline: "+timelineIndex+" "+timeline.filePath);
+
+			var xml=new XML('<svg xmlns:xlink="http://www.w3.org/1999/xlink"/>');
+			xml['@id']=this.id;
+			xml['@image-rendering']=this.rendering;
+			xml['@baseProfile']=this.baseProfile;
+			xml['@version']=this.version;
+			if(this.includeBackground){
+				xml['@style']="background-color:"+this.backgroundColor;
+			}
+			xml['@x']=String(this.x)+'px';
+			xml['@y']=String(this.y)+'px';
+			xml['@width']=String(this.width)+'px';
+			xml['@height']=String(this.height)+'px';
+			xml['@xml:space']='preserve';
+			xml.appendChild(new XML('<defs/>'));
+
+			var x=this._getTimeline(
+				timeline.timeline,
+				{
+					dom:xml,
+					matrix:timeline.matrix,
+					startFrame:timeline.frames[0],
+					endFrame:timeline.frames[0]+timeline.frames.length,
+					//selection:this.selection,
+					libraryItem:timeline.libraryItem,
+					isRoot:true,
+					flattenMotion:this.flattenMotion,
+					beginAnimation:this.beginAnimation,
+					repeatCount:this.repeatCount
+				}
+			);
+			this._explodeNode(x, xml);
+			this.doms[timelineIndex] = xml;
+
 			if(ext.log){
 				ext.log.pauseTimer(timer);	
 			}
@@ -359,46 +412,20 @@
 		 * and vice-versa.
 		 */
 		deleteExistingFiles:function(){
-			var fileExists=FLfile.exists(this.file);
-			if(
-				this.file && 
-				fileExists && (
-					(
-						(
-							this.timelines.length > 1 ||
-							this.frames.length > 1
-						) && (
-							FLfile.getAttributes(
-								this.file
-							).indexOf("D")<0
-						)
-					)||(
-						(
-							this.timelines.length==1 &&
-							this.frames.length==1
-						) && (
-							FLfile.getAttributes(
-								this.file
-							).indexOf("D")>-1
-						)
-					)
-				)
-			){
-				FLfile.remove(this.file);
-				fileExists=false;
+			var folderRequired = (this.timelines.length > 1 || (this.frames.length>1 && !this.animated));
+			var path = (folderRequired?this.file:this.file+".svg");
+			var exists = FLfile.exists(path);
+
+			if(exists){
+				var isFolder = (FLfile.getAttributes(path).indexOf("D")!=-1);
+				if(folderRequired != isFolder){
+					FLfile.remove(path);
+					exists=false;
+				}
 			}
-
-			if(this.frames.length==1 || this.animated){
-
-				if(this.file && fileExists){
-					success = FLfile.remove(this.file);
-				}
-			}else{
-
-				if(this.file && !fileExists){
-					if(!FLfile.createFolder(this.file))
-						throw new Error('Problem creating folder.');
-				}
+			if(folderRequired && !exists){
+				if(!FLfile.createFolder(path))
+					throw new Error('Problem creating folder.');
 			}
 		},
 		processExpandUseNodes:function(){
@@ -440,7 +467,6 @@
 			// 		this.qData.push(closure(this.executeExpandUse, [symbol.@id, symbol, useList, this.doms[0].defs], this));
 			// 	}
 			// }
-
 
 			var onceUsed = this.expandSymbols=='usedOnce';
 			var nested = this.expandSymbols=='nested';
@@ -556,44 +582,44 @@
 			}
 			for(var k=0; k<this.timelines.length;k++){
 				var timeline = this.timelines[k];
-				var dom = this.doms[k];
-				if(this.frames.length==1 || this.animated){
-					documents = [dom];
-				}else{
+				//var dom = this.doms[k];
+				//if(this.frames.length==1 || this.animated){
+					//documents = [dom];
+				/*}else{
 					documents = this._splitXML(dom);
+				}*/
+				//for(var i=0;i<documents.length;i++){
+				//	var document = documents[i];
+				var document = this.doms[k];
+
+				if(this.applyTransformations){
+					this.applyMatrices(document);
 				}
-				for(var i=0;i<documents.length;i++){
-					var document = documents[i];
+				this._applyColorEffects(document,document.defs);
+				//this.deleteUnusedReferences(document);
+				document['@xmlns']="http://www.w3.org/2000/svg";
 
-					if(this.applyTransformations){
-						this.applyMatrices(document);
-					}
-					this._applyColorEffects(document,document.defs);
-					//this.deleteUnusedReferences(document);
-					document['@xmlns']="http://www.w3.org/2000/svg";
-
-					if(!document['@viewBox'].length()){
-						document['@viewBox']=String(this.x)+' '+String(this.y)+' '+String(this.width)+' '+String(this.height);
-						document.@width = this.width;
-						document.@height = this.height;
-					}
-
-					if(this.includeBackground){
-						document['@enable-background']='new '+document['@viewBox'];
-					}
-
-					if(this.file){
-						var outputObject = {};
-						outputObject.string= this.docString + document.toXMLString();
-						outputObject.id = document.@id;
-
-						this.qData.push(closure(this.processFixUseLinks, [outputObject], this));
-						this.qData.push(closure(this.processCompactColours, [outputObject], this));
-						this.qData.push(closure(this.processRemoveIdentMatrices, [outputObject], this));
-						this.qData.push(closure(this.processConvertHairlineStrokes, [outputObject], this));
-						this.qData.push(closure(this.processSaveFile, [documents, outputObject], this));
-					}
+				if(!document['@viewBox'].length()){
+					document['@viewBox']=String(this.x)+' '+String(this.y)+' '+String(this.width)+' '+String(this.height);
+					document.@width = this.width;
+					document.@height = this.height;
 				}
+
+				if(this.includeBackground){
+					document['@enable-background']='new '+document['@viewBox'];
+				}
+				var outputObject = {};
+				outputObject.string= this.docString + document.toXMLString();
+				outputObject.id = document.@id;
+
+				fl.trace("finalise: "+timeline.filePath);
+				this.qData.push(closure(this.processFixUseLinks, [outputObject], this));
+				this.qData.push(closure(this.processCompactColours, [outputObject], this));
+				this.qData.push(closure(this.processRemoveIdentMatrices, [outputObject], this));
+				this.qData.push(closure(this.processConvertHairlineStrokes, [outputObject], this));
+				this.qData.push(closure(this.processSaveFile, [outputObject, timeline.filePath], this));
+					
+				//}
 			}
 			if(ext.log){
 				ext.log.pauseTimer(timer);
@@ -643,10 +669,10 @@
 				ext.log.pauseTimer(timer);
 			}
 		},
-		processSaveFile:function(documents, outputObj){
-			if(documents.length==1){
-				success=FLfile.write(this.file,outputObj.string);
-			}else{
+		processSaveFile:function(outputObj, filePath){
+			//if(this.timelines.length==1){
+				success=FLfile.write(filePath, outputObj.string);
+			/*}else{
 				var rPath=decodeURIComponent(
 					String(
 						outputObj.id
@@ -656,7 +682,6 @@
 						'g'
 					)
 				);
-				fl.trace("id: "+rPath);
 				var rPathArray=rPath.split('/');
 				for(var n=0;n<rPathArray.length;n++){
 					rPathArray[n]=rPathArray[n].safeFileName();
@@ -676,9 +701,9 @@
 					outputPath,
 					outputObj.string
 				);
-			}
+			}*/
 			if(!success){
-				ext.warn('Problem writing '+outputPath||this.file);
+				ext.warn('Problem writing '+filePath);
 			}
 		},
 		processCleanup:function(){
@@ -701,20 +726,24 @@
 					}
 				}
 			}
-			this._timelineCopies = {};
 			/*
 			 * cleanup temporary items
 			 */
 			if(ext.lib.itemExists(this._tempFolder)){
 				ext.lib.deleteItem(this._tempFolder);	
 			}
+
+			this._timelineCopies = {};
 			ext.sel=this._origSelection;
 			var epSuccess=true;
 			if(this.swfPanel){
 				epSuccess=this.swfPanel.call('endProgress');	
 			}
 			if(epSuccess){
-				ext.message('Export Successful: '+this.file);
+				ext.message('Export Successful: ');
+				for(var i=0; i<this.timelines.length; ++i){
+					ext.message('\t'+this.timelines[i].filePath);
+				}
 			}
 		},
 		/**
@@ -999,9 +1028,9 @@
 			}*/
 			if(element instanceof ext.Instance){
 				if(element.instanceType=='symbol'){
-					result=this._getSymbolInstance(element,settings);
+					result=this._getSymbolInstance(element, settings);
 				}else if(element.instanceType=='bitmap'){
-					result=this._getBitmapInstance(element,settings);
+					result=this._getBitmapInstance(element, settings);
 				}
 			}else{
 				if(element instanceof ext.Shape){
@@ -1101,7 +1130,7 @@
 		 * @parameter {String} [options.color] A hexadecimal color value.
 		 * @private
 		 */
-		_getTimeline:function(timeline,options){
+		_getTimeline:function(timeline, options){
 			if(ext.log){
 				var timer=ext.log.startTimer('extensible.SVG._getTimeline()');	
 			}
@@ -1128,18 +1157,18 @@
 			var xml,instanceXML,id;
 			var frameCount = timeline.$.frameCount;
 
-			if(settings.startFrame>frameCount-1){
+			if(settings.startFrame > frameCount-1){
 				settings.startFrame = frameCount-1;
 			}
-			if(settings.endFrame > frameCount-1){
-				settings.endFrame = frameCount-1;
+			if(settings.endFrame > frameCount){
+				settings.endFrame = frameCount;
 			}
 
 			if(settings.frameCount==null){
-				settings.frameCount = settings.endFrame-settings.startFrame+1;
+				settings.frameCount = settings.endFrame - settings.startFrame;
 			}else{
-				if(settings.endFrame > settings.startFrame+settings.frameCount-1){
-					settings.endFrame = settings.startFrame+settings.frameCount-1;
+				if(settings.endFrame > settings.startFrame+settings.frameCount){
+					settings.endFrame = settings.startFrame+settings.frameCount;
 				}
 			}
 
@@ -1197,8 +1226,8 @@
 						var layer=layers[i];
 						if(layer.layerType=="guide" || layer.layerType=="folder")continue;
 
-						var layerEnd = settings.endFrame+1;
-						if(layerEnd>layer.frameCount)layerEnd = layer.frameCount;
+						var layerEnd = settings.endFrame;
+						if(layerEnd > layer.frameCount)layerEnd = layer.frameCount;
 
 						var layerSelected = false;
 						for(var n=settings.startFrame; n<layerEnd; ++n){
@@ -1256,8 +1285,8 @@
 					var frames = [];
 					for(var i=0;i<layers.length;i++){
 						var layer=layers[i];
-						var layerEnd = settings.endFrame+1;
-						if(layerEnd>layer.frameCount)layerEnd = layer.frameCount;
+						var layerEnd = settings.endFrame;
+						if(layerEnd > layer.frameCount)layerEnd = layer.frameCount;
 
 						for(var n=settings.startFrame; n<layerEnd; ++n){
 							var frame=layer.frames[n];
@@ -1291,7 +1320,7 @@
 
 				if(!settings.isRoot){
 					this._symbols[symbolIDString] = xml;
-					this._symbolToUseNodes[symbolIDString] = [instanceXML];
+					//this._symbolToUseNodes[symbolIDString] = [instanceXML];
 				}
 
 				if(this.animated){
@@ -1339,15 +1368,19 @@
 					var layer=layers[i];
 					if(layer.layerType=="guide" || layer.layerType=="folder")continue;
 
-					var layerEnd = settings.endFrame+1;
-					if(layerEnd>layer.frameCount)layerEnd = layer.frameCount;
+					var layerEnd = settings.endFrame;
+					if(layerEnd > layer.frameCount)layerEnd = layer.frameCount;
 
 					var doAnim = this.animated && layerEnd-settings.startFrame-1>1 && settings.frameCount!=1;
 
 					var lVisible=layer.visible;
 					var lLocked=layer.locked;
-					if(!lVisible){layer.visible=true;}
-					if(lLocked){layer.locked=false;}
+					if(!lVisible){
+						layer.visible=true;
+					}
+					if(lLocked){
+						layer.locked=false;
+					}
 
 					if(masked.length && layer.layerType!='masked'){
 						// masked layers have ended group
@@ -1526,7 +1559,7 @@
 								var elementXML=new XML('<g id="'+elementID+'"></g>');
 								this.qData.push(closure(this.processElement, [elementID, elementXML, element, elemSettings, dom], this));
 							}else{
-								var elementXML=this._getElement(
+								var elementXML = this._getElement(
 									element,elemSettings
 								);
 							}
@@ -1728,7 +1761,7 @@
 				instanceXML['@x']=vb[0];
 				instanceXML['@y']=vb[1];
 				instanceXML['@overflow']="visible";
-				this._symbolToUseNodes[symbolIDString].push(instanceXML);
+				//this._symbolToUseNodes[symbolIDString].push(instanceXML);
 			}
 			/*
 			 *  If this is a temporary scene, delete it and return to the original.
@@ -2146,17 +2179,17 @@
 			var timeline=instance.timeline;
 			var settings=new ext.Object({
 				startFrame:0,
-				endFrame: timeline.frames.length,
+				frameCount: timeline.frames.length,
 				matrix: new ext.Matrix(),
 				colorTransform: null,
 				libraryItem:instance.libraryItem
 			});
 			settings.extend(options);
-			ext.message("_getSymbolInstance: "+instance.libraryItem.name+" - loop:"+instance.loop+" frameCount:"+settings.frameCount+" startFrame:"+settings.startFrame);
+			//ext.message("_getSymbolInstance: "+instance.libraryItem.name+" - loop:"+instance.loop+" frameCount:"+settings.frameCount+" startFrame:"+settings.startFrame);
 			var dom = settings.dom;
 			//settings.matrix = instance.matrix.concat(settings.matrix);
 			settings.matrix = fl.Math.concatMatrix(instance.matrix, settings.matrix);
-			var xml = this._getTimeline(instance.timeline,settings);
+			var xml = this._getTimeline(instance.timeline, settings);
 			var filterID=this._getFilters(instance, options, dom.defs);
 			if(filterID && dom.defs.filter.(@id==filterID).length()){
 				xml['@filter']='url(#'+filterID+')';
@@ -2429,7 +2462,6 @@
 						*/
 					}else{
 						if(!color.percent.is([100,100,100,100])){
-								fl.trace("FILTER 2");
 							feColorMatrix=<feColorMatrix id={this._uniqueID('feColorMatrix')} />;
 							feColorMatrix.@type="matrix";
 							feColorMatrix['@in']=src;
@@ -2484,7 +2516,7 @@
 		_getBitmapItem:function(item){
 			var bitmapURI=this._bitmaps[item.name];
 			if(!bitmapURI){
-				if(this.timelines.length==1 && (this.timelines[0].frames.length==1 || this.animated)){
+				/*if(this.timelines.length==1 && (this.timelines[0].frames.length==1 || this.animated)){
 					bitmapURI=this.file.dir+'/'+item.name.basename;
 				}else{
 					bitmapURI=this.file+'/'+item.name;
@@ -2497,7 +2529,8 @@
 					if(!FLfile.exists(this.file)){
 						FLfile.createFolder(this.file);
 					}
-				}
+				}*/
+				bitmapURI=this.file+'/'+item.name;
 				var ext=item.sourceFilePath.extension;
 				var re=new RegExp('\.'+ext+'$');
 				if(!re.test(bitmapURI)){
@@ -3443,7 +3476,7 @@
 		 * Splits the xml into multiple documents. For use when exporting multiple root timelines.
 		 * @private
 		 */
-		_splitXML:function(inputXML){
+		/*_splitXML:function(inputXML){
 			if(ext.log){
 				var timer=ext.log.startTimer('extensible.SVG._splitXML()');	
 			}
@@ -3485,7 +3518,7 @@
 				ext.log.pauseTimer(timer);	
 			}
 			return documents;
-		},
+		},*/
 		_uniqueID:function(id,xml){
 			id = id.replace(' ',"_",'g');
 			var invalid=id.match(/[^A-Za-z\d\-\.\:]/g);
