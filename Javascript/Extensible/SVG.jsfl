@@ -1177,7 +1177,7 @@
 				symbolIDString += '_'+settings.color.idString; //should factor this out and use a transform
 			}
 			if(frameCount>1){
-				if(settings.startFrame==settings.endFrame){
+				if(settings.frameCount==1){
 					symbolIDString += '_f'+settings.startFrame;
 				}else if(settings.timeOffset!=null && settings.timeOffset>0){
 					symbolIDString += '_t'+Math.round(settings.timeOffset * Math.pow(10, this.decimalPointPrecision));
@@ -1306,7 +1306,7 @@
 				this._symbolBounds[symbolIDString] = boundingBox;
 			}
 			//ext.message("getTimeline: "+symbolIDString+" "+settings.startFrame+" "+settings.endFrame+" "+settings.frameCount+" "+isNew+" "+settings.timeOffset+" "+layers.length);
-			var instanceID=this._uniqueID(id);	
+			var instanceID = this._uniqueID(id);
 			instanceXML=new XML('<use xlink-href="#'+id+'" id="'+instanceID+'" />');
 			if(isNew){
 				instanceXML['@width']=0;
@@ -1342,12 +1342,12 @@
 					if(settings.totalDuration!=null){
 						animDur = settings.totalDuration;
 					}else{
-						if(this.repeatCount=="indefinite"){
+						/*if(this.repeatCount=="indefinite"){
 							// when looping, we behave as if the timeline is 1 frame shorter so the last KF acts as an end-point (making for seemless loops)
 							animDur = this.precision((totFrames-1)*(1/ext.doc.frameRate));
-						}else{
+						}else{*/
 							animDur = this.precision(totFrames*(1/ext.doc.frameRate));
-						}
+						//}
 					}
 
 					animNode.@dur = animDur+"s";
@@ -1356,6 +1356,7 @@
 				}
 				var animatedFrames = {};
 
+				var lastFrameTime = this.precision((settings.timeOffset + (settings.endFrame - settings.startFrame)*(1/ext.doc.frameRate))/animDur);
 				/*
 				 * Loop through the visible frames by layer &
 				 * either take note of the elements for linear
@@ -1371,7 +1372,7 @@
 					var layerEnd = settings.endFrame;
 					if(layerEnd > layer.frameCount)layerEnd = layer.frameCount;
 
-					var doAnim = this.animated && layerEnd-settings.startFrame-1>1 && settings.frameCount!=1;
+					var doAnim = this.animated && settings.endFrame-settings.startFrame>1 && settings.frameCount!=1;
 
 					var lVisible=layer.visible;
 					var lLocked=layer.locked;
@@ -1467,7 +1468,7 @@
 							ext.log.pauseTimer(timer2);
 						}
 
-						var doCollateFrames = (doAnim && !settings.flattenMotion  && items.length==1 && tweenType!="shape" && items[0].$.elementType=="instance");
+						var doCollateFrames = (doAnim && items.length==1 && tweenType!="shape" && items[0].$.elementType=="instance");
 						var frameEnd = n+1;
 						var transToDiff = false;
 						if(doCollateFrames){
@@ -1604,12 +1605,12 @@
 								this._addAnimFrame(frame, element, invMatrix, time, 0, 0, 0, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, alphaList, timeList, splineList);
 								
 								var lastRot = 0;
-
 								var lastFrame = frame;
-
 								var autoRotate = 0;
 
 								var mainElem = frame.elements[0];
+								var loopAnim = (n==settings.startFrame && frameEnd==settings.endFrame && settings.repeatCount=="indefinite" && layer.frames[frameEnd-1].startFrame==frameEnd-1);
+								var addTweenKiller = false;
 								for(var nextInd = n+1; nextInd<frameEnd; ++nextInd){
 									var nextFrame = layer.frames[nextInd];
 									if(nextFrame.startFrame!=nextInd)continue;
@@ -1617,7 +1618,8 @@
 									var attemptForeRot = true;
 									var attemptBackRot = true;
 									var time = (settings.timeOffset+nextInd*(1/ext.doc.frameRate))/animDur;
-									if(lastFrame.tweenType=="none" || lastFrame.duration==1){
+									var isLast = (nextFrame.duration + nextInd >= frameEnd);
+									if(addTweenKiller){
 										timeList.push(this.precision(time-0.0000001));
 									}else if(lastFrame.tweenType=="motion"){
 										tweensFound = true;
@@ -1663,35 +1665,39 @@
 									if(boundingBox.right<swingRight)boundingBox.right = swingRight;
 									if(boundingBox.bottom<swingBottom)boundingBox.bottom = swingBottom;
 
-									this._addAnimFrame(nextFrame, nextElement, invMatrix, time, rot, skewX, skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, alphaList, timeList, splineList);
-								
+									addTweenKiller = (nextFrame.tweenType=="none" && (!loopAnim || !isLast));
+									this._addAnimFrame(nextFrame, nextElement, invMatrix, time, rot, skewX, skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, alphaList, timeList, splineList, addTweenKiller);
+									
 									lastFrame = nextFrame;
 									lastRot = rot;
 
 									if(!transToDiff || nextInd<frameEnd-1)animatedFrames[i+"-"+nextInd] = true;
 									if(nextFrame.elements.length>1 || nextElement.libraryItem!=element.libraryItem)break;
 								}
-								if(lastFrame.tweenType=="none" || lastFrame.duration==1){
-									// this code works in tandem with code within _addAnimFrame which adds an 'end-point' to non-tweened frame runs
-									xList.pop();
-									yList.pop();
-									scxList.pop();
-									scyList.pop();
-									skxList.pop();
-									skyList.pop();
-									rotList.pop();
-									trxList.pop();
-									tryList.pop();
-									alphaList.pop();
-									splineList.pop();
+								if(addTweenKiller || loopAnim){
+									timeList.push((settings.timeOffset+nextInd*(1/ext.doc.frameRate))/animDur);
+									if(loopAnim){
+										// this code joins the end of the animation up with the start for seemless looping
+										xList.push(xList[0]);
+										yList.push(yList[0]);
+										scxList.push(scxList[0]);
+										scyList.push(scyList[0]);
+										skxList.push(skxList[0]);
+										skyList.push(skyList[0]);
+										rotList.push(rotList[0]);
+										trxList.push(trxList[0]);
+										tryList.push(tryList[0]);
+										alphaList.push(alphaList[0]);
+										splineList.push(splineList[0]);
+									}
 								}
-								// // the ordering of these animation nodes is important
-								this._addAnimationNode(elementXML, "translate", [xList, yList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount)
-								this._addAnimationNode(elementXML, "rotate", [rotList, trxList, tryList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, rotList.length>1)
-								this._addAnimationNode(elementXML, "skewX", [skxList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount)
-								this._addAnimationNode(elementXML, "skewY", [skyList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount)
-								this._addAnimationNode(elementXML, "scale", [scxList, scyList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, scxList.length>1)
-								this._addAnimationNode(elementXML, "opacity", [alphaList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount)
+								// the ordering of these animation nodes is important
+								this._addAnimationNode(elementXML, "translate", [xList, yList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, settings.flattenMotion)
+								this._addAnimationNode(elementXML, "rotate", [rotList, trxList, tryList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, settings.flattenMotion, rotList.length>1)
+								this._addAnimationNode(elementXML, "skewX", [skxList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, settings.flattenMotion)
+								this._addAnimationNode(elementXML, "skewY", [skyList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, settings.flattenMotion)
+								this._addAnimationNode(elementXML, "scale", [scxList, scyList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, settings.flattenMotion, scxList.length>1)
+								this._addAnimationNode(elementXML, "opacity", [alphaList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, settings.flattenMotion)
 
 								elementXML.@transform = this._getMatrix(matrix);
 
@@ -1705,13 +1711,19 @@
 									// this will add in extra time for frames with non changing content (which won't be included as a real frame)
 								}
 							}*/
-							var frameTimeStart = String(this.precision((settings.timeOffset + (n - settings.startFrame)*(1/ext.doc.frameRate))/animDur));
-							var frameTimeEnd = String(this.precision((settings.timeOffset + ((transToDiff?frameEnd-1:frameEnd) - settings.startFrame)*(1/ext.doc.frameRate))/animDur));
-							if(frameTimeEnd>1)frameTimeEnd = 1;
+
+							var lastFrameInd = (transToDiff?frameEnd-1:frameEnd)
+							lastFrameInd    += (lastFrameInd==layerEnd?1:0);
+							var frameTimeStart = this.precision((settings.timeOffset + (n - settings.startFrame)*(1/ext.doc.frameRate))/animDur);
+							var frameTimeEnd = this.precision((settings.timeOffset + (lastFrameInd - settings.startFrame)*(1/ext.doc.frameRate))/animDur);
+
+
 
 							if(frameTimeStart>1)fl.trace("START TIME WARNING: "+frameTimeStart+" "+settings.timeOffset+" "+animDur+" "+n+" "+settings.startFrame+" "+((n - settings.startFrame)*(1/ext.doc.frameRate)));
 							if(frameTimeEnd>1)fl.trace("END TIME WARNING: "+frameTimeEnd);
 
+							if(frameTimeEnd>1)frameTimeEnd = 1;
+							
 							if(items.length>0 && (frameTimeStart!=0 || frameTimeEnd!=1)){ // don't bother if element is always there
 								var fAnimNode = animNode.copy();
 								if(frameTimeStart==0){
@@ -1893,7 +1905,7 @@
 				return element.rotation;
 			}
 		},
-		_addAnimFrame:function(frame, element, invMatrix, time, rot, skewX, skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, alphaList, timeList, splineList){
+		_addAnimFrame:function(frame, element, invMatrix, time, rot, skewX, skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, alphaList, timeList, splineList, addTweenKiller){
 
 			var matrix = fl.Math.concatMatrix(element.matrix, invMatrix);
 			var transPoint = element.getTransformationPoint();
@@ -1949,7 +1961,7 @@
 			splineList.push(this._getSplineData(frame));
 			timeList.push(this.precision(time));
 
-			if(frame.tweenType=="none" || frame.duration==1){
+			if(addTweenKiller){
 				xList.push(xList[xList.length-1]);
 				yList.push(yList[yList.length-1]);
 				scxList.push(scxList[scxList.length-1]);
@@ -2038,7 +2050,7 @@
 			xml.appendChild(mg);
 			masked.clear();
 		},
-		_addAnimationNode:function(toNode, type, valueLists, times, totalTime, splineList, tweensFound, defaultValue, beginAnimation, repeatCount, force){
+		_addAnimationNode:function(toNode, type, valueLists, times, totalTime, splineList, tweensFound, defaultValue, beginAnimation, repeatCount, forceDiscrete, force){
 
 			if(defaultValue==null)defaultValue = 0;
 
@@ -2129,7 +2141,7 @@
 			animNode.@keyTimes = validT.join(";");
 			animNode.@values = validV.join(";");
 
-			if(tweensFound){
+			if(tweensFound && !forceDiscrete){
 				animNode.@keySplines = validS.join(";");
 				animNode.@calcMode="spline";
 			}else{
