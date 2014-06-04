@@ -2007,6 +2007,10 @@
 				var layer=layers[i];
 				var thisFrame = layer.frames[frame];
 				if(thisFrame){
+					if(thisFrame.tweenType=="motion"){
+						failed = true;
+						break;
+					}
 					for(var j=0; j<thisFrame.elements.length; j++){
 						var element = thisFrame.elements[j];
 						/*if(element.symbolType=="graphic" && element.loop!="single frame" && element.libraryItem.timeline.frameCount>1){
