@@ -12,5 +12,6 @@
     <file source="Javascript/Extensible" destination="$flash/Javascript"/>
     <file source="Tools/extensible.jsfl" destination="$flash/Tools"/>
     <file source="WindowSWF/SVG.swf" destination="$flash/WindowSWF"/>
+    <file source="WindowSWF/svg-help.xml" destination="$flash/WindowSWF"/>
   </files>
 </macromedia-extension>

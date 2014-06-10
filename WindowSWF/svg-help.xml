@@ -1,0 +1,78 @@
+<dialog title="Flash to SVG Help" buttons="cancel">
+  <grid>
+    <columns>
+      <column flex="1"/>
+      <column flex="2"/>
+    </columns>
+    <rows>
+      <row>
+        <label value="Decimal Places"/>
+      </row>
+      <row>
+        <label value=""/>
+        <label value="Controls how accurately numbers are stored in the resulting output. A smaller number reduces output size and accuracy."/>
+      </row>
+
+      <row>
+        <label value="Expand Symbols"/>
+      </row>
+      <row>
+        <label value=""/>
+        <label value="Controls which symbols will be expanded in the output. 'None' results in the smallest output size, 'All' results in the largest file but has potential performance benefits."/>
+      </row>
+      <row>
+        <label value=""/>
+        <label value="'Once Used' will only expand symbols which are only used once and is the recommended setting."/>
+      </row>
+
+      <row>
+        <label value="Before/After Anim"/>
+      </row>
+      <row>
+        <label value=""/>
+        <label value="Controls how the output looks when it is not being animated, this doesn't apply to auto-playing looping animations."/>
+      </row>
+      
+      <row>
+        <label value="Apply Transforms"/>
+      </row>
+      <row>
+        <label value=""/>
+        <label value="Whether matrix transforms should be applied into all child paths."/>
+      </row>
+      
+      <row>
+        <label value="Convert Patterns to Symbols"/>
+      </row>
+      <row>
+        <label value=""/>
+        <label value="Whether repeating bitmaps should be exported as reused symbols."/>
+      </row>
+      
+      <row>
+        <label value="Flatten motion tweens"/>
+      </row>
+      <row>
+        <label value=""/>
+        <label value="Should every frame be exported in tweens or just keyframes. Sometimes this can help the animations match those in flash more accurately."/>
+      </row>
+      
+      <row>
+        <label value="Fixed FPS"/>
+      </row>
+      <row>
+        <label value=""/>
+        <label value="When checked any easing between frames is turned off, resulting in an animation matching the FPS listed in flash."/>
+      </row>
+      
+      <row>
+        <label value="Loop full timeline tweens"/>
+      </row>
+      <row>
+        <label value=""/>
+        <label value="Will attempt to seemlessly animate the end of a tween back into it's beginning. Only applies when Fixed FPS is not being used."/>
+      </row>
+
+    </rows>
+  </grid>
+</dialog>

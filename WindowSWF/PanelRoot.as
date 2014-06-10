@@ -78,7 +78,6 @@ package{
 			stage.align=StageAlign.TOP_LEFT;
 			stage.scaleMode=StageScaleMode.NO_SCALE;
 
-			setTimeout(doIntro, 500); // delays allow components to initialise fully
 
 			var panelRef:PanelRoot = this;
 
@@ -124,6 +123,13 @@ package{
 			_exportSettings.addSetting(controlsLayout.flattenMotionCheckBox, "selected", "flattenMotion", false, true, radioGetter, radioSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.includeBackgroundCheckBox, "selected", "includeBackground", false, true, radioGetter, radioSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.loopCheckBox, "selected", "repeatCount", true, true, radioGetter, radioSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.loopTweensCheckBox, "selected", "loopTweens", true, true, radioGetter, radioSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.discreteEasingCheckBox, "selected", "discreteEasing", true, true, radioGetter, radioSetter, Event.CHANGE);
+
+			this.controlsLayout.flattenMotionCheckBox.addEventListener(Event.CHANGE, onFlattenMotionChanged);
+			this.controlsLayout.discreteEasingCheckBox.addEventListener(Event.CHANGE, onDiscreteEasingChanged);
+
+			this.controlsLayout.helpButton.addEventListener(MouseEvent.CLICK, onHelpClicked);
 
 			exportGroupsChanged();
 
@@ -189,10 +195,6 @@ package{
 			);
 			//ProgressBar
 			this.controlsLayout.progressBar.minimum=0;
-			//this.timer.repeatCount=2999;
-
-			// For some reasons, this only works after a delay...
-			//setTimeout(finSetup,500);
 
 
 			// Document change...
@@ -221,6 +223,8 @@ package{
 			documentChanged();
 
 			_exportSettings.init();
+
+			setTimeout(doIntro, 500); // delays allow components to initialise fully
 		}
 
 		private function documentChanged():void{
@@ -246,14 +250,10 @@ package{
 				fileName += ".svg";
 				_exportSettings.setDefaultForSetting("file",fileName);
 			}
-			finSetup();
-		}
-
-
-		private function finSetup():void{
 			onSourceChanged();
 			onFramesChanged();
 			onOutputChanged();
+			onFlattenMotionChanged();
 		}
 
 		private var _contHandler:Function;
@@ -346,9 +346,11 @@ package{
 		}
 
 		private function doIntro():void{
-			this.alpha = 1;
 			// this initialises the controls
 			controlsLogic.setSize(scrollPane.width-(scrollPane.verticalScrollBar.visible?15:0), scrollPane.height);
+			controlsLogic.update();
+
+			this.alpha = 1;
 
 			stage.addEventListener(Event.RESIZE,onStageResize);
 			onStageResize();
@@ -382,7 +384,20 @@ package{
 			this.controlsLayout.showFrameRow.visible = isAnim;
 			this.controlsLayout.flattenMotionCheckBox.visible = isAnim;
 			this.controlsLayout.loopCheckBox.visible = isAnim;
+			this.controlsLayout.discreteEasingCheckBox.visible = isAnim;
+			this.controlsLayout.loopTweensCheckBox.visible = isAnim;
+			this.controlsLayout.applyTransformationsCheckBox.visible = !isAnim;
 			controlsLogic.update();
+		}
+		private function onFlattenMotionChanged(e:Event=null):void{
+			this.controlsLayout.discreteEasingCheckBox.enabled = this.controlsLayout.flattenMotionCheckBox.selected;
+			onDiscreteEasingChanged();
+		}
+		private function onDiscreteEasingChanged(e:Event=null):void{
+			this.controlsLayout.loopTweensCheckBox.enabled = !this.controlsLayout.discreteEasingCheckBox.enabled || !this.controlsLayout.discreteEasingCheckBox.selected;
+		}
+		private function onHelpClicked(e:Event):void{
+			MMExecute('fl.getDocumentDOM().xmlPanel(fl.configURI + "/WindowSWF/svg-help.xml")');
 		}
 		
 		private function exportSVG(e:Event):void

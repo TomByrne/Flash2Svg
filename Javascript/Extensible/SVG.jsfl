@@ -63,7 +63,9 @@
 			clipToBoundingBox:false, // only relevant when source=='Selected Library Items'
 			beginAnimation:"0s",
 			repeatCount:"indefinite",
-			nonAnimatingShow:"start"
+			nonAnimatingShow:"start",
+			loopTweens:true,
+			discreteEasing:true
 		});
 		if(options instanceof XML || typeof(options)=='string'){
 			ext.Task.apply(this,[settings]);
@@ -124,6 +126,8 @@
 		if(this.output=='animation'){
 			this.animated = true;
 		}
+		if(this.animated)this.applyTransformations = false;
+		
 		if(typeof(this.curveDegree)=='string'){
 			this.curveDegree=['','','Quadratic','Cubic'].indexOf(this.curveDegree);
 		}
@@ -385,7 +389,9 @@
 					isRoot:true,
 					flattenMotion:this.flattenMotion,
 					beginAnimation:this.beginAnimation,
-					repeatCount:this.repeatCount
+					repeatCount:this.repeatCount,
+					loopTweens:this.loopTweens,
+					discreteEasing:this.discreteEasing
 				}
 			);
 			this._explodeNode(x, xml);
@@ -1267,6 +1273,10 @@
 								}
 								var end = start+frame.duration;
 								timeline.$.convertToKeyframes(start, end);
+								for(var v=start; v<end; v++){
+									var frame = layer.frames[v];
+									frame.hasCustomEase = false;
+								}
 								n = end-1;
 							}
 
@@ -1322,6 +1332,8 @@
 					this._symbols[symbolIDString] = xml;
 					//this._symbolToUseNodes[symbolIDString] = [instanceXML];
 				}
+
+				var forceDiscrete = settings.flattenMotion && settings.discreteEasing;
 
 				if(this.animated){
 					var totFrames = (settings.endFrame-settings.startFrame+1);
@@ -1513,7 +1525,6 @@
 							}
 						}
 
-
 						for(var j=0; j<items.length; ++j){
 							var element = items[j];
 							element.timeline = timeline;
@@ -1527,7 +1538,9 @@
 										frameCount:(frameEnd - n),
 										totalDuration:animDur,
 										beginAnimation:"0s",
-										repeatCount:settings.repeatCount
+										repeatCount:settings.repeatCount,
+										loopTweens:this.loopTweens,
+										discreteEasing:this.discreteEasing
 									};
 
 							if(element.symbolType=="graphic"){
@@ -1555,7 +1568,6 @@
 								elemSettings.totalDuration = (elemSettings.frameCount-1)*(1/ext.doc.frameRate);
 								elemSettings.repeatCount = "indefinite";
 							}
-
 							if(this._delayedProcessing){
 								var elementXML=new XML('<g id="'+elementID+'"></g>');
 								this.qData.push(closure(this.processElement, [elementID, elementXML, element, elemSettings, dom], this));
@@ -1609,7 +1621,7 @@
 								var autoRotate = 0;
 
 								var mainElem = frame.elements[0];
-								var loopAnim = (n==settings.startFrame && frameEnd==settings.endFrame && settings.repeatCount=="indefinite" && layer.frames[frameEnd-1].startFrame==frameEnd-1);
+								var loopAnim = (settings.loopTweens && n==settings.startFrame && frameEnd==settings.endFrame && settings.repeatCount=="indefinite" && layer.frames[frameEnd-1].startFrame==frameEnd-1);
 								var addTweenKiller = false;
 								for(var nextInd = n+1; nextInd<frameEnd; ++nextInd){
 									var nextFrame = layer.frames[nextInd];
@@ -1692,12 +1704,12 @@
 									}
 								}
 								// the ordering of these animation nodes is important
-								this._addAnimationNode(elementXML, "translate", [xList, yList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, settings.flattenMotion)
-								this._addAnimationNode(elementXML, "rotate", [rotList, trxList, tryList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, settings.flattenMotion, rotList.length>1)
-								this._addAnimationNode(elementXML, "skewX", [skxList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, settings.flattenMotion)
-								this._addAnimationNode(elementXML, "skewY", [skyList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, settings.flattenMotion)
-								this._addAnimationNode(elementXML, "scale", [scxList, scyList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, settings.flattenMotion, scxList.length>1)
-								this._addAnimationNode(elementXML, "opacity", [alphaList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, settings.flattenMotion)
+								this._addAnimationNode(elementXML, "translate", [xList, yList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete)
+								this._addAnimationNode(elementXML, "rotate", [rotList, trxList, tryList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete, rotList.length>1)
+								this._addAnimationNode(elementXML, "skewX", [skxList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete)
+								this._addAnimationNode(elementXML, "skewY", [skyList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete)
+								this._addAnimationNode(elementXML, "scale", [scxList, scyList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, scxList.length>1)
+								this._addAnimationNode(elementXML, "opacity", [alphaList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete)
 
 								elementXML.@transform = this._getMatrix(matrix);
 
@@ -1914,7 +1926,6 @@
 			skewX -= rot;
 			skewY -= rot;
 
-
 			// fl.trace("\trot: "+this.precision(rot)+" "+(rot * matrix.a * matrix.c * matrix.d > 0)+" "+matrix);
 			// fl.trace("\tcheck: ad:"+(matrix.a*matrix.d)+" bc:"+(matrix.b*matrix.c));
 			// fl.trace("\tcheck: sx:"+element.scaleX+" sy:"+element.scaleY);
@@ -1925,7 +1936,7 @@
 			//if(element.skewY < 0 && isNaN(element.rotation)){
 			if(Math.abs(element.skewY - element.skewX) > 90 && isNaN(element.rotation)){
 				rot = -rot;
-				//fl.trace("FLIP");
+				skewY = -skewY;
 			}
 
 			var rotRad = rot / 180 * Math.PI;
@@ -1951,7 +1962,7 @@
 			scyList.push(this.precision(matrix.d));
 
 			skxList.push(this.precision(this._getClosestRotList(-skewX, skxList)));
-			skyList.push(this.precision(this._getClosestRotList(-skewY, skyList)));
+			skyList.push(this.precision(this._getClosestRotList( skewY, skyList)));
 
 			trxList.push(transPoint.x);
 			tryList.push(transPoint.y);
@@ -2905,7 +2916,9 @@
 							frameCount:settings.frameCount,
 							//totalDuration:settings.totalDuration,
 							beginAnimation:settings.beginAnimation,
-							repeatCount:settings.repeatCount
+							repeatCount:settings.repeatCount,
+							loopTweens:this.loopTweens,
+							discreteEasing:this.discreteEasing
 						}
 					);
 					if(e){svg.appendChild(e);}

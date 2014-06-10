@@ -52,10 +52,13 @@ package{
 								layout.applyTransformationsCheckBox,
 								layout.convertPatternsToSymbolsCheckBox,
 								layout.flattenMotionCheckBox,
+								layout.discreteEasingCheckBox,
+								layout.loopTweensCheckBox,
 								layout.includeBackgroundCheckBox,
 								layout.loopCheckBox];
 
-			rightControls = [   layout.fileRow.button,
+			rightControls = [   layout.helpButton,
+								layout.fileRow.button,
 								layout.customFramesRow,
 								layout.presetRow.deleteButton,
 								layout.presetRow.saveButton];
@@ -79,6 +82,8 @@ package{
 						layout.applyTransformationsCheckBox,
 						layout.convertPatternsToSymbolsCheckBox,
 						layout.flattenMotionCheckBox,
+						layout.discreteEasingCheckBox,
+						layout.loopTweensCheckBox,
 						layout.includeBackgroundCheckBox,
 						layout.loopCheckBox];
 
@@ -103,6 +108,8 @@ package{
 						layout.applyTransformationsCheckBox,
 						layout.convertPatternsToSymbolsCheckBox,
 						layout.flattenMotionCheckBox,
+						layout.discreteEasingCheckBox,
+						layout.loopTweensCheckBox,
 						layout.includeBackgroundCheckBox,
 						layout.loopCheckBox];
 
