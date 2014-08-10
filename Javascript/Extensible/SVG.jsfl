@@ -1611,10 +1611,22 @@
 
 								var tweensFound = (frame.tweenType!="none" && frame.duration>1);
 
-								var matrix = element.matrix.clone();
+								var matrix;
+								var invMatrix;
+								if(this.showEndFrame){
+									for(var nextInd = n/*+1*/; nextInd<frameEnd; ++nextInd){
+										var nextFrame = layer.frames[nextInd];
+										if(nextFrame.startFrame!=nextInd)continue;
+										var nextElement = nextFrame.elements[0];
+									}
+									var matrix = new ext.Matrix(nextElement.matrix).clone();
+								}else{
+									var matrix = element.matrix.clone();
+								}
 								var invMatrix = matrix.invert();
+
 								var time = settings.timeOffset+(n*(1/ext.doc.frameRate))/animDur;
-								this._addAnimFrame(frame, element, invMatrix, time, 0, 0, 0, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, alphaList, timeList, splineList);
+								//this._addAnimFrame(frame, element, invMatrix, time, 0, 0, 0, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, alphaList, timeList, splineList);
 								
 								var lastRot = 0;
 								var lastFrame = frame;
@@ -1623,7 +1635,7 @@
 								var mainElem = frame.elements[0];
 								var loopAnim = (settings.loopTweens && n==settings.startFrame && frameEnd==settings.endFrame && settings.repeatCount=="indefinite" && layer.frames[frameEnd-1].startFrame==frameEnd-1);
 								var addTweenKiller = false;
-								for(var nextInd = n+1; nextInd<frameEnd; ++nextInd){
+								for(var nextInd = n/*+1*/; nextInd<frameEnd; ++nextInd){
 									var nextFrame = layer.frames[nextInd];
 									if(nextFrame.startFrame!=nextInd)continue;
 
