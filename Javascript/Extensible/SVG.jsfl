@@ -1591,9 +1591,6 @@
 									var timer2=ext.log.startTimer('extensible.SVG._getTimeline() >> Get keyframes');	
 								}
 
-								var firstRot = this._getRotation(element);
-								var firstSkX = element.skewX;
-								var firstSkY = element.skewY;
 
 								var xList = [];
 								var yList = [];
@@ -1613,15 +1610,26 @@
 
 								var matrix;
 								var invMatrix;
+								var firstRot;
+								var firstSkX;
+								var firstSkY;
 								if(this.showEndFrame){
 									for(var nextInd = n/*+1*/; nextInd<frameEnd; ++nextInd){
 										var nextFrame = layer.frames[nextInd];
 										if(nextFrame.startFrame!=nextInd)continue;
 										var nextElement = nextFrame.elements[0];
 									}
-									var matrix = new ext.Matrix(nextElement.matrix).clone();
+									matrix = new ext.Matrix(nextElement.matrix).clone();
+
+									firstRot = this._getRotation(nextElement);
+									firstSkX = nextElement.skewX;
+									firstSkY = nextElement.skewY;
 								}else{
-									var matrix = element.matrix.clone();
+									matrix = element.matrix.clone();
+
+									firstRot = this._getRotation(element);
+									firstSkX = element.skewX;
+									firstSkY = element.skewY;
 								}
 								var invMatrix = matrix.invert();
 
