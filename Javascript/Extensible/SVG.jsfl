@@ -3142,6 +3142,33 @@
 			if(controlPoints.length==0){
 				return;	
 			}
+			
+
+			//filter segments if they are discontinuous
+			if (controlPoints.length > 2)
+			{
+				var newControlPoints = new ext.Array([]);
+				newControlPoints.push(controlPoints[0]);
+
+				for(var i=1;i<controlPoints.length-1;i++){ //don't look at first or last segments
+					var currentSegment = controlPoints[i];
+					var prevSegment = controlPoints[i-1];
+					var nextSegment = controlPoints[i+1];
+					if ((currentSegment[0].is(prevSegment[0]) || currentSegment[0].is(prevSegment[prevSegment.length-1])
+						||currentSegment[0].is(nextSegment[0]) || currentSegment[0].is(nextSegment[nextSegment.length-1]))
+						&& 
+						(currentSegment[currentSegment.length-1].is(prevSegment[0]) || currentSegment[currentSegment.length-1].is(prevSegment[prevSegment.length-1])
+						||currentSegment[currentSegment.length-1].is(nextSegment[0]) || currentSegment[currentSegment.length-1].is(nextSegment[nextSegment.length-1])))
+						{
+							newControlPoints.push(currentSegment);
+						}
+
+				}
+
+				newControlPoints.push(controlPoints[controlPoints.length-1]);
+				controlPoints = newControlPoints;
+			}
+
 			var degPrefix=['M','L','Q','C'];
 			var deg=controlPoints[0].length-1;
 			var curveString=[degPrefix[0]+controlPoints[0][0].x+","+controlPoints[0][0].y+" "];
