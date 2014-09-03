@@ -1178,7 +1178,7 @@
 				}
 			}
 
-			var symbolIDString = timeline.name;
+			var symbolIDString = timeline.libraryItem.name.split("/").join("_");
 			if(settings.color){
 				symbolIDString += '_'+settings.color.idString; //should factor this out and use a transform
 			}
@@ -1219,9 +1219,9 @@
 				 */
 				var originalScene,timelines;
 				if(hasTweens){
-					if(settings.libraryItem==undefined){
-						originalScene=timeline.name;
-					}
+					/*if(settings.libraryItem==undefined){
+						originalScene=timeline.libraryItem.name;
+					}*/
 					timeline = this._getTimelineCopy(settings.libraryItem, timeline, settings.startFrame, settings.endFrame);
 					var layers = timeline.$.layers;
 
@@ -1489,7 +1489,10 @@
 							}
 							var mainElem = frame.elements[0];
 							var childFrame = mainElem.firstFrame;
-							if(mainElem.loop=="single frame" || frame.duration==1)var singleFrameStart = this._getPriorFrame(mainElem.libraryItem.timeline, mainElem.firstFrame);
+							//if(mainElem.loop=="single frame" || frame.duration==1){
+							if(mainElem.symbolType=="graphic"){
+								var singleFrameStart = this._getPriorFrame(mainElem.libraryItem.timeline, mainElem.firstFrame);
+							}
 							while(frameEnd<layerEnd){
 								var nextFrame = layer.frames[frameEnd];
 								if(nextFrame){
@@ -1501,8 +1504,8 @@
 										}else if(nextElem.libraryItem!=mainElem.libraryItem || mainElem.symbolType!=nextElem.symbolType || 
 														(mainElem.symbolType=="graphic" && mainElem.libraryItem.timeline.frameCount>1 &&
 													    ((nextElem.loop!=mainElem.loop && !((mainElem.loop=="single frame" || frame.duration==1) && (nextElem.loop=="single frame" || nextFrame.duration==1)))
-													 || (nextElem.loop!="single frame" && nextFrame.duration!=1) 
-													 || (singleFrameStart!=this._getPriorFrame(nextElem.libraryItem.timeline, nextElem.firstFrame)))
+													// || (nextElem.loop!="single frame" && nextFrame.duration!=1) 
+													 || (singleFrameStart!=this._getPriorFrame(nextElem.libraryItem.timeline, nextElem.firstFrame + (nextElem.loop=="single frame"?0:nextFrame.duration))))
 													    )){
 											//tweening to different symbol
 											++frameEnd;
@@ -1878,10 +1881,10 @@
 		},
 		_timelineCopies:null,
 		_getTimelineCopy:function(libraryItem, timeline, startFrame, endFrame){
-			var list = this._timelineCopies[timeline.name];
+			var list = this._timelineCopies[libraryItem.name];
 			if(!list){
 				list = [];
-				this._timelineCopies[timeline.name] = list;
+				this._timelineCopies[libraryItem.name] = list;
 			}else{
 				for(var i=0; i<list.length; ++i){
 					var pack = list[i];
@@ -1901,8 +1904,6 @@
 			}
 
 			if(libraryItem==undefined){
-				originalScene=timeline.name;
-
 				ext.doc.editScene(ext.doc.timelines.indexOf(timeline.$));
 				ext.doc.duplicateScene();
 				//ext.doc.editScene(ext.doc.timelines.indexOf(timeline.$)+1); // edit new scene (after duplication current scene changes to last scene)
@@ -1910,7 +1911,7 @@
 				timelines=ext.doc.timelines;
 				timeline = new ext.Timeline(timelines[ext.doc.timelines.indexOf(timeline.$)+1]);
 			}else{
-				var tempName=this._tempFolder+'/'+libraryItem.name;
+				var tempName = ext.lib.uniqueName(this._tempFolder+'/'+libraryItem.name);
 				if(!ext.lib.itemExists(tempName.dir)){
 					ext.lib.addNewItem('folder',tempName.dir);
 				}
@@ -2036,6 +2037,8 @@
 			
 			for(var i=0; i<layers.length && !failed; i++){
 				var layer=layers[i];
+				if(layer.layerType=='guide')continue;
+
 				var thisFrame = layer.frames[frame];
 				if(thisFrame){
 					if(thisFrame.tweenType=="motion"){
