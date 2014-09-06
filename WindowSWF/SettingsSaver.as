@@ -160,14 +160,14 @@ package{
 				if(MMExecute('extensible.doc.getTimeline().libraryItem!=null')=='true'){
 					if(MMExecute('extensible.doc.getTimeline().libraryItem.hasData("'+_documentSaveName+'")')=='true'){
 						xml = new XML(MMExecute('extensible.doc.getTimeline().libraryItem.getData("'+_documentSaveName+'")'));
-						updateSettingGroup(_currentSettings, deserialise(xml), true);
+						updateSettingGroup(_currentSettings, deserialise(xml), true, true);
 					}else{
 						clearNonCarryOver(_currentSettings, true);
 					}
 				}else{
 					if(MMExecute('extensible.doc.documentHasData("'+_documentSaveName+"_"+MMExecute('extensible.doc.currentTimeline')+'")')=='true'){
 						xml = new XML(MMExecute('extensible.doc.getDataFromDocument("'+_documentSaveName+"_"+MMExecute('extensible.doc.currentTimeline')+'")'));
-						updateSettingGroup(_currentSettings, deserialise(xml), true);
+						updateSettingGroup(_currentSettings, deserialise(xml), true, true);
 					}else{
 						clearNonCarryOver(_currentSettings, true);
 					}
@@ -249,17 +249,17 @@ package{
 			return true;
 		}
 
-		public function addSetting(object:Object, prop:String, settingName:String, defValue:*, diskSave:Boolean=true, getter:Function=null, setter:Function=null, event:String=null, carryValue:Boolean=true):void{
-			var setting:SettingDefinition = new SettingDefinition(object, prop, settingName, defValue, diskSave, getter, setter, carryValue);
+		public function addSetting(object:Object, prop:String, settingName:String, defValue:*, diskSave:Boolean=true, getter:Function=null, setter:Function=null, event:String=null, carryValue:Boolean=true, migrateValues:Object=null):void{
+			var setting:SettingDefinition = new SettingDefinition(object, prop, settingName, defValue, diskSave, getter, setter, carryValue, migrateValues);
 			_settingsDefs.push(setting);
-			updateSetting(object, prop);
+			updateSetting(object, prop, defValue);
 
 			if(event){
 				(object as EventDispatcher).addEventListener( event, makeUpdateHandler(object, prop));
 			}
 		}
 
-		public function updateSetting(object:Object, prop:String, doSave:Boolean=false):void{
+		public function updateSetting(object:Object, prop:String, defValue:*=null):void{
 			var def:SettingDefinition = getSettingDef(object, prop);
 			var value:*;
 			if(def.getter!=null){
@@ -267,7 +267,14 @@ package{
 			}else{
 				value = object[prop];
 			}
-			
+			if(value==null && defValue!=null){
+				value = defValue;
+				if(def.setter!=null){
+					def.setter(def.object, def.prop, value);
+				}else{
+					def.object[def.prop] = value;
+				}
+			}
 			_currentSettings.setSetting(def.settingName, value);
 			checkState();
 
@@ -345,7 +352,7 @@ package{
 			setState(STATE_LOADED);
 		}
 
-		private function updateSettingGroup(update:SettingGroup, withGroup:SettingGroup, updateObjects:Boolean):void{
+		private function updateSettingGroup(update:SettingGroup, withGroup:SettingGroup, updateObjects:Boolean, doMigration:Boolean=false):void{
 			for each(var settingDef in _settingsDefs){
 				var value:* = withGroup.getSetting(settingDef.settingName);
 
@@ -353,6 +360,9 @@ package{
 					if(settingDef.carryValue)continue;
 
 					value = settingDef.defValue;
+				}else if(doMigration && settingDef.migrateValues){
+					var migrate = settingDef.migrateValues[value];
+					if(migrate)value = migrate;
 				}
 
 				update.setSetting(settingDef.settingName, value);
@@ -436,8 +446,9 @@ class SettingDefinition{
 	public var getter:Function;
 	public var setter:Function;
 	public var carryValue:Boolean;
+	public var migrateValues:Object;
 
-	public function SettingDefinition(object:Object, prop:String, settingName:String, defValue:*, diskSave:Boolean, getter:Function, setter:Function, carryValue:Boolean){
+	public function SettingDefinition(object:Object, prop:String, settingName:String, defValue:*, diskSave:Boolean, getter:Function, setter:Function, carryValue:Boolean, migrateValues:Object){
 		this.object = object;
 		this.prop = prop;
 		this.defValue = defValue;
@@ -446,5 +457,6 @@ class SettingDefinition{
 		this.getter = getter;
 		this.setter = setter;
 		this.carryValue = carryValue;
+		this.migrateValues = migrateValues;
 	}
 }

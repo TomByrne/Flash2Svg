@@ -94,49 +94,6 @@ package{
 			_dev = true;
 			var jsDir:String = MMExecute('extensible.dir');
 
-			_panelSettings = new SettingsSaver(jsDir+'/Settings/SVGPanel/', true);
-			_panelSettings.addSetting(this, "dev", "dev", _dev);
-			_panelSettings.setSettingTitle("Settings", true);
-
-			_exportSettings = new SettingsSaver(jsDir+'/Settings/SVG/', false, confirmOverwrite, "SVGExportOptions", this.swfPanelName);
-			_exportSettings.addEventListener(SettingsSaver.EVENT_STATE_CHANGED, exportStateChanged);
-			_exportSettings.addEventListener(SettingsSaver.EVENT_GROUPS_CHANGED, exportGroupsChanged);
-
-			_exportSettings.addSetting(controlsLayout.fileRow.input, "text", "file", null, false, fileGetter, fileSetter, Event.CHANGE, false);
-			_exportSettings.addSetting(controlsLayout.sourceRow.input, "selectedIndex", "source", "current", false, comboGetter, comboSetter, Event.CHANGE);
-			_exportSettings.addSetting(controlsLayout.framesRow.input, "selectedIndex", "frames", "all", false, comboGetter, comboSetter, Event.CHANGE);
-			_exportSettings.addSetting(controlsLayout.outputRow.input, "selectedIndex", "output", "animation", false, comboGetter, comboSetter, Event.CHANGE);
-			_exportSettings.addSetting(controlsLayout.clippingRow.clipToScalingGridRadioButton, "selected", "clipToScalingGrid", false, false, radioGetter, radioSetter, Event.CHANGE);
-			_exportSettings.addSetting(controlsLayout.clippingRow.clipToBoundingBoxRadioButton, "selected", "clipToBoundingBox", true, false, radioGetter, radioSetter, Event.CHANGE);
-			_exportSettings.addSetting(controlsLayout.customFramesRow.startFrameNumericStepper, "value", "startFrame", 0, false, null, null, Event.CHANGE);
-			_exportSettings.addSetting(controlsLayout.customFramesRow.endFrameNumericStepper, "value", "endFrame", 0, false, null, null, Event.CHANGE);
-
-			_exportSettings.addSetting(controlsLayout.masksRow.input, "selectedIndex", "maskingType", "clipping", true, comboGetter, comboSetter, Event.CHANGE);
-			_exportSettings.addSetting(controlsLayout.decimalRow.input, "value", "decimalPointPrecision", 3, true, null, null, Event.CHANGE);
-			_exportSettings.addSetting(controlsLayout.curvesRow.input, "selectedIndex", "curveDegree", 2, true, comboGetter, comboSetter, Event.CHANGE);
-			_exportSettings.addSetting(controlsLayout.expandRow.input, "selectedIndex", "expandSymbols", "usedOnce", true, comboGetter, comboSetter, Event.CHANGE);
-			_exportSettings.addSetting(controlsLayout.beginRow.input, "selectedIndex", "beginAnimation", "0s", true, comboGetter, comboSetter, Event.CHANGE);
-			_exportSettings.addSetting(controlsLayout.showFrameRow.input, "selectedIndex", "nonAnimatingShow", "start", true, comboGetter, comboSetter, Event.CHANGE);
-			_exportSettings.addSetting(controlsLayout.renderingRow.input, "selectedIndex", "rendering", "auto", true, comboGetter, comboSetter, Event.CHANGE);
-			_exportSettings.addSetting(controlsLayout.applyTransformationsCheckBox, "selected", "applyTransformations", true, true, radioGetter, radioSetter, Event.CHANGE);
-			_exportSettings.addSetting(controlsLayout.convertPatternsToSymbolsCheckBox, "selected", "convertPatternsToSymbols", true, true, radioGetter, radioSetter, Event.CHANGE);
-			_exportSettings.addSetting(controlsLayout.flattenMotionCheckBox, "selected", "flattenMotion", false, true, radioGetter, radioSetter, Event.CHANGE);
-			_exportSettings.addSetting(controlsLayout.includeBackgroundCheckBox, "selected", "includeBackground", false, true, radioGetter, radioSetter, Event.CHANGE);
-			_exportSettings.addSetting(controlsLayout.loopCheckBox, "selected", "repeatCount", true, true, radioGetter, radioSetter, Event.CHANGE);
-			_exportSettings.addSetting(controlsLayout.loopTweensCheckBox, "selected", "loopTweens", true, true, radioGetter, radioSetter, Event.CHANGE);
-			_exportSettings.addSetting(controlsLayout.discreteEasingCheckBox, "selected", "discreteEasing", true, true, radioGetter, radioSetter, Event.CHANGE);
-
-			this.controlsLayout.flattenMotionCheckBox.addEventListener(Event.CHANGE, onFlattenMotionChanged);
-			this.controlsLayout.discreteEasingCheckBox.addEventListener(Event.CHANGE, onDiscreteEasingChanged);
-
-			this.controlsLayout.helpButton.addEventListener(MouseEvent.CLICK, onHelpClicked);
-
-			exportGroupsChanged();
-
-			if(_exportSettings.state==SettingsSaver.STATE_UNLOADED){
-				_panelSettings.setToFirst(false);
-			}
-
 
 			this.controlsLayout.sourceRow.input.dataProvider = new DataProvider([{label:'Current Timeline', showBoundsInput:false, 	data:"current"},
 																			{label:'Selected Library Items', showBoundsInput:true, 	data:"libraryItems"}]);
@@ -159,6 +116,51 @@ package{
 																				 {label:'All', 				data:"all"},
 																				 {label:'None', 			data:"none"},
 																				 {label:'Nested', 			data:"nested"}]);
+
+			_panelSettings = new SettingsSaver(jsDir+'/Settings/SVGPanel/', true);
+			_panelSettings.addSetting(this, "dev", "dev", _dev);
+			_panelSettings.setSettingTitle("Settings", true);
+
+			_exportSettings = new SettingsSaver(jsDir+'/Settings/SVG/', false, confirmOverwrite, "SVGExportOptions", this.swfPanelName);
+			_exportSettings.addEventListener(SettingsSaver.EVENT_STATE_CHANGED, exportStateChanged);
+			_exportSettings.addEventListener(SettingsSaver.EVENT_GROUPS_CHANGED, exportGroupsChanged);
+
+			_exportSettings.addSetting(controlsLayout.fileRow.input, "text", "file", null, false, fileGetter, fileSetter, Event.CHANGE, false);
+			_exportSettings.addSetting(controlsLayout.sourceRow.input, "selectedIndex", "source", "current", false, comboGetter, comboSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.framesRow.input, "selectedIndex", "frames", "all", false, comboGetter, comboSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.outputRow.input, "selectedIndex", "output", "animation", false, comboGetter, comboSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.clippingRow.clipToScalingGridRadioButton, "selected", "clipToScalingGrid", false, false, radioGetter, radioSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.clippingRow.clipToBoundingBoxRadioButton, "selected", "clipToBoundingBox", true, false, radioGetter, radioSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.customFramesRow.startFrameNumericStepper, "value", "startFrame", 0, false, null, null, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.customFramesRow.endFrameNumericStepper, "value", "endFrame", 0, false, null, null, Event.CHANGE);
+
+			_exportSettings.addSetting(controlsLayout.masksRow.input, "selectedIndex", "maskingType", "clipping", true, comboGetter, comboSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.decimalRow.input, "value", "decimalPointPrecision", 3, true, null, null, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.curvesRow.input, "selectedIndex", "curveDegree", 2, true, comboGetter, comboSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.expandRow.input, "selectedIndex", "expandSymbols", "usedOnce", true, comboGetter, comboSetter, Event.CHANGE, true, {All:"all", None:"none", Nested:"nested"});
+			_exportSettings.addSetting(controlsLayout.beginRow.input, "selectedIndex", "beginAnimation", "0s", true, comboGetter, comboSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.showFrameRow.input, "selectedIndex", "nonAnimatingShow", "start", true, comboGetter, comboSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.renderingRow.input, "selectedIndex", "rendering", "auto", true, comboGetter, comboSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.applyTransformationsCheckBox, "selected", "applyTransformations", true, true, radioGetter, radioSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.convertPatternsToSymbolsCheckBox, "selected", "convertPatternsToSymbols", true, true, radioGetter, radioSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.flattenMotionCheckBox, "selected", "flattenMotion", false, true, radioGetter, radioSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.includeBackgroundCheckBox, "selected", "includeBackground", false, true, radioGetter, radioSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.loopCheckBox, "selected", "repeatCount", true, true, radioGetter, radioSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.loopTweensCheckBox, "selected", "loopTweens", true, true, radioGetter, radioSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.discreteEasingCheckBox, "selected", "discreteEasing", true, true, radioGetter, radioSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.removeGroupsCheckBox, "selected", "removeGroups", true, true, radioGetter, radioSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.compactOutputCheckBox, "selected", "compactOutput", true, true, radioGetter, radioSetter, Event.CHANGE);
+
+			this.controlsLayout.flattenMotionCheckBox.addEventListener(Event.CHANGE, onFlattenMotionChanged);
+			this.controlsLayout.discreteEasingCheckBox.addEventListener(Event.CHANGE, onDiscreteEasingChanged);
+
+			this.controlsLayout.helpButton.addEventListener(MouseEvent.CLICK, onHelpClicked);
+
+			exportGroupsChanged();
+
+			if(_exportSettings.state==SettingsSaver.STATE_UNLOADED){
+				_panelSettings.setToFirst(false);
+			}
 			
 			//Inputs
 			this.controlsLayout.fileRow.button.addEventListener(
@@ -335,6 +337,7 @@ package{
 					return;
 				}
 			}
+			Fl.log("WARNING: Unknown option '"+value+"' for property '"+prop+"'");
 			combo.selectedIndex = -1;
 		}
 		private function comboGetter(combo:ComboBox, prop:String):String{

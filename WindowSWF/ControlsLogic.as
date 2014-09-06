@@ -55,7 +55,9 @@ package{
 								layout.discreteEasingCheckBox,
 								layout.loopTweensCheckBox,
 								layout.includeBackgroundCheckBox,
-								layout.loopCheckBox];
+								layout.loopCheckBox,
+								layout.removeGroupsCheckBox,
+								layout.compactOutputCheckBox];
 
 			rightControls = [   layout.helpButton,
 								layout.fileRow.button,
@@ -85,7 +87,9 @@ package{
 						layout.discreteEasingCheckBox,
 						layout.loopTweensCheckBox,
 						layout.includeBackgroundCheckBox,
-						layout.loopCheckBox];
+						layout.loopCheckBox,
+						layout.removeGroupsCheckBox,
+						layout.compactOutputCheckBox];
 
 			enable = [layout.fileRow.input,
 						layout.sourceRow.input,
@@ -111,7 +115,9 @@ package{
 						layout.discreteEasingCheckBox,
 						layout.loopTweensCheckBox,
 						layout.includeBackgroundCheckBox,
-						layout.loopCheckBox];
+						layout.loopCheckBox,
+						layout.removeGroupsCheckBox,
+						layout.compactOutputCheckBox];
 
 		}
 

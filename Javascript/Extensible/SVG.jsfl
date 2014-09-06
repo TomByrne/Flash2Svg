@@ -21,9 +21,10 @@
 		this.STATE_DELETE_EXISTING_FILES = 3;
 		this.STATE_EXPANDING_USE_NODES = 4;
 		this.STATE_REMOVING_UNUSED_SYMBOLS = 5;
-		this.STATE_FINALISING_FILES = 6;
-		this.STATE_CLEANUP = 7;
-		this.STATE_DONE = 8;
+		this.STATE_SIMPLIFYING_FRAMES = 6;
+		this.STATE_FINALISING_FILES = 7;
+		this.STATE_CLEANUP = 8;
+		this.STATE_DONE = 9;
 
 		var settings=new ext.Object({
 			file:undefined,
@@ -52,7 +53,7 @@
 			x:0,y:0,
 			width:ext.doc.width,
 			height:ext.doc.height,
-			docString:'<?xml version="1.0" encoding="utf-8"?>\n<!-- Generator: flash2svg, http://dissentgraphics.com/tools/flash2svg -->\n',
+			docString:'<?xml version="1.0" encoding="utf-8"?>\n',
 			version:'1.1',
 			baseProfile:'basic',
 			log:ext.doc.pathURI.stripExtension()+'.log.csv', // debugging log
@@ -65,7 +66,9 @@
 			repeatCount:"indefinite",
 			nonAnimatingShow:"start",
 			loopTweens:true,
-			discreteEasing:true
+			discreteEasing:true,
+			removeGroups:true,
+			compactOutput:true
 		});
 		if(options instanceof XML || typeof(options)=='string'){
 			ext.Task.apply(this,[settings]);
@@ -311,6 +314,9 @@
 				case this.STATE_REMOVING_UNUSED_SYMBOLS:
 					//this.qData.push(closure(this.processRemoveUnused, [], this));
 					break;
+				case this.STATE_SIMPLIFYING_FRAMES:
+					this.qData.push(closure(this.processSimplifyFrames, [], this));
+					break;
 				case this.STATE_FINALISING_FILES:
 					this.qData.push(closure(this.processFinaliseDocuments, [], this));
 					break;
@@ -354,6 +360,7 @@
 			this._timelineCopies = {};
 			this._symbols={};
 			this._symbolBounds={};
+			this._fillMap={};
 			this._maskFilter = null;
 
 			var timelineIndex = this._timelineIndex;
@@ -511,7 +518,7 @@
 				if(symbol && symbol.length() && (!nested || (symbol[0]..use && symbol[0]..use.length()))
 					&& (!onceUsed || useList.length==1)){
 
-					fl.trace("executeExpandUse: "+id+" "+useList.length);
+					//fl.trace("executeExpandUse: "+id+" "+useList.length+" "+onceUsed);
 					this.executeExpandUse(id, symbol, useList, defs);
 
 					if(isNaN(element.childIndex())){
@@ -552,57 +559,187 @@
 				ext.log.pauseTimer(timer);
 			}
 		},
-		/*processRemoveUnused:function(){
-			var onceUsed = this.expandSymbols=='usedOnce';
+		processSimplifyFrames:function(){
+			if(!this.removeGroups)return;
+
+			this._doneSimplified = [];
 			for(var i=0; i<this.doms.length; ++i){
 				var dom = this.doms[i];
-				this.qData.push(closure(this.checkUnused, [dom.defs.symbol[0], dom, dom..use], this));
+				this.qData.push(closure(this.simplifyFrame, [dom], this));
 			}
 		},
-		checkUnused:function(element, root, useNodes){
-			var id = "#"+element.@id;
-			var useNodes = root..use;
-			var found = false;
-			for(var i=0; i<useNodes.length(); ++i){
-				var useNode = useNodes[i];
-				if(useNode['@xlink-href']==id){
-					found = true;
-					break;
+		simplifyFrame:function(frameNode, verbose){
+			if(ext.log){
+				var timer=ext.log.startTimer('extensible.SVG.simplifyFrame()');	
+			}
+			var copy = frameNode.toXMLString();
+
+			var length = frameNode.children().length();
+			var frameName = frameNode.localName();
+			if(frameName!="mask" && frameName!="g" && frameName!="symbol"){
+				for(var i=0; i<length; ++i){
+					this.qData.unshift(closure(this.simplifyFrame, [frameNode.children()[i]], this));
 				}
+				return;
 			}
-			var parent = element.parent();
-			var index = element.childIndex();
-			if(!found){
-				delete parent.children()[index];
-				--index;
+			//verbose = true;
+
+			var searchChildren = [];
+			var i=0;
+			if(verbose)fl.trace("\n\nBEFORE:\n"+frameNode.toXMLString());
+			var toDelete = [];
+			var graphChildren = frameNode.g.length() + frameNode.path.length();
+			var canExplode = frameName=="g";
+			while( i<length ){
+				var childNode = frameNode.children()[i];
+				var name = childNode.localName();
+				if(verbose)fl.trace(">> "+i+"/"+length+" "+name+" "+childNode.animate.length()+" "+childNode.animateTransform.length()+" "+childNode.@transform.length());
+				if(name=="g"){
+					var animTransNodes = childNode.animateTransform.length();
+					var animNodes = animTransNodes + childNode.animate.length();
+					if((animTransNodes && childNode.@transform.length() && (graphChildren > 1 || !canExplode)) ||
+						(animNodes && graphChildren > 1) ||
+						childNode.@mask.length()>0){
+						/*
+							Sometimes a group can't be expanded because it serves as an animation
+							container, or a mask container.
+						*/
+						searchChildren.push(childNode);
+						++i;
+						continue;
+					}
+					if(verbose)fl.trace("\n\nBEF:\n"+frameNode.toXMLString());
+
+					doSearchSelf = true;
+					var hasTrans = childNode.@transform.length()>0;
+					var parentTakenTrans = false;
+					var grandchild = childNode.children().length();
+					if(hasTrans){
+						var trans = childNode.@transform.toString();
+						var transMat = new ext.Matrix(trans);
+
+						/*
+							Count how many graphic children don't have transforms so we know whether breaking the
+							group apart will actually increase file size.
+						*/
+						var noTransCount = 0;
+						var sameTrans = true;
+						var childTrans = null;
+						for(var k=0; k<grandchild; k++){
+							var newChild = childNode.children()[k];
+							if(newChild.@transform.length()==0){
+								noTransCount++;
+								sameTrans = false;
+							}else if(sameTrans){
+								if(!childTrans){
+									childTrans = newChild.@transform.toString();
+								}else if(newChild.@transform.toString()!=childTrans){
+									sameTrans = false;
+								}
+							}
+						}
+						if(grandchild>1 && sameTrans && !animTransNodes){
+							/*
+								Here we can check if all children have the same transform and, if so,
+								move it to the parent (and skip expansion by setting noTransCount).
+							*/
+							this._applyMatrix(childNode, childTrans, new ext.Matrix(childTrans), true);
+							noTransCount = grandchild;
+							for(var k=0; k<grandchild; k++){
+								var newChild = childNode.children()[k];
+								delete newChild.@transform;
+							}
+							//fl.trace("SAME TRANS: "+childTrans+"\n"+frameNode.toXMLString());
+							parentTakenTrans = true;
+						}
+						if(noTransCount > 2){
+							/*
+								If a group has many children without transforms, it's not worth expanding.
+							*/
+							searchChildren.push(childNode);
+							++i;
+							//fl.trace("TOO MANY EMPTY: "+noTransCount);
+							continue;
+						}
+
+						if(graphChildren==1 && canExplode && noTransCount && !parentTakenTrans){
+							/*
+								if there are no siblings which would be negatively effected, we just move the transform to the parent
+								instead of cluttering the children with transforms (unless all of the children already have transforms)
+							*/
+							this._applyMatrix(frameNode, trans, transMat, true);
+							parentTakenTrans = true;
+						}
+					}
+					var lastChild = childNode;
+					var lastIndex = i;
+					for(var k=0; k<grandchild; k++){
+						var newChild = childNode.children()[k];
+						frameNode.insertChildAfter(lastChild, newChild);
+						newChild = frameNode.children()[lastIndex + 1];
+						if(hasTrans && !parentTakenTrans){
+							this._applyMatrix(newChild, trans, transMat, false);
+							/*if(!newChild.@transform.length()){
+								newChild.@transform = trans;
+							}else{
+								var childTrans = new ext.Matrix(newChild.@transform.toString());
+								var mat = childTrans.concat(transMat);
+								fl.trace("\nC MERGE: "+k+"/"+childNode.children().length()+"\n"+newChild.@transform.toString()+" + "+trans+" = "+this._getMatrix(mat));
+								newChild.@transform = this._getMatrix(mat);
+							}*/
+						}
+						for(var j=0; j<childNode.attributes().length(); j++){
+							var attr = childNode.attributes()[j];
+							if(attr.name()=="id"){
+								if(frameNode.@id.length()==0)frameNode.@id = attr.toXMLString();
+								continue;
+							}
+							if(!hasTrans || attr.name()!="transform")newChild.@[attr.name()] = attr.toXMLString();
+						}
+						lastChild = newChild;
+						lastIndex++;
+						//if(verbose)fl.trace("ADD: "+i+"/"+frameNode.children().length()+" "+lastIndex);
+					}
+					var lengthWas = frameNode.children().length();
+					delete frameNode.children()[i];
+					if(frameNode.children().length() == lengthWas){
+						toDelete.push(i);
+						i++
+					}
+					if(verbose)fl.trace("\nAFT: "+hasTrans+" "+trans+" "+frameNode.children().length()+" "+length+"\n"+frameNode.toXMLString());
+
+
+					length = frameNode.children().length();
+					graphChildren = frameNode.g.length() + frameNode.path.length();
+					continue;
+
+				}
+				++i;
 			}
-
-			var siblings = parent.children();
-			if(index==siblings.length()-1)return; // done
-
-			this.qData.unshift(closure(this.checkUnused, [siblings[index+1], root, useNodes], this));
-		},*/
+			if(verbose)fl.trace("DELETE: "+frameNode.children().length()+" "+toDelete.length);
+			for(var i=0; i<toDelete.length; i++){
+				delete frameNode.children()[toDelete[i]];
+			}
+			if(verbose)fl.trace("\nAFTER: "+frameNode.children().length()+" "+length+"\n"+frameNode.toXMLString());
+			for(var i=0; i<searchChildren.length; ++i){
+				this.qData.unshift(closure(this.simplifyFrame, [searchChildren[i]], this));
+			}
+			if(ext.log){
+				ext.log.pauseTimer(timer);
+			}
+		},
 		processFinaliseDocuments:function(){
 			if(ext.log){
 				var timer=ext.log.startTimer('extensible.SVG.processFinaliseDocuments()');	
 			}
 			for(var k=0; k<this.timelines.length;k++){
 				var timeline = this.timelines[k];
-				//var dom = this.doms[k];
-				//if(this.frames.length==1 || this.animated){
-					//documents = [dom];
-				/*}else{
-					documents = this._splitXML(dom);
-				}*/
-				//for(var i=0;i<documents.length;i++){
-				//	var document = documents[i];
 				var document = this.doms[k];
 
 				if(this.applyTransformations){
 					this.applyMatrices(document);
 				}
 				this._applyColorEffects(document,document.defs);
-				//this.deleteUnusedReferences(document);
 				document['@xmlns']="http://www.w3.org/2000/svg";
 
 				if(!document['@viewBox'].length()){
@@ -616,6 +753,10 @@
 				}
 				var outputObject = {};
 				outputObject.string= this.docString + document.toXMLString();
+				if(this.compactOutput){
+					outputObject.string = outputObject.string.split("  ").join("");
+					outputObject.string = outputObject.string.split("\n").join("");
+				}
 				outputObject.id = document.@id;
 
 				fl.trace("finalise: "+timeline.filePath);
@@ -760,7 +901,7 @@
 		 */
 		expandUseNow:function( xml, within, onlyOnceUsed, recursive, defs ){
 			if(ext.log){
-				var timer=ext.log.startTimer('extensible.SVG.executeExpandUse()');	
+				var timer=ext.log.startTimer('extensible.SVG.expandUseNow()');	
 			}
 			defs = defs||xml.defs;
 			if(recursive==undefined){
@@ -830,17 +971,20 @@
 					delete useNode['@x'];
 					delete useNode['@y'];
 					this.copyNodeContents(useNode, symbol);
+					delete useNode['@id'];
 					delete symbol['@viewBox'];
 
 					if(useNode.@transform && useNode.@transform!=this.IDENTITY_MATRIX)symbol.@transform = useNode.@transform;
 					delete useNode.parent().children()[useNode.childIndex()];
+
+					useNode = symbol;
 
 					doRemove = false;
 				}else{
 					var symCopy = symbol[0].copy();
 					this.copyNodeContents(symCopy, useNode);
 					useNode.setName('g');
-					useNode['@id']=this._uniqueID(String(symbol['@id'])+'_1');
+					//useNode['@id']=this._uniqueID(String(symbol['@id'])+'_1');
 					delete useNode['@xlink-href'];
 					delete useNode['@width'];
 					delete useNode['@height'];
@@ -880,7 +1024,8 @@
 							}
 						}
 					}
-					//fl.trace("expand: "+id);
+
+					useNode = symCopy;
 				}
 			}
 			if(ext.log){
@@ -984,7 +1129,7 @@
 			return xml;
 		},
 
-		processElement:function(id, node, element, settings, dom){
+		processElement:function(node, element, settings, dom){
 			var elementXML=this._getElement(element,settings);
 			if(elementXML){
 				//var list = dom..g.(@id==id);
@@ -1015,7 +1160,7 @@
 		 * @parameter {Object} options Options object, contents dependant on element type.
 		 * @private
 		 */
-		_getElement:function(element,options){
+		_getElement:function(element, options){
 			var settings=new ext.Object({});
 			settings.extend(options);
 			var result;
@@ -1178,7 +1323,9 @@
 				}
 			}
 
-			var symbolIDString = timeline.libraryItem.name.split("/").join("_");
+			var timelineName = timeline.libraryItem?timeline.libraryItem.name:timeline.name;
+
+			var symbolIDString = timelineName.split("/").join("_");
 			if(settings.color){
 				symbolIDString += '_'+settings.color.idString; //should factor this out and use a transform
 			}
@@ -1189,7 +1336,7 @@
 					symbolIDString += '_t'+Math.round(settings.timeOffset * Math.pow(10, this.decimalPointPrecision));
 				}
 			}
-			var isNew,instanceID,boundingBox;
+			var isNew,boundingBox;
 			if(this._symbols[symbolIDString]){
 				isNew=false;
 				xml = this._symbols[symbolIDString];
@@ -1220,7 +1367,7 @@
 				var originalScene,timelines;
 				if(hasTweens){
 					/*if(settings.libraryItem==undefined){
-						originalScene=timeline.libraryItem.name;
+						originalScene=timelineName;
 					}*/
 					timeline = this._getTimelineCopy(settings.libraryItem, timeline, settings.startFrame, settings.endFrame);
 					var layers = timeline.$.layers;
@@ -1316,8 +1463,8 @@
 				this._symbolBounds[symbolIDString] = boundingBox;
 			}
 			//ext.message("getTimeline: "+symbolIDString+" "+settings.startFrame+" "+settings.endFrame+" "+settings.frameCount+" "+isNew+" "+settings.timeOffset+" "+layers.length);
-			var instanceID = this._uniqueID(id);
-			instanceXML=new XML('<use xlink-href="#'+id+'" id="'+instanceID+'" />');
+			//var instanceID = this._uniqueID(id);
+			instanceXML=new XML('<use xlink-href="#'+id+'" />');
 			if(isNew){
 				instanceXML['@width']=0;
 				instanceXML['@height']=0;
@@ -1452,13 +1599,14 @@
 						 * we need to manipulate the color of the mask to ensure
 						 * the proper behavior
 						 */
-						var filtered;
+						//var filtered;
 						if(isMask){
 							frameXML=<mask id={layerFrameId}/>;
 							maskId = layerFrameId;
 							if(colorX){
-								filtered=<g id={this._uniqueID('g')} />;
-								frameXML.appendChild(filtered);
+								//filtered=<g id={this._uniqueID('g')} />;
+								//frameXML.appendChild(filtered);
+								//filtered = frameXML;
 								if(!this._maskFilter){
 									this._maskFilter=this._getFilters(
 										null,{
@@ -1468,13 +1616,11 @@
 									);
 								}
 								if(this._maskFilter){
-									filtered.@filter="url(#"+this._maskFilter+")";
+									frameXML.@filter="url(#"+this._maskFilter+")";
 								}
 							}
-						}else if(isMasked){
-							frameXML=new XML('<g id="'+layerFrameId+'" />');
 						}else{
-							frameXML=new XML('<g id="'+layerFrameId+'" />');
+							frameXML=new XML('<g />');
 						}
 						if(ext.log){
 							ext.log.pauseTimer(timer2);
@@ -1531,7 +1677,7 @@
 						for(var j=0; j<items.length; ++j){
 							var element = items[j];
 							element.timeline = timeline;
-							var elementID=this._uniqueID('element');
+							//var elementID=this._uniqueID('element');
 
 							var time = settings.timeOffset+(n - settings.startFrame)*(1/ext.doc.frameRate);
 							var elemSettings = {
@@ -1547,23 +1693,10 @@
 									};
 
 							if(element.symbolType=="graphic"){
-								//if(element.loop=="single frame" || frame.duration==1){
-									elemSettings.frameCount = 1;
-									var childFrame = element.firstFrame;
-									if(element.loop!="single frame")childFrame += (n - frame.startFrame);
-									elemSettings.startFrame = this._getPriorFrame(element.timeline, childFrame);
-								/*}else{
-									elemSettings.startFrame = element.firstFrame + (n - frame.startFrame);
-									var maxCount = (settings.endFrame + 1) - n;
-									if(maxCount<elemSettings.frameCount)elemSettings.frameCount = maxCount;
-									if(elemSettings.startFrame>=element.libraryItem.timeline.frameCount){
-										if(element.loop=="loop"){
-											elemSettings.startFrame = elemSettings.startFrame%element.libraryItem.timeline.frameCount;
-										}else{
-											elemSettings.startFrame = element.libraryItem.timeline.frameCount-1;
-										}
-									}
-								}*/
+								elemSettings.frameCount = 1;
+								var childFrame = element.firstFrame;
+								if(element.loop!="single frame")childFrame += (n - frame.startFrame);
+								elemSettings.startFrame = this._getPriorFrame(element.timeline, childFrame);
 							}else if(element.symbolType=="movie clip" && element.libraryItem.timeline.frameCount<(frameEnd-n)*0.5 && frameEnd>n+1){
 								// if MC play time is shorter than half of it's visible run, we'll treat it as an independant loop
 								elemSettings.timeOffset = 0;
@@ -1572,21 +1705,16 @@
 								elemSettings.repeatCount = "indefinite";
 							}
 							if(this._delayedProcessing){
-								var elementXML=new XML('<g id="'+elementID+'"></g>');
-								this.qData.push(closure(this.processElement, [elementID, elementXML, element, elemSettings, dom], this));
+								var elementXML=new XML('<g />');
+								this.qData.push(closure(this.processElement, [elementXML, element, elemSettings, dom], this));
 							}else{
-								var elementXML = this._getElement(
-									element,elemSettings
-								);
+								var elementXML = this._getElement( element, elemSettings );
 							}
 							if(elementXML){
-								if(layer.layerType=='mask' && colorX){
-									filtered.appendChild(elementXML);
-								}else{
-									frameXML.appendChild(elementXML);
-								};
+								frameXML.appendChild(elementXML);
 							}
 						}
+
 						if(doAnim){
 							
 							if(doCollateFrames){
@@ -2081,7 +2209,7 @@
 			return deg;
 		},
 		_doMask:function(xml, masked, maskId){
-			var mg = <g id={this._uniqueID('masked')} mask={"url(#"+maskId+")"}/>;
+			var mg = <g mask={"url(#"+maskId+")"}/>;
 			for(var m=0;m<masked.length;m++){
 				mg.appendChild(masked[m]);
 			}
@@ -2348,10 +2476,10 @@
 							 */
 							if(f.brightness!=0){
 								var brightness=f.brightness/100;
-								var feComponentTransfer_brightness=<feComponentTransfer id={this._uniqueID('feComponentTransfer_brightness')} />;
-								var feFuncR=<feFuncR id={this._uniqueID('feFuncR')} ></feFuncR>;
-								var feFuncG=<feFuncG id={this._uniqueID('feFuncG')} ></feFuncG>;
-								var feFuncB=<feFuncB id={this._uniqueID('feFuncB')} ></feFuncB>;
+								var feComponentTransfer_brightness=<feComponentTransfer />;
+								var feFuncR=<feFuncR/>;
+								var feFuncG=<feFuncG/>;
+								var feFuncB=<feFuncB/>;
 								feFuncR.@type=feFuncG.@type=feFuncB.@type="linear";
 								feFuncR.@slope=feFuncG.@slope=feFuncB.@slope=(
 									(
@@ -2372,10 +2500,10 @@
 							}
 							if(f.contrast!=0){
 								var contrast=f.contrast/100;
-								var feComponentTransfer_contrast=<feComponentTransfer id={this._uniqueID('feComponentTransfer_contrast')} />;
-								var feFuncR=<feFuncR id={this._uniqueID('feFuncR')} ></feFuncR>;
-								var feFuncG=<feFuncG id={this._uniqueID('feFuncG')} ></feFuncG>;
-								var feFuncB=<feFuncB id={this._uniqueID('feFuncB')} ></feFuncB>;
+								var feComponentTransfer_contrast=<feComponentTransfer/>;
+								var feFuncR=<feFuncR/>;
+								var feFuncG=<feFuncG/>;
+								var feFuncB=<feFuncB/>;
 								feFuncR.@type=feFuncG.@type=feFuncB.@type="linear";
 								feFuncR.@slope=feFuncG.@slope=feFuncB.@slope=(
 									(
@@ -2396,7 +2524,7 @@
 								filter.appendChild(feComponentTransfer_contrast);
 							}
 							if(f.saturation!=0){
-								var feColorMatrix2=<feColorMatrix id={this._uniqueID('feColorMatrix')} />;
+								var feColorMatrix2=<feColorMatrix/>;
 								feColorMatrix2.@type='matrix';
 								var s=f.saturation/100+1;
 								feColorMatrix2.@values=[
@@ -2410,7 +2538,7 @@
 								filter.appendChild(feColorMatrix2);
 							}
 							if(f.hue!=0){
-								var feColorMatrix=<feColorMatrix id={this._uniqueID('feColorMatrix')} />;
+								var feColorMatrix=<feColorMatrix/>;
 								feColorMatrix.@type='hueRotate';
 								feColorMatrix.@values=f.hue;
 								feColorMatrix['@in']=src;
@@ -2428,7 +2556,7 @@
 								var sx=element.matrix.scaleX;
 								var sy=element.matrix.scaleY;
 
-								var feGaussianBlur=<feGaussianBlur id={this._uniqueID('feGaussianBlur')} />;
+								var feGaussianBlur=<feGaussianBlur />;
 								feGaussianBlur.@stdDeviation=[f.blurX, f.blurY].join(' ');
 								feGaussianBlur['@in']=src;
 								feGaussianBlur.@result=src=prefix+'feGaussianBlur';
@@ -2459,7 +2587,7 @@
 								var feComposite=<feComposite in2="SourceAlpha" operator="in"/>;
 								filter.appendChild(feComposite);
 
-								var feGaussianBlur=<feGaussianBlur id={this._uniqueID('feGaussianBlur')} />;
+								var feGaussianBlur=<feGaussianBlur/>;
 								feGaussianBlur.@stdDeviation=[f.blurX,f.blurY].join(' ');
 								feGaussianBlur.@result=src=prefix+'feGaussianBlur';
 								filter.appendChild(feGaussianBlur);
@@ -2526,7 +2654,7 @@
 						*/
 					}else{
 						if(!color.percent.is([100,100,100,100])){
-							feColorMatrix=<feColorMatrix id={this._uniqueID('feColorMatrix')} />;
+							feColorMatrix=<feColorMatrix />;
 							feColorMatrix.@type="matrix";
 							feColorMatrix['@in']=src;
 							feColorMatrix.@values=[
@@ -2539,13 +2667,13 @@
 							filter.appendChild(feColorMatrix);
 						}
 						if(!color.amount.is([0,0,0,0])){
-							var feComponentTransfer=<feComponentTransfer id={this._uniqueID('feComponentTransfer')} />;
+							var feComponentTransfer=<feComponentTransfer />;
 							feComponentTransfer['@in']=src;
 							feComponentTransfer.@result=src='colorEffect_amount';
-							var feFuncR=<feFuncR id={this._uniqueID('feFuncR')} ></feFuncR>;
-							var feFuncG=<feFuncG id={this._uniqueID('feFuncG')} ></feFuncG>;
-							var feFuncB=<feFuncB id={this._uniqueID('feFuncB')} ></feFuncB>;
-							var feFuncA=<feFuncA id={this._uniqueID('feFuncA')} ></feFuncA>;
+							var feFuncR=<feFuncR/>;
+							var feFuncG=<feFuncG/>;
+							var feFuncB=<feFuncB/>;
+							var feFuncA=<feFuncA/>;
 							feFuncR.@type=feFuncG.@type=feFuncB.@type=feFuncA.@type="linear";
 							feFuncR.@slope=feFuncG.@slope=feFuncB.@slope=feFuncA.@slope=1;
 							feFuncR.@intercept=color.amount[0]/255;
@@ -2569,7 +2697,7 @@
 		_getBitmapInstance:function(bitmapInstance,options){
 			var item=bitmapInstance.libraryItem;
 			var bitmapURI=this._getBitmapItem(item);
-			var xml=<image overflow='visible' id={this._uniqueID(item.name.basename.stripExtension())} />;
+			var xml=<image overflow='visible' />;
 			xml['@xlink-href']=bitmapURI;
 			var bits=bitmapInstance.getBits();
 			xml.@height=bitmapInstance.vPixels;
@@ -2654,13 +2782,13 @@
 			var descendantMatrix=new ext.Matrix();
 			var pathMatrix=null;
 			var layerLocked=shape.layer.locked;
-			var id;
+			//var id;
 			if( shape.isRectangleObject || shape.isOvalObject ){ // ! important
-				id=(
+				/*id=(
 					shape.isRectangleObject?
 					this._uniqueID('rectangleObject'):
 					this._uniqueID('ovalObject')
-				);
+				);*/
 				shape.setTransformationPoint({x:0.0,y:0.0});
 				var origin=new ext.Point({
 					x:(shape.objectSpaceBounds.left-shape.objectSpaceBounds.right)/2,
@@ -2677,11 +2805,11 @@
 					});
 				}
 			}else if(shape.isDrawingObject){
-				id=this._uniqueID('drawingObject');
+				//id=this._uniqueID('drawingObject');
 				//matrix=matrix.concat(settings.matrix);
 				matrix=fl.Math.concatMatrix(matrix, settings.matrix);
 			}else if(shape.isGroup){
-				id=this._uniqueID('group');
+				//id=this._uniqueID('group');
 
 				descendantMatrix = matrix.invert();
 				matrix = new ext.Matrix();
@@ -2719,7 +2847,7 @@
 				}
 				//matrix=matrix.concat(settings.matrix);
 			}else{
-				id=this._uniqueID('shape');
+				//id=this._uniqueID('shape');
 				matrix.tx=shape.left;
 				matrix.ty=shape.top;
 				//matrix=matrix.concat(settings.matrix);
@@ -2868,7 +2996,7 @@
 					}
 				}
 			}	
-			var svg=new XML('<g id="'+id+'"/>');
+			var svg=new XML('<g/>');
 			var matrixStr = this._getMatrix(matrix);
 			if(matrixStr!=this.IDENTITY_MATRIX)svg['@transform']=matrixStr;
 			for(var i=0;i<svgArray.length;i++){
@@ -2944,7 +3072,7 @@
 							discreteEasing:this.discreteEasing
 						}
 					);
-					if(e){svg.appendChild(e);}
+					if(e)svg.appendChild(e);
 				}
 			}
 			if(ext.log){
@@ -3020,14 +3148,16 @@
 							opacityString = ' fill-opacity="'+fillOp+'"';
 						}
 					}else{
-						dom.defs.appendChild(fill)
+						if(!fill.parent()){
+							dom.defs.appendChild(fill)
+						}
 						fillString='url(#'+String(fill['@id'])+')';
 					}
 				}
-				id=this._uniqueID('path');
-				idString='id="'+id+'" ';
+				//id=this._uniqueID('path');
+				//idString='id="'+id+'" ';
 				var strokeStr = (sameStrokes?" "+this._getStroke(lastStroke,{shape:contour.shape,dom:dom}):"");
-				paths.push('<path  '+idString+xform+'fill="'+fillString + '"' + strokeStr + opacityString+' d="'+cdata+'"/>\n');
+				paths.push('<path  '+/*idString+*/xform+'fill="'+fillString + '"' + strokeStr + opacityString+' d="'+cdata+'"/>\n');
 			}
 			if(controlPoints.length>0 && !settings.reversed && !sameStrokes){
 				//Create a contour for each length of contiguous edges w/ the same stroke attributes. 
@@ -3047,11 +3177,11 @@
 						}else{
 							// next part of path has a dif'rent stroke, finalise the current path and start a new one
 							if(stroke && cp.length>0){
-								id=this._uniqueID('path');
-								idString='id="'+id+'" ';
+								//id=this._uniqueID('path');
+								//idString='id="'+id+'" ';
 								paths.push(
 									'<path '+
-									idString+
+									//idString+
 									xform+
 									'fill="none" '+
 									this._getStroke(stroke,{shape:contour.shape,dom:dom})+
@@ -3064,11 +3194,11 @@
 						}
 					}else{
 						if(stroke && cp.length>0){
-							id=this._uniqueID('path');
-							idString='id="'+id+'" ';
+							//id=this._uniqueID('path');
+							//idString='id="'+id+'" ';
 							paths.push(
 								'<path '+
-								idString+
+								//idString+
 								xform+
 								'fill="none" '+
 								this._getStroke(stroke,{dom:dom})+
@@ -3103,11 +3233,11 @@
 						}
 						paths[pathID]=x.toXMLString()+'\n';
 					}else{
-						id=this._uniqueID('path');
-						idString='id="'+id+'" ';
+						//id=this._uniqueID('path');
+						//idString='id="'+id+'" ';
 						paths.push(
 							'<path '+
-							idString+
+							//idString+
 							xform+
 							'fill="none" '+
 							this._getStroke(stroke,{dom:dom})+
@@ -3118,8 +3248,8 @@
 				}
 			}
 			var xml;
-			id=this._uniqueID('shape');
-			xml=new XML('<g id="'+id+'"/>');
+			//id=this._uniqueID('shape');
+			xml=new XML('<g/>');
 			for(var i=0;i<paths.length;i++){
 				xml.appendChild(new XML(paths[i]));
 			}
@@ -3323,8 +3453,8 @@
 					}
 					break;
 				case 'bitmap':
-					xml=<pattern id={this._uniqueID('pattern')} />;
-					var image=<image id={this._uniqueID(fillObj.bitmapPath.basename)} />;
+					xml=<pattern/>;
+					var image=<image/>;
 					xml.@patternUnits=xml.@patternContentUnits='userSpaceOnUse';
 					var item=ext.lib.getItem(fillObj.bitmapPath);
 					var bitmapURI=this._getBitmapItem(item);
@@ -3341,7 +3471,7 @@
 					if(this.convertPatternsToSymbols){
 						var symbol=<symbol id={this._uniqueID(fillObj.bitmapPath.basename+'_symbol')} />;
 						symbol.@viewBox=String(xml.@viewBox);
-						var use=<use id={this._uniqueID(fillObj.bitmapPath.basename+'_use')} />;
+						var use=<use />;
 						use.@width=String(image.@width);
 						use.@height=String(image.@height);
 						use.@x=use.@y=0;
@@ -3361,7 +3491,14 @@
 					if(color.opacity<1)xml['@solid-opacity']=this.precision(color.opacity);
 					break;
 			}
-			xml['@id']=id;
+			var str = xml.toXMLString();
+			var cached = this._fillMap[str];
+			if(cached){
+				xml = cached;
+			}else{
+				this._fillMap[str] = xml;
+				xml['@id']=id;
+			}
 			if(ext.log){ext.log.pauseTimer(timer);}
 			return xml;
 		},
@@ -3392,7 +3529,9 @@
 						fillString=String(fill['@solid-color']);
 						opacityString=String(fill['@solid-opacity']);
 					}else{
-						dom.defs.appendChild(fill)
+						if(!fill.parent()){
+							dom.defs.appendChild(fill)
+						}
 						fillString='url(#'+String(fill['@id'])+')';
 					}
 				}
@@ -3551,6 +3690,20 @@
 				return xml;
 			}
 			return xml;
+		},
+		_applyMatrix:function(toNode, transStr, transMat, upwards){
+			if(!toNode.@transform.length()){
+				toNode.@transform = transStr;
+			}else{
+				var frameTrans = new ext.Matrix(toNode.@transform.toString());
+				if(upwards){
+					var mat = transMat.concat(frameTrans);
+				}else{
+					var mat = frameTrans.concat(transMat);
+				}
+				//fl.trace("\nP MERGE: "+k+"/" + childNode.children().length()+"\n"+toNode.@transform.toString()+" + "+transStr+" = "+this._getMatrix(mat)+"\n");
+				toNode.@transform = this._getMatrix(mat);
+			}
 		},
 		_getMatrix:function(matrix){
 			if(!(matrix instanceof ext.Matrix)){
