@@ -2852,14 +2852,8 @@
 				matrix.ty=shape.top;
 				//matrix=matrix.concat(settings.matrix);
 				matrix=fl.Math.concatMatrix(matrix, settings.matrix);
-				if(
-					shape.objectSpaceBounds &&
-					(
-						shape.objectSpaceBounds.left!=0 ||
-						shape.objectSpaceBounds.top!=0
-					)
-				){
-					pathMatrix=new ext.Matrix({tx:shape.objectSpaceBounds.left,ty:shape.objectSpaceBounds.top});
+				if(shape.left!=0 || shape.top!=0 ){
+					pathMatrix=new ext.Matrix({tx:shape.left,ty:shape.top});
 					pathMatrix=pathMatrix.invert();
 				}
 			}
@@ -3106,7 +3100,7 @@
 			var xform='';
 			if(settings.matrix){
 				xform='transform="'+this._getMatrix(settings.matrix)+'" ';
-			}	
+			}
 			var id,idString;
 			if(contour.interior){//Construct a curve for the enclosed shape if present.
 
@@ -3275,7 +3269,7 @@
 			
 
 			//filter segments if they are discontinuous
-			if (controlPoints.length > 2)
+			/*if (controlPoints.length > 2)
 			{
 				var newControlPoints = new ext.Array([]);
 				newControlPoints.push(controlPoints[0]);
@@ -3297,7 +3291,7 @@
 
 				newControlPoints.push(controlPoints[controlPoints.length-1]);
 				controlPoints = newControlPoints;
-			}
+			}*/
 
 			var degPrefix=['M','L','Q','C'];
 			var deg=controlPoints[0].length-1;
