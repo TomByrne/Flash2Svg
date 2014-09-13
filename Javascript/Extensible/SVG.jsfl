@@ -44,7 +44,7 @@
 			timelines:new ext.Array([]),
 			backgroundColor:ext.doc.backgroundColor,
 			includeBackground:false,
-			includeHiddenLayers:ext.includeHiddenLayers,
+			includeHiddenLayers:true,
 			convertTextToOutlines:true,
 			includeGuides:false,
 			selection:null,
@@ -143,6 +143,7 @@
 		this._origSelection=new ext.Selection([]);
 		this._delayedProcessing=true;// If true, a timeline is processed one level deep in it's entirety before progressing to descendants.
 		this.currentState=0;
+		this._origTimeline = ext.doc.getTimeline();
 
 		var versionParser = /\w* (\d+),.*/g;
 		var result = versionParser.exec(fl.version);
@@ -867,7 +868,7 @@
 				for(var j=0; j<list.length; ++j){
 					var pack = list[j];
 					if(!pack.clone.libraryItem){
-						var sceneIndex = fl.getDocumentDOM().timelines.indexOf(pack.clone.$);
+						var sceneIndex = ext.doc.timelines.indexOf(pack.clone.$);
 						ext.doc.editScene(sceneIndex);
 						ext.doc.deleteScene();
 					}
@@ -885,6 +886,11 @@
 			var epSuccess=true;
 			if(this.swfPanel){
 				epSuccess=this.swfPanel.call('endProgress');	
+			}
+			if(this._origTimeline.libraryItem){
+				ext.doc.library.editItem(this._origTimeline.libraryItem.name);
+			}else{
+				ext.doc.editScene(ext.doc.timelines.indexOf(this._origTimeline));
 			}
 			if(epSuccess){
 				ext.message('Export Successful: ');
@@ -2364,7 +2370,7 @@
 		 * @parameter {Object} options
 		 * @private
 		 */
-		_getSymbolInstance:function(instance,options){
+		_getSymbolInstance:function(instance, options){
 			if(ext.log){
 				var timer=ext.log.startTimer('extensible.SVG._getSymbolInstance()');	
 			}
@@ -2381,11 +2387,20 @@
 			var dom = settings.dom;
 			//settings.matrix = instance.matrix.concat(settings.matrix);
 			settings.matrix = fl.Math.concatMatrix(instance.matrix, settings.matrix);
+
+			// deselect all
+			ext.doc.library.editItem(instance.libraryItem.name);
+			instance.timeline.setSelectedFrames(0, instance.timeline.frameCount-1, true);
+			instance.timeline.setSelectedFrames(0,0);
+			ext.doc.selectNone();
+			ext.doc.exitEditMode();
+
 			var xml = this._getTimeline(instance.timeline, settings);
 			var filterID=this._getFilters(instance, options, dom.defs);
 			if(filterID && dom.defs.filter.(@id==filterID).length()){
 				xml['@filter']='url(#'+filterID+')';
 			}
+
 			if(ext.log){
 				ext.log.pauseTimer(timer);
 			}
@@ -2848,14 +2863,14 @@
 				//matrix=matrix.concat(settings.matrix);
 			}else{
 				//id=this._uniqueID('shape');
-				matrix.tx=shape.left;
-				matrix.ty=shape.top;
+				matrix.tx = 0;//shape.left;
+				matrix.ty = 0;//shape.top;
 				//matrix=matrix.concat(settings.matrix);
-				matrix=fl.Math.concatMatrix(matrix, settings.matrix);
-				if(shape.left!=0 || shape.top!=0 ){
-					pathMatrix=new ext.Matrix({tx:shape.left,ty:shape.top});
-					pathMatrix=pathMatrix.invert();
-				}
+				matrix = fl.Math.concatMatrix(matrix, settings.matrix);
+				/*if(shape.left!=0 || shape.top!=0 ){
+					pathMatrix = new ext.Matrix({tx:shape.left, ty:shape.top});
+					pathMatrix = pathMatrix.invert();
+				}*/
 			}
 			var contours=shape.contours;
 			if(!(contours && contours.length) && !shape.isGroup){
@@ -2887,8 +2902,9 @@
 							var deleted=false;
 							for(var n=filled.length-1;n>-1;n-=1){
 								var fillN = filled[n];
-								var noFills=oppositeFill.style=='noFill' && fill.style=='noFill';
-								var insideOut=!noFills && fill.is(validContours[fillN].fill);
+								var otherFill = svgArray[fillN];
+								var noFills = oppositeFill.style=='noFill' && fill.style=='noFill';
+								var insideOut = !noFills && fill.orientation!=fill.orientation;//fill.is(validContours[fillN].fill);
 								var sameDir=(
 									contours[i].orientation
 									//+Number(contours[i].getControlPoints( {curveDegree:this.curveDegree} ).isReversed)
@@ -2899,9 +2915,9 @@
 									<0
 								);
 								if(
-									svgArray[fillN].path.length()  
-									//&& svgArray[fillN].path.fill.length()
-									&& svgArray[fillN].path[0].@stroke.length()==0
+									otherFill.path.length()  
+									&& (otherFill.path.fill.length() || otherFill.path.@fill.length())
+									//&& otherFill.path[0].@stroke.length()==0
 									&& (
 										oppositeFill.is(validContours[fillN].fill) 
 										|| noFills
@@ -2909,16 +2925,17 @@
 											insideOut
 											&& oppositeFill.style=='noFill'
 										) //???
-									) && svgArray[fillN].path[0].stroke.length()==0
+									)// && otherFill.path[0].stroke.length()==0
 								){
-									var cutID=String(svgArray[fillN].path[0]['@id']);
+									var cutID=String(otherFill.path[0]['@id']);
 									var rev=( sameDir && !insideOut ) || ( insideOut && !sameDir);
 									if(rev){
 										s=this._getContour(contours[i],{
 											colorTransform:settings.colorTransform,
 											reversed: true,
 											matrix:pathMatrix,
-											dom:dom
+											dom:dom,
+											filledOnly: true
 										});
 									}else{
 										s=svgArray.at(-1);
@@ -2931,7 +2948,7 @@
 											dom:dom
 										});
 										if(so.path.length()){
-											var f=String(svgArray[fillN].path[0]['@d']);
+											var f=String(otherFill.path[0]['@d']);
 											var fs=f.match(/^[^Zz]*[Zz]?/)[0].trim();
 											var pStr=String(s.path[0]['@d']);
 											var pA=/^[^Zz]*[Zz]?/.exec(pStr)[0].trim();
@@ -2944,7 +2961,7 @@
 											if(pAO[pAO.length-1]!=='z'){pAO+='z';}
 
 											if(fs==pAO || fs==pA){
-													svgArray[fillN].path[0]['@d']+=pStr.replace(pA,'').replace(pAO,'');
+													otherFill.path[0]['@d']+=pStr.replace(pA,'').replace(pAO,'');
 													svgArray[svgArray.length-1].path[0].@d=String(
 														svgArray[svgArray.length-1].path[0].@d
 													).replace(pA,'').replace(pAO,'');
@@ -2954,8 +2971,8 @@
 												if(pA[pA.length-1]!=='z'){
 													pA+='z';
 												}
-												svgArray[fillN].path[0]['@d'] += pA;
-												if(oppositeFill.style==fill.style!='noFill' && insideOut){
+												otherFill.path[0]['@d'] += pA;
+												if((oppositeFill.style==fill.style) && fill.style!='noFill' && insideOut){
 													delete svgArray[svgArray.length-1].path[0];
 													deleted=true;
 												}
@@ -2994,14 +3011,16 @@
 			var matrixStr = this._getMatrix(matrix);
 			if(matrixStr!=this.IDENTITY_MATRIX)svg['@transform']=matrixStr;
 			for(var i=0;i<svgArray.length;i++){
-				if(svgArray[i].path.length()){ // eliminate duplicate paths
+				svg.appendChild(svgArray[i]);
+				/*var node = svgArray[i];
+				if(node.path.length()){ // eliminate duplicate paths
 					ii=0; 
-					for each(n in svgArray[i].path){
+					for each(n in node.path){
 						if(
 							(!n['@stroke'].length() || String(n['@stroke'][0])=='none' || String(n['@stroke'][0])=='') && 
 							(!n['@fill'].length() || String(n['@fill'][0])=='none' ||  String(n['@fill'][0])=='')
 						){
-							delete svgArray[i].path[ii];
+							delete node.path[ii];
 						}else if(n.localName()=='path' && n['@stroke'].length()){
 							var cs0=String(n['@d']).replace(/[^\d\.\,]/g,' ').replace(/([^\s])(\s\s*?)([^\s])/g,'$1 $3').trim();
 							var ca0=cs0.split(' ');
@@ -3040,7 +3059,7 @@
 					for each(var s in svgArray[i].*){
 						svg.appendChild(s);
 					}
-				}
+				}*/
 			}
 			if(
 				shape.isGroup && 
@@ -3075,6 +3094,163 @@
 			return svg;		
 		},
 		_getContour:function(contour,options){
+			if(ext.log){
+				var timer=ext.log.startTimer('extensible.SVG._getContour()');	
+			}
+			var settings=new ext.Object({
+				matrix:null,
+				reversed:false,
+				colorTransform:null,
+				filledOnly:false
+			});
+			settings.extend(options);
+			var dom = settings.dom;
+			var curveDeg = this.curveDegree;
+
+			var xform='';
+			if(settings.matrix){
+				xform=' transform="'+this._getMatrix(settings.matrix)+'" ';
+			}
+
+
+			var fill=this._getFill(contour.fill,{
+				shape : contour.shape
+			});
+
+			var opacityString = "";
+			var filledPath;
+			var paths = [];
+			if(fill){
+				if(fill.name()=='solidColor'){
+					fillString=String(fill['@solid-color']);
+					var fillOp = String(fill['@solid-opacity']);
+					if(fillOp && fillOp.length){
+						opacityString = ' fill-opacity="'+fillOp+'"';
+					}
+				}else{
+					if(!fill.parent()){
+						dom.defs.appendChild(fill)
+					}
+					fillString='url(#'+String(fill['@id'])+')';
+				}
+				var fillString = ' fill="'+fillString+'"';
+			}else{
+				var fillString = ' fill="none"';
+			}
+			filledPath = {stroke:"", fill:fillString, contours:[]};
+			paths.push(filledPath);
+
+			var he = contour.$.getHalfEdge(); 
+			var iStart = he.id; 
+			var id = 0; 
+			var shape = contour.shape.$;
+			var strokeMap = {};
+			var currPath;
+			var lastStroke;
+			while (id != iStart) 
+			{ 
+				var e = he.getEdge();
+				try{
+					var cubicSegmentIndex = curveDeg==3?e.cubicSegmentIndex:-1;
+				}catch(e){
+					cubicSegmentIndex = -1;
+				}
+				var cp;
+				if(e.isLine){
+					cp =[e.getControl(0), e.getControl(2)];
+				}else{
+					if(curveDeg==3){
+						if(cubicSegmentIndex && cubicSegmentIndex!=-1){
+							cp = shape.getCubicSegmentPoints(cubicSegmentIndex);
+						}else{
+							cp = [e.getControl(0), e.getControl(1), e.getControl(2)];
+						}
+					}else{
+						cp = [e.getControl(0), e.getControl(1), e.getControl(2)];
+					}
+				}
+				if(e.getHalfEdge(1).id == he.id){
+					cp = cp.reverse();
+				}
+				
+				if(!settings.filledOnly && e.stroke && e.stroke.style!='noStroke'){
+					var stroke = " "+this._getStroke(e.stroke, {dom:dom});
+
+					if(!currPath || stroke!=lastStroke){
+						currPath = strokeMap[stroke];
+						if(!currPath){
+							currPath = {stroke:stroke, fill:" fill='none'", contours:[]};
+							paths.push(currPath);
+							strokeMap[stroke] = currPath;
+						}
+						lastStroke = stroke;
+					}
+					currPath.contours.push(cp);
+				}
+				if(filledPath)filledPath.contours.push(cp);
+
+				he = he.getNext(); 
+				id = he.id; 
+			}
+
+			if(filledPath && paths.length>1){
+				var firstStroke = paths[1];
+				if(filledPath.contours.length==firstStroke.contours.length){
+					// stroke and fill have the same paths, combine
+					filledPath.stroke = firstStroke.stroke;
+					paths.splice(1,1);
+				}
+			}
+
+			var degPrefix=['M','L','Q','C'];
+			var pathNodes = [];
+			for (var i=0; i<paths.length; i++) 
+			{ 
+				currPath = paths[i];
+				var pathStr = '';
+				var lastDeg = null;
+				var lastPoint = null;
+
+				if(settings.reversed){
+					currPath.contours.reverse();
+				}
+
+				for(var j=0; j<currPath.contours.length; j++){
+					cp = currPath.contours[j];
+					if(settings.reversed){
+						cp.reverse();
+					}
+					var firstPoint = cp[0];
+					if(!lastPoint || lastPoint.x!=firstPoint.x || lastPoint.y!=firstPoint.y){
+						lastDeg = degPrefix[0];
+						pathStr += lastDeg+firstPoint.x+","+firstPoint.y;
+					}
+					var deg = degPrefix[cp.length-1];
+					if(deg!=lastDeg){
+						pathStr += deg;
+						lastDeg = deg;
+					}else{
+						pathStr += " ";
+					}
+					for(var k=1; k<cp.length; k++){
+						if(k!=1)pathStr += " ";
+						var point = cp[k];
+						pathStr += point.x+","+point.y;
+					}
+					lastPoint = point;
+				}
+				pathNodes.push('<path '+currPath.fill + currPath.stroke + opacityString+' d="'+pathStr+'"/>\n');
+			}
+
+			var xmlStr  = '<g'+xform+'>'+pathNodes.join("")+"</g>";
+
+			if(ext.log){
+				ext.log.pauseTimer(timer);	
+			}
+			return new XML(xmlStr);
+
+		},
+		/*_getContour:function(contour,options){
 			if(ext.log){
 				var timer=ext.log.startTimer('extensible.SVG._getContour()');	
 			}
@@ -3151,7 +3327,7 @@
 				//id=this._uniqueID('path');
 				//idString='id="'+id+'" ';
 				var strokeStr = (sameStrokes?" "+this._getStroke(lastStroke,{shape:contour.shape,dom:dom}):"");
-				paths.push('<path  '+/*idString+*/xform+'fill="'+fillString + '"' + strokeStr + opacityString+' d="'+cdata+'"/>\n');
+				paths.push('<path  '+xform+'fill="'+fillString + '"' + strokeStr + opacityString+' d="'+cdata+'"/>\n');
 			}
 			if(controlPoints.length>0 && !settings.reversed && !sameStrokes){
 				//Create a contour for each length of contiguous edges w/ the same stroke attributes. 
@@ -3251,13 +3427,13 @@
 				ext.log.pauseTimer(timer);	
 			}
 			return(xml);
-		},
+		},*/
 		/**
 		 * Build a curve string from an array of arrays of points.
 		 * @param {Array} controlPoints
 		 * @private {Boolean} close
 		 */
-		_getCurve:function(controlPoints, close, tuple){
+		/*_getCurve:function(controlPoints, close, tuple){
 			if(ext.log){
 				var timer=ext.log.startTimer('extensible.SVG._getCurve()');	
 			}
@@ -3265,7 +3441,7 @@
 			close = (close!==undefined?close==-1:true);
 			if(controlPoints.length==0){
 				return;	
-			}
+			}*/
 			
 
 			//filter segments if they are discontinuous
@@ -3293,7 +3469,7 @@
 				controlPoints = newControlPoints;
 			}*/
 
-			var degPrefix=['M','L','Q','C'];
+			/*var degPrefix=['M','L','Q','C'];
 			var deg=controlPoints[0].length-1;
 			var curveString=[degPrefix[0]+controlPoints[0][0].x+","+controlPoints[0][0].y+" "];
 			if(deg>0){
@@ -3335,7 +3511,7 @@
 				ext.log.pauseTimer(timer);	
 			}
 			return curveString.join('');
-		},
+		},*/
 		/**
 		 * Returns a paint server for the specified fill.
 		 * @param {extensible.Fill} fillObj
