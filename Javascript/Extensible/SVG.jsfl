@@ -200,8 +200,8 @@
 							var rect=selectedItems[i].scalingGridRect;
 							timeline.width=rect.right-rect.left;
 							timeline.height=rect.bottom-rect.top;
-							timeline.matrix.x=-rect.left;
-							timeline.matrix.y=-rect.top;
+							timeline.matrix.tx=-rect.left;
+							timeline.matrix.ty=-rect.top;
 						}else{
 							timeline.width=ext.doc.width;
 							timeline.height=ext.doc.height;
@@ -583,7 +583,7 @@
 				}
 				return;
 			}
-			//verbose = true;
+			verbose = frameNode.@id.toString()=="Tween_2_t417";
 
 			var searchChildren = [];
 			var i=0;
@@ -598,9 +598,11 @@
 				if(name=="g"){
 					var animTransNodes = childNode.animateTransform.length();
 					var animNodes = animTransNodes + childNode.animate.length();
+					var hasStyle = childNode.@style.length()>0;
 					if((animTransNodes && childNode.@transform.length() && (graphChildren > 1 || !canExplode)) ||
 						(animNodes && graphChildren > 1) ||
-						childNode.@mask.length()>0){
+						(hasStyle && graphChildren > 1) || // If has style attribute and other graphic siblings, cannot change
+						childNode.@mask.length()>0 ){
 						/*
 							Sometimes a group can't be expanded because it serves as an animation
 							container, or a mask container.
@@ -672,6 +674,9 @@
 							parentTakenTrans = true;
 						}
 					}
+					if(hasStyle){
+						frameNode.@style = childNode.@style;
+					}
 					var lastChild = childNode;
 					var lastIndex = i;
 					for(var k=0; k<grandchild; k++){
@@ -691,11 +696,14 @@
 						}
 						for(var j=0; j<childNode.attributes().length(); j++){
 							var attr = childNode.attributes()[j];
-							if(attr.name()=="id"){
+							var name = attr.name();
+							if(name=="id"){
 								if(frameNode.@id.length()==0)frameNode.@id = attr.toXMLString();
 								continue;
 							}
-							if(!hasTrans || attr.name()!="transform")newChild.@[attr.name()] = attr.toXMLString();
+							if(	(!hasTrans || name!="transform") &&
+								(!hasStyle || name!="style"))
+									newChild.@[attr.name()] = attr.toXMLString();
 						}
 						lastChild = newChild;
 						lastIndex++;
@@ -743,11 +751,31 @@
 				this._applyColorEffects(document,document.defs);
 				document['@xmlns']="http://www.w3.org/2000/svg";
 
-				if(!document['@viewBox'].length()){
-					document['@viewBox']=String(this.x)+' '+String(this.y)+' '+String(this.width)+' '+String(this.height);
-					document.@width = this.width;
-					document.@height = this.height;
+				var trans = document.@transform;
+				if(trans.length()){
+					// transform doesn't work on the root node, so transfer it to it's children
+					var transMat = new ext.Matrix(trans);
+					var children = document.children().length();
+					for(var i=0; i<children; i++){
+						var child = document.children()[i];
+						var childName = child.localName();
+						if(childName=="g" || childName=="path" || childName=="path"){
+							var childTrans = child.@transform;
+							if(childTrans.length()){
+								var mat = new ext.Matrix(trans);
+								mat.concat(transMat);
+								child.@transform = this._getMatrix(mat);
+							}else{
+								child.@transform = trans;
+							}
+						}
+					}
+					delete document.@transform;
 				}
+				document['@viewBox']=String(this.x)+' '+String(this.y)+' '+String(this.width)+' '+String(this.height);
+				document.@width = this.width;
+				document.@height = this.height;
+				
 
 				if(this.includeBackground){
 					document['@enable-background']='new '+document['@viewBox'];
@@ -1336,6 +1364,8 @@
 				symbolIDString += '_'+settings.color.idString; //should factor this out and use a transform
 			}
 			if(frameCount>1){
+				var dur = settings.totalDuration * ext.doc.frameRate;
+				var offset = settings.timeOffset * ext.doc.frameRate;
 				if(settings.frameCount==1){
 					symbolIDString += '_f'+settings.startFrame;
 				}else if(settings.timeOffset!=null && settings.timeOffset>0){
@@ -1489,7 +1519,7 @@
 				var forceDiscrete = settings.flattenMotion && settings.discreteEasing;
 
 				if(this.animated){
-					var totFrames = (settings.endFrame-settings.startFrame+1);
+					var totFrames = (settings.endFrame - settings.startFrame);
 
 					var animNode = <animate
 								      attributeName="display"/>;
@@ -1511,7 +1541,7 @@
 							// when looping, we behave as if the timeline is 1 frame shorter so the last KF acts as an end-point (making for seemless loops)
 							animDur = this.precision((totFrames-1)*(1/ext.doc.frameRate));
 						}else{*/
-							animDur = this.precision(totFrames*(1/ext.doc.frameRate));
+							animDur = this.precision(totFrames / ext.doc.frameRate);
 						//}
 					}
 
@@ -1685,7 +1715,7 @@
 							element.timeline = timeline;
 							//var elementID=this._uniqueID('element');
 
-							var time = settings.timeOffset+(n - settings.startFrame)*(1/ext.doc.frameRate);
+							var time = settings.timeOffset + (n - settings.startFrame) / ext.doc.frameRate;
 							var elemSettings = {
 										frame:n,
 										dom:dom,
@@ -1702,12 +1732,18 @@
 								elemSettings.frameCount = 1;
 								var childFrame = element.firstFrame;
 								if(element.loop!="single frame")childFrame += (n - frame.startFrame);
+								/*if(element.loop=="loop"){
+									elemSettings.timeOffset = 0;
+									elemSettings.totalDuration = element.timeline.frameCount / ext.doc.frameRate;
+								}*/
 								elemSettings.startFrame = this._getPriorFrame(element.timeline, childFrame);
-							}else if(element.symbolType=="movie clip" && element.libraryItem.timeline.frameCount<(frameEnd-n)*0.5 && frameEnd>n+1){
-								// if MC play time is shorter than half of it's visible run, we'll treat it as an independant loop
-								elemSettings.timeOffset = 0;
-								elemSettings.frameCount = element.libraryItem.timeline.frameCount;
-								elemSettings.totalDuration = (elemSettings.frameCount-1)*(1/ext.doc.frameRate);
+
+							}else if(element.symbolType=="movie clip"){
+								if(elemSettings.timeOffset==0 || element.libraryItem.timeline.frameCount<=(frameEnd-n) && frameEnd>n+1){
+									elemSettings.timeOffset = 0;
+									elemSettings.frameCount = element.libraryItem.timeline.frameCount;
+									elemSettings.totalDuration = elemSettings.frameCount / ext.doc.frameRate;
+								}
 								elemSettings.repeatCount = "indefinite";
 							}
 							if(this._delayedProcessing){
@@ -1770,7 +1806,7 @@
 								}
 								var invMatrix = matrix.invert();
 
-								var time = settings.timeOffset+(n*(1/ext.doc.frameRate))/animDur;
+								var time = settings.timeOffset+(n/ext.doc.frameRate)/animDur;
 								//this._addAnimFrame(frame, element, invMatrix, time, 0, 0, 0, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, alphaList, timeList, splineList);
 								
 								var lastRot = 0;
@@ -1786,7 +1822,7 @@
 
 									var attemptForeRot = true;
 									var attemptBackRot = true;
-									var time = (settings.timeOffset+nextInd*(1/ext.doc.frameRate))/animDur;
+									var time = (settings.timeOffset+nextInd/ext.doc.frameRate)/animDur;
 									var isLast = (nextFrame.duration + nextInd >= frameEnd);
 									if(addTweenKiller){
 										timeList.push(this.precision(time-0.0000001));
@@ -1829,10 +1865,12 @@
 									var swingTop = nextElement.matrix.ty+(nextElement.top-nextElement.matrix.ty)*Math.cos(rotDif)+(nextElement.left-nextElement.matrix.tx)*Math.sin(rotDif);
 									var swingRight = nextElement.matrix.tx+(nextElement.right-nextElement.matrix.tx)*Math.cos(rotDif)+(nextElement.bottom-nextElement.matrix.ty)*Math.sin(rotDif);
 									var swingBottom = nextElement.matrix.ty+(nextElement.bottom-nextElement.matrix.ty)*Math.cos(rotDif)+(nextElement.right-nextElement.matrix.tx)*Math.sin(rotDif);
-									if(boundingBox.left>swingLeft)boundingBox.left = swingLeft;
-									if(boundingBox.top>swingTop)boundingBox.top = swingTop;
-									if(boundingBox.right<swingRight)boundingBox.right = swingRight;
-									if(boundingBox.bottom<swingBottom)boundingBox.bottom = swingBottom;
+									if(!isMasked){
+										if(boundingBox.left>swingLeft)boundingBox.left = swingLeft;
+										if(boundingBox.top>swingTop)boundingBox.top = swingTop;
+										if(boundingBox.right<swingRight)boundingBox.right = swingRight;
+										if(boundingBox.bottom<swingBottom)boundingBox.bottom = swingBottom;
+									}
 
 									addTweenKiller = (nextFrame.tweenType=="none" && (!loopAnim || !isLast));
 									this._addAnimFrame(nextFrame, nextElement, invMatrix, time, rot, skewX, skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, alphaList, timeList, splineList, addTweenKiller);
@@ -1844,7 +1882,7 @@
 									if(nextFrame.elements.length>1 || nextElement.libraryItem!=element.libraryItem)break;
 								}
 								if(addTweenKiller || loopAnim){
-									timeList.push((settings.timeOffset+nextInd*(1/ext.doc.frameRate))/animDur);
+									timeList.push((settings.timeOffset+nextInd/ext.doc.frameRate)/animDur);
 									if(loopAnim){
 										// this code joins the end of the animation up with the start for seemless looping
 										xList.push(xList[0]);
@@ -1882,14 +1920,14 @@
 							}*/
 
 							var lastFrameInd = (transToDiff?frameEnd-1:frameEnd)
-							lastFrameInd    += (lastFrameInd==layerEnd?1:0);
-							var frameTimeStart = this.precision((settings.timeOffset + (n - settings.startFrame)*(1/ext.doc.frameRate))/animDur);
-							var frameTimeEnd = this.precision((settings.timeOffset + (lastFrameInd - settings.startFrame)*(1/ext.doc.frameRate))/animDur);
-
+							//lastFrameInd    += (lastFrameInd==layerEnd?1:0);
+							var frameTimeStart = this.precision((settings.timeOffset + (n - settings.startFrame)/ext.doc.frameRate)/animDur);
+							var frameTimeEnd = this.precision((settings.timeOffset + (lastFrameInd - settings.startFrame)/ext.doc.frameRate)/animDur);
 
 
 							if(frameTimeStart>1)fl.trace("START TIME WARNING: "+frameTimeStart+" "+settings.timeOffset+" "+animDur+" "+n+" "+settings.startFrame+" "+((n - settings.startFrame)*(1/ext.doc.frameRate)));
-							if(frameTimeEnd>1)fl.trace("END TIME WARNING: "+frameTimeEnd);
+							if(frameTimeEnd>1)fl.trace("END TIME WARNING: "+timeline.name+" "+((settings.timeOffset + (lastFrameInd - settings.startFrame)/ext.doc.frameRate) * ext.doc.frameRate)+" / "+(animDur * ext.doc.frameRate)+" = "+frameTimeEnd);
+
 
 							if(frameTimeEnd>1)frameTimeEnd = 1;
 							
@@ -1984,9 +2022,14 @@
 			}else{
 				instanceXML['@viewBox'] = viewBox;
 			}
+			var trans = this._getMatrix(settings.matrix);
+			if(trans==this.IDENTITY_MATRIX)trans = null;
+
 			if(settings.isRoot){
 				if(ext.log) ext.log.pauseTimer(timer);
 				xml.setName('g');
+				
+				if(trans) xml['@transform'] = trans;
 				delete xml['@xlink-href'];
 				return xml;
 			}else{
@@ -2002,7 +2045,7 @@
 
 					// not sure if this is really helping, must test more
 				}
-				instanceXML['@transform'] = this._getMatrix(settings.matrix);
+				if(trans) instanceXML['@transform'] = trans;
 				// if(settings.isRoot && settings.libraryItem){
 				// 	dom.@viewBox = viewBox;
 				// 	dom.@width = instanceXML.@width;
