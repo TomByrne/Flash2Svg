@@ -1,8 +1,9 @@
 (function(ext){
 	function ExtensibleMatrix(matrix){
-		matrix=matrix||{};
+		matrix=matrix || {};
+		if(typeof(matrix)=='xml')matrix = matrix.toString(); // attribute normally
 		if(typeof(matrix)=='string'){
-			matrix=matrix.match(/[\d\.\-]*\d/g);
+			matrix = matrix.match(/[\d\.\-]*\d/g);
 		}
 		if(matrix instanceof Array){
 			this.a=matrix[0]!=undefined?Number(matrix[0]):1;

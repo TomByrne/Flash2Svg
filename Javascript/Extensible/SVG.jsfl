@@ -143,6 +143,7 @@
 		this._origSelection=new ext.Selection([]);
 		this._delayedProcessing=true;// If true, a timeline is processed one level deep in it's entirety before progressing to descendants.
 		this.currentState=0;
+
 		this._origTimeline = ext.doc.getTimeline();
 
 		var versionParser = /\w* (\d+),.*/g;
@@ -234,6 +235,21 @@
 			}
 			this.timelines = splitTimelines;
 		}
+
+
+		this._originalEditList = [];
+		var currentTimeline = ext.doc.getTimeline();
+		while(currentTimeline.libraryItem){
+			ext.doc.exitEditMode();
+			if(ext.doc.selection.length!=1 || (ext.doc.selection[0].libraryItem!=currentTimeline.libraryItem)){
+				alert("Couldn't discover edit path"); // just a precaution at the moment
+				return;
+			}
+			this._originalEditList.unshift(ext.doc.selection[0]);
+			currentTimeline = ext.doc.getTimeline();
+		}
+		this._originalEditList.unshift(ext.doc.timelines.indexOf(currentTimeline));
+
 		return this;
 	}
 	SVG.prototype={
@@ -444,43 +460,6 @@
 		},
 		processExpandUseNodes:function(){
 			if(this.expandSymbols=="none")return;
-
-
-			// if(this.expandSymbols=='usedOnce'){
-			// 	for(var i in this._symbols){
-			// 		var useList = this._symbolToUseNodes[i];
-			// 		if(useList.length==1){
-			// 			var symbol = this._symbols[i];
-			// 			this.qData.push(closure(this.executeExpandUse, [symbol.@id, symbol, useList, this.doms[0].defs], this));
-			// 		}
-			// 	}
-			// }
-			// else if(this.expandSymbols=='nested'){
-			// 	for(var i in this._symbols){
-			// 		var useList = this._symbolToUseNodes[i];
-			// 		var j=0;
-			// 		while(j<useList.length){
-			// 			var useNode = useList[j];
-			// 			if(!isDescendant(this.doms[0].defs, useNode)){
-			// 				useList.splice(j, 1);
-			// 			}else{
-			// 				++j;
-			// 			}
-			// 		}
-			// 		if(useList.length>0){
-			// 			var symbol = this._symbols[i];
-			// 			this.qData.push(closure(this.executeExpandUse, [symbol.@id, symbol, useList, this.doms[0].defs], this));
-			// 		}
-			// 	}
-			// }
-			// else{
-			// 	// expand all
-			// 	for(var i in this._symbols){
-			// 		var useList = this._symbolToUseNodes[i];
-			// 		var symbol = this._symbols[i];
-			// 		this.qData.push(closure(this.executeExpandUse, [symbol.@id, symbol, useList, this.doms[0].defs], this));
-			// 	}
-			// }
 
 			var onceUsed = this.expandSymbols=='usedOnce';
 			var nested = this.expandSymbols=='nested';
@@ -760,14 +739,7 @@
 						var child = document.children()[i];
 						var childName = child.localName();
 						if(childName=="g" || childName=="path" || childName=="path"){
-							var childTrans = child.@transform;
-							if(childTrans.length()){
-								var mat = new ext.Matrix(trans);
-								mat.concat(transMat);
-								child.@transform = this._getMatrix(mat);
-							}else{
-								child.@transform = trans;
-							}
+							this._applyMatrix(child, trans, transMat, false);
 						}
 					}
 					delete document.@transform;
@@ -775,7 +747,6 @@
 				document['@viewBox']=String(this.x)+' '+String(this.y)+' '+String(this.width)+' '+String(this.height);
 				document.@width = this.width;
 				document.@height = this.height;
-				
 
 				if(this.includeBackground){
 					document['@enable-background']='new '+document['@viewBox'];
@@ -785,6 +756,8 @@
 				if(this.compactOutput){
 					outputObject.string = outputObject.string.split("  ").join("");
 					outputObject.string = outputObject.string.split("\n").join("");
+					// Some older versions of Chrome (and possibly others) have a bug that requires a newline before closing the symbol tag
+					outputObject.string = outputObject.string.split("</symbol>").join("\n</symbol>");
 				}
 				outputObject.id = document.@id;
 
@@ -915,11 +888,19 @@
 			if(this.swfPanel){
 				epSuccess=this.swfPanel.call('endProgress');	
 			}
-			if(this._origTimeline.libraryItem){
+			/*if(this._origTimeline.libraryItem){
 				ext.doc.library.editItem(this._origTimeline.libraryItem.name);
 			}else{
 				ext.doc.editScene(ext.doc.timelines.indexOf(this._origTimeline));
+			}*/
+
+			ext.doc.editScene(this._originalEditList[0]);
+			for(var i=1; i<this._originalEditList.length; i++){
+				ext.doc.selection = [this._originalEditList[i]];
+				ext.doc.enterEditMode("inPlace");
 			}
+
+
 			if(epSuccess){
 				ext.message('Export Successful: ');
 				for(var i=0; i<this.timelines.length; ++i){
@@ -1545,7 +1526,7 @@
 						//}
 					}
 
-					animNode.@dur = animDur+"s";
+					animNode.@dur = this.precision(animDur)+"s";
 				}else{
 					animDur = 0;
 				}
@@ -2012,10 +1993,10 @@
 				}
 			}
 			var viewBox=(
-				String(boundingBox.left)+' '+
-				String(boundingBox.top)+' '+
-				String(boundingBox.right-boundingBox.left)+' '+
-				String(boundingBox.bottom-boundingBox.top)
+				String(this.precision(boundingBox.left))+' '+
+				String(this.precision(boundingBox.top))+' '+
+				String(this.precision(boundingBox.right-boundingBox.left))+' '+
+				String(this.precision(boundingBox.bottom-boundingBox.top))
 			);
 			if(isNew){
 				xml['@viewBox'] = viewBox;
@@ -2352,7 +2333,7 @@
 			animNode.@begin = beginAnimation;
 			animNode.@repeatCount = repeatCount;
 
-			animNode.@dur = totalTime+"s";
+			animNode.@dur = this.precision(totalTime)+"s";
 			animNode.@keyTimes = validT.join(";");
 			animNode.@values = validV.join(";");
 
@@ -3266,7 +3247,7 @@
 					var firstPoint = cp[0];
 					if(!lastPoint || lastPoint.x!=firstPoint.x || lastPoint.y!=firstPoint.y){
 						lastDeg = degPrefix[0];
-						pathStr += lastDeg+firstPoint.x+","+firstPoint.y;
+						pathStr += lastDeg+this.precision(firstPoint.x)+","+this.precision(firstPoint.y);
 					}
 					var deg = degPrefix[cp.length-1];
 					if(deg!=lastDeg){
@@ -3278,7 +3259,7 @@
 					for(var k=1; k<cp.length; k++){
 						if(k!=1)pathStr += " ";
 						var point = cp[k];
-						pathStr += point.x+","+point.y;
+						pathStr += this.precision(point.x)+","+this.precision(point.y);
 					}
 					lastPoint = point;
 				}
@@ -3293,268 +3274,6 @@
 			return new XML(xmlStr);
 
 		},
-		/*_getContour:function(contour,options){
-			if(ext.log){
-				var timer=ext.log.startTimer('extensible.SVG._getContour()');	
-			}
-			var settings=new ext.Object({
-				matrix:null,
-				reversed:false,
-				colorTransform:null
-			});
-			settings.extend(options);
-			var dom = settings.dom;
-
-			var controlPoints=contour.getControlPoints({
-				curveDegree:this.curveDegree,
-				reversed:settings.reversed
-			});
-			if(!controlPoints || controlPoints.length==0){
-				return;
-			}
-
-			var sameStrokes = contour.interior && controlPoints.length>1;
-
-			var paths=new ext.Array();
-			var xform='';
-			if(settings.matrix){
-				xform='transform="'+this._getMatrix(settings.matrix)+'" ';
-			}
-			var id,idString;
-			if(contour.interior){//Construct a curve for the enclosed shape if present.
-
-				var tuple = {};
-				var cdata = this._getCurve(controlPoints, contour.orientation, tuple);
-
-				if(sameStrokes){
-					// work out of the path is closed
-					var firstPoint = controlPoints[0][0];
-					var lastCont = controlPoints[controlPoints.length-1];
-					var lastDeg = lastCont.length-1;
-					var lastPoint = lastCont[lastDeg];
-					sameStrokes = lastPoint.is(firstPoint) && !tuple.moved;
-				}
-
-				if(sameStrokes){
-					// If the whole path has the same stroke we only need to create one path element, we work that out here
-					var lastStroke = null;
-					for(i=0;i<controlPoints.length;i++){
-						var edge = controlPoints[i][0].edge;
-						if(!edge.stroke || (i!=0 && !edge.stroke.is(lastStroke)) || edge.stroke.style=="noStroke"){
-							sameStrokes = false;
-							break;
-						}
-						lastStroke = edge.stroke;
-					}
-				}
-
-				var fillString='none';
-				var opacityString = "";
-				var fill=this._getFill(contour.fill,{
-					shape:contour.shape
-				});
-				if(fill){
-					if(fill.name()=='solidColor'){
-						fillString=String(fill['@solid-color']);
-						var fillOp = String(fill['@solid-opacity']);
-						if(fillOp && fillOp.length){
-							opacityString = ' fill-opacity="'+fillOp+'"';
-						}
-					}else{
-						if(!fill.parent()){
-							dom.defs.appendChild(fill)
-						}
-						fillString='url(#'+String(fill['@id'])+')';
-					}
-				}
-				//id=this._uniqueID('path');
-				//idString='id="'+id+'" ';
-				var strokeStr = (sameStrokes?" "+this._getStroke(lastStroke,{shape:contour.shape,dom:dom}):"");
-				paths.push('<path  '+xform+'fill="'+fillString + '"' + strokeStr + opacityString+' d="'+cdata+'"/>\n');
-			}
-			if(controlPoints.length>0 && !settings.reversed && !sameStrokes){
-				//Create a contour for each length of contiguous edges w/ the same stroke attributes. 
-				//Skipped for settings.reversed, which is only used for creating hollows.
-				var cp=new ext.Array([]);
-				var stroke=null;
-				var firstEdge=controlPoints[0][0].edge;
-				if(firstEdge.stroke && firstEdge.stroke.style!='noStroke'){
-					cp.push(controlPoints[0]);
-					stroke=firstEdge.stroke;
-				}
-				for(i=1;i<controlPoints.length;i++){
-					var edge=controlPoints[i][0].edge;
-					if(edge.stroke && edge.stroke.style!='noStroke'){
-						if(stroke!==null && edge.stroke.is(stroke)){
-							cp.push(controlPoints[i]);
-						}else{
-							// next part of path has a dif'rent stroke, finalise the current path and start a new one
-							if(stroke && cp.length>0){
-								//id=this._uniqueID('path');
-								//idString='id="'+id+'" ';
-								paths.push(
-									'<path '+
-									//idString+
-									xform+
-									'fill="none" '+
-									this._getStroke(stroke,{shape:contour.shape,dom:dom})+
-									'd="'+this._getCurve(cp,contour.orientation)+'" '+
-									'/>\n'
-								);
-							}
-							stroke=edge.stroke;
-							cp=new ext.Array([controlPoints[i]]);
-						}
-					}else{
-						if(stroke && cp.length>0){
-							//id=this._uniqueID('path');
-							//idString='id="'+id+'" ';
-							paths.push(
-								'<path '+
-								//idString+
-								xform+
-								'fill="none" '+
-								this._getStroke(stroke,{dom:dom})+
-								'd="'+this._getCurve(cp,contour.orientation)+'" '+
-								'/>\n'
-							);
-						}
-						stroke=null;
-						cp.clear();
-					}
-				}
-				if(stroke && cp.length>0){//create the last stroke
-					if(
-						firstEdge.stroke && firstEdge.stroke.style!='noStroke' && stroke.is(firstEdge.stroke)
-						&& ((contour.interior && paths.length>1) || (!contour.interior && paths.length>0))
-					){//if the stroke on the beginning of the contour matches that at the end, connect them
-						var pathID=contour.interior?1:0;
-						var x=new XML(paths[pathID]);
-						var cd1=this._getCurve(cp,contour.orientation).trim();
-						var cd2=x['@d'].trim();
-						var cd1Points=cd1.split(' ');
-						var cd2Points=cd2.split(' ');
-						var cd1ep=cd1Points.pop();
-						var cd2sp=cd2Points.shift();
-						if(cd1ep.replace(/[A-Za-z]/g,'')==cd2sp.replace(/[A-Za-z]/g,'')){
-							x['@d']=cd1Points.join(' ')+' '+cd1ep+' '+cd2Points.join(' ');
-						}else{
-							x['@d']=cd1+' '+cd2;
-						}
-						if(cd1Points.shift().replace(/[A-Za-z]/g,'')==cd2Points.pop().replace(/[A-Za-z]/g,'')){
-							x['@d']+='z';
-						}
-						paths[pathID]=x.toXMLString()+'\n';
-					}else{
-						//id=this._uniqueID('path');
-						//idString='id="'+id+'" ';
-						paths.push(
-							'<path '+
-							//idString+
-							xform+
-							'fill="none" '+
-							this._getStroke(stroke,{dom:dom})+
-							'd="'+this._getCurve(cp,(contour.orientation && paths.length>2)?true:false)+'" '+
-							'/>\n'
-						);
-					}
-				}
-			}
-			var xml;
-			//id=this._uniqueID('shape');
-			xml=new XML('<g/>');
-			for(var i=0;i<paths.length;i++){
-				xml.appendChild(new XML(paths[i]));
-			}
-			if(ext.log){
-				ext.log.pauseTimer(timer);	
-			}
-			return(xml);
-		},*/
-		/**
-		 * Build a curve string from an array of arrays of points.
-		 * @param {Array} controlPoints
-		 * @private {Boolean} close
-		 */
-		/*_getCurve:function(controlPoints, close, tuple){
-			if(ext.log){
-				var timer=ext.log.startTimer('extensible.SVG._getCurve()');	
-			}
-			close=(close!==undefined?close:true);
-			close = (close!==undefined?close==-1:true);
-			if(controlPoints.length==0){
-				return;	
-			}*/
-			
-
-			//filter segments if they are discontinuous
-			/*if (controlPoints.length > 2)
-			{
-				var newControlPoints = new ext.Array([]);
-				newControlPoints.push(controlPoints[0]);
-
-				for(var i=1;i<controlPoints.length-1;i++){ //don't look at first or last segments
-					var currentSegment = controlPoints[i];
-					var prevSegment = controlPoints[i-1];
-					var nextSegment = controlPoints[i+1];
-					if ((currentSegment[0].is(prevSegment[0]) || currentSegment[0].is(prevSegment[prevSegment.length-1])
-						||currentSegment[0].is(nextSegment[0]) || currentSegment[0].is(nextSegment[nextSegment.length-1]))
-						&& 
-						(currentSegment[currentSegment.length-1].is(prevSegment[0]) || currentSegment[currentSegment.length-1].is(prevSegment[prevSegment.length-1])
-						||currentSegment[currentSegment.length-1].is(nextSegment[0]) || currentSegment[currentSegment.length-1].is(nextSegment[nextSegment.length-1])))
-						{
-							newControlPoints.push(currentSegment);
-						}
-
-				}
-
-				newControlPoints.push(controlPoints[controlPoints.length-1]);
-				controlPoints = newControlPoints;
-			}*/
-
-			/*var degPrefix=['M','L','Q','C'];
-			var deg=controlPoints[0].length-1;
-			var curveString=[degPrefix[0]+controlPoints[0][0].x+","+controlPoints[0][0].y+" "];
-			if(deg>0){
-				curveString.push(degPrefix[deg]+controlPoints[0][1].x+","+controlPoints[0][1].y+" ");
-			}
-			if(deg>1){
-				curveString.push(controlPoints[0][2].x+","+controlPoints[0][2].y+" ");
-			}
-			if(deg>2){
-				curveString.push(controlPoints[0][3].x+","+controlPoints[0][3].y+" ");
-			}
-			for(var i=1;i<controlPoints.length;i++){
-				var prevdeg=deg;
-				deg=controlPoints[i].length-1;
-				if(!controlPoints[i][0].is(controlPoints[i-1][prevdeg])){
-					prevdeg = (close?"L":"M");
-					curveString.push(
-						prevdeg+String(controlPoints[i][0].x)+","+
-						String(controlPoints[i][0].y)+" "
-					);
-					if(tuple)tuple.moved = true;
-				}
-				if(deg!=prevdeg){
-					curveString.push(degPrefix[deg]);
-				}
-				for(var n=1;n<=deg;n++){
-					curveString.push(controlPoints[i][n].x+","+controlPoints[i][n].y+(n==deg?"":" "));
-				}
-				if(
-					close && controlPoints[i][deg].is(controlPoints[0][0])
-				){
-					curveString.push('z ');
-					break;
-				}else{
-					curveString.push(" ");
-				}
-			}
-			if(ext.log){
-				ext.log.pauseTimer(timer);	
-			}
-			return curveString.join('');
-		},*/
 		/**
 		 * Returns a paint server for the specified fill.
 		 * @param {extensible.Fill} fillObj
@@ -3914,7 +3633,6 @@
 				}else{
 					var mat = frameTrans.concat(transMat);
 				}
-				//fl.trace("\nP MERGE: "+k+"/" + childNode.children().length()+"\n"+toNode.@transform.toString()+" + "+transStr+" = "+this._getMatrix(mat)+"\n");
 				toNode.@transform = this._getMatrix(mat);
 			}
 		},
@@ -3923,12 +3641,12 @@
 				matrix=new ext.Matrix(matrix);
 			}
 			return([
-				'matrix('+String(matrix.a),
-				String(matrix.b),
-				String(matrix.c),
-				String(matrix.d),
-				String(matrix.tx),
-				String(matrix.ty)+')'
+				'matrix('+String(this.precision(matrix.a)),
+				String(this.precision(matrix.b)),
+				String(this.precision(matrix.c)),
+				String(this.precision(matrix.d)),
+				String(this.precision(matrix.tx)),
+				String(this.precision(matrix.ty))+')'
 			].join(' '));
 		},
 		_uniqueID:function(id,xml){
