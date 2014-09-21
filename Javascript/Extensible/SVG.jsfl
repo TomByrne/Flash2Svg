@@ -33,7 +33,7 @@
 			rendering:'auto', // 'auto', 'optimizeSpeed', 'optimizeQuality', 'inherit'
 			convertPatternsToSymbols:true,
 			applyTransformations:true,
-			applyColorEffects:true,
+			applyColorEffects:false,
 			flattenMotion:true,
 			curveDegree:3,
 			maskingType:'clipping',
@@ -238,6 +238,7 @@
 
 
 		this._originalEditList = [];
+		this._originalFramesList = [];
 		var currentTimeline = ext.doc.getTimeline();
 		while(currentTimeline.libraryItem){
 			ext.doc.exitEditMode();
@@ -245,10 +246,14 @@
 				alert("Couldn't discover edit path"); // just a precaution at the moment
 				return;
 			}
-			this._originalEditList.unshift(ext.doc.selection[0]);
+			var element = ext.doc.selection[0];
+			element.frame = currentTimeline.currentFrame;
+			this._originalEditList.unshift(element);
+			this._originalFramesList.unshift(currentTimeline.currentFrame);
 			currentTimeline = ext.doc.getTimeline();
 		}
 		this._originalEditList.unshift(ext.doc.timelines.indexOf(currentTimeline));
+		this._originalFramesList.unshift(currentTimeline.currentFrame);
 
 		return this;
 	}
@@ -562,7 +567,6 @@
 				}
 				return;
 			}
-			verbose = frameNode.@id.toString()=="Tween_2_t417";
 
 			var searchChildren = [];
 			var i=0;
@@ -673,6 +677,8 @@
 								newChild.@transform = this._getMatrix(mat);
 							}*/
 						}
+						var newChildName = newChild.localName();
+						var isGraphic = (newChildName=="g" || newChildName=="path");
 						for(var j=0; j<childNode.attributes().length(); j++){
 							var attr = childNode.attributes()[j];
 							var name = attr.name();
@@ -681,7 +687,9 @@
 								continue;
 							}
 							if(	(!hasTrans || name!="transform") &&
-								(!hasStyle || name!="style"))
+								(!hasStyle || name!="style") &&
+								(!isGraphic || name!="viewBox") &&
+								(!isGraphic || name!="overflow"))
 									newChild.@[attr.name()] = attr.toXMLString();
 						}
 						lastChild = newChild;
@@ -728,6 +736,7 @@
 					this.applyMatrices(document);
 				}
 				this._applyColorEffects(document,document.defs);
+				this._deleteUnusedFilters(document);
 				document['@xmlns']="http://www.w3.org/2000/svg";
 
 				var trans = document.@transform;
@@ -895,9 +904,15 @@
 			}*/
 
 			ext.doc.editScene(this._originalEditList[0]);
+			var frame = this._originalFramesList[0];
+			ext.doc.getTimeline().currentFrame = frame;
+
 			for(var i=1; i<this._originalEditList.length; i++){
-				ext.doc.selection = [this._originalEditList[i]];
+				var element = this._originalEditList[i];
+				frame = this._originalFramesList[i];
+				ext.doc.selection = [element];
 				ext.doc.enterEditMode("inPlace");
+				ext.doc.getTimeline().currentFrame = frame;
 			}
 
 
@@ -988,6 +1003,7 @@
 					this.copyNodeContents(useNode, symbol);
 					delete useNode['@id'];
 					delete symbol['@viewBox'];
+					delete symbol['@overflow'];
 
 					if(useNode.@transform && useNode.@transform!=this.IDENTITY_MATRIX)symbol.@transform = useNode.@transform;
 					delete useNode.parent().children()[useNode.childIndex()];
@@ -1005,6 +1021,8 @@
 					delete useNode['@height'];
 					delete useNode['@x'];
 					delete useNode['@y'];
+					delete useNode['@viewBox'];
+					delete useNode['@overflow'];
 					if(useNode['@transform']==this.IDENTITY_MATRIX){
 						delete useNode['@transform'];
 					}
@@ -1054,25 +1072,21 @@
 		 * Deletes unreferenced defs.
 		 * @parameter {XML} xml
 		 */
-		// deleteUnusedReferences:function(xml){
-		// 	if(!xml.defs || xml.defs.length()==0){
-		// 		return xml;	
-		// 	}
-		// 	var refs=this._listReferences(xml);//memory errors!
-		// 	var references=xml.defs.*.copy();
-		// 	delete xml.defs.*;
-		// 	for each(var def in references){
-		// 		if(
-		// 			refs.indexOf(String(def.@id))>=0 && (
-		// 				def.localName()!='filter' ||
-		// 				def.*.length()>0
-		// 			)
-		// 		){
-		// 			xml.defs.appendChild(def);
-		// 		}
-		// 	}
-		// 	return xml;
-		// },
+		_deleteUnusedFilters:function(xml){
+			if(!xml.defs || xml.defs.length()==0){
+				return xml;	
+			}
+			var references = xml.defs.children();
+			for(var i=0; i<references.length(); i++){
+				var def = references[i];
+				if(def.localName()!="filter")continue;
+
+				var id = def.@id.toString();
+				if(xml..use.(hasOwnProperty('@filter') && @filter==id).length()==0){
+					delete xml.defs.children()[i];
+				}
+			}
+		},
 		/**
 		 * Retrieves a list of references used.
 		 * @parameter {XML} xml
@@ -1720,7 +1734,8 @@
 								elemSettings.startFrame = this._getPriorFrame(element.timeline, childFrame);
 
 							}else if(element.symbolType=="movie clip"){
-								if(elemSettings.timeOffset==0 || element.libraryItem.timeline.frameCount<=(frameEnd-n) && frameEnd>n+1){
+								if(elemSettings.timeOffset==0 || element.libraryItem.timeline.frameCount<(frameEnd-n) && frameEnd>n+1){
+									elemSettings.beginAnimation = this.precision(elemSettings.timeOffset)+"s";
 									elemSettings.timeOffset = 0;
 									elemSettings.frameCount = element.libraryItem.timeline.frameCount;
 									elemSettings.totalDuration = elemSettings.frameCount / ext.doc.frameRate;
@@ -1865,6 +1880,9 @@
 								if(addTweenKiller || loopAnim){
 									timeList.push((settings.timeOffset+nextInd/ext.doc.frameRate)/animDur);
 									if(loopAnim){
+										if(settings.loopTweens && splineList[splineList.length-1]==this.NO_TWEEN_SPLINE){
+											splineList[splineList.length-1] = splineList[0];
+										}
 										// this code joins the end of the animation up with the start for seemless looping
 										xList.push(xList[0]);
 										yList.push(yList[0]);
@@ -1881,10 +1899,10 @@
 								}
 								// the ordering of these animation nodes is important
 								this._addAnimationNode(elementXML, "translate", [xList, yList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete)
+								this._addAnimationNode(elementXML, "scale", [scxList, scyList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, scxList.length>1)
 								this._addAnimationNode(elementXML, "rotate", [rotList, trxList, tryList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete, rotList.length>1)
 								this._addAnimationNode(elementXML, "skewX", [skxList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete)
 								this._addAnimationNode(elementXML, "skewY", [skyList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete)
-								this._addAnimationNode(elementXML, "scale", [scxList, scyList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, scxList.length>1)
 								this._addAnimationNode(elementXML, "opacity", [alphaList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete)
 
 								elementXML.@transform = this._getMatrix(matrix);
@@ -2000,7 +2018,7 @@
 			);
 			if(isNew){
 				xml['@viewBox'] = viewBox;
-			}else{
+			}else if(xml['@viewBox']!=viewBox){
 				instanceXML['@viewBox'] = viewBox;
 			}
 			var trans = this._getMatrix(settings.matrix);
@@ -2313,7 +2331,7 @@
 					validS.push(splineList[i]);
 				}
 			}
-			if(validT[0]<1){
+			if(validT[validT.length-1]<1){
 				validV.push(lastVal);
 				validT.push(1);
 			}else{
