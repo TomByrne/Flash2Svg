@@ -1076,13 +1076,14 @@
 			if(!xml.defs || xml.defs.length()==0){
 				return xml;	
 			}
+			var filtered = xml.descendants().(function::attribute('filter').length() && @['filter']!=null);
 			var references = xml.defs.children();
-			for(var i=0; i<references.length(); i++){
+			for(var i=references.length()-1; i>=0; i--){
 				var def = references[i];
 				if(def.localName()!="filter")continue;
 
-				var id = def.@id.toString();
-				if(xml..use.(hasOwnProperty('@filter') && @filter==id).length()==0){
+				var id = "url(#"+def.@id.toString()+")";
+				if(filtered.(@filter.toString()==id).length()==0){
 					delete xml.defs.children()[i];
 				}
 			}
@@ -1178,8 +1179,9 @@
 				var attr = fromNode.attributes()[i];
 				toNode.@[attr.name()] = attr.toXMLString();
 			}
-			for(var i=0; i<fromNode.children().length(); i++){
-				var child = fromNode.children()[i];
+			var children = fromNode.children();
+			for(var i=children.length()-1; i>=0; i--){
+				var child = children[i];
 				toNode.appendChild(child);
 			}
 		},
@@ -2945,32 +2947,28 @@
 							for(var n=filled.length-1;n>-1;n-=1){
 								var fillN = filled[n];
 								var otherFill = svgArray[fillN];
-								var noFills = oppositeFill.style=='noFill' && fill.style=='noFill';
+								var othContour = validContours[fillN];
+								var noFills = oppositeFill.style=='noFill' && othContour.fill.style=='noFill';
 								var insideOut = !noFills && fill.orientation!=fill.orientation;//fill.is(validContours[fillN].fill);
 								var sameDir=(
 									contours[i].orientation
 									//+Number(contours[i].getControlPoints( {curveDegree:this.curveDegree} ).isReversed)
 									<0
 								)==(
-									validContours[fillN].orientation
+									othContour.orientation
 									//+Number(validContours[fillN].getControlPoints( {curveDegree:this.curveDegree} ).isReversed)
 									<0
 								);
-								if(
-									otherFill.path.length()  
+								if(		otherFill.path.length()
 									&& (otherFill.path.fill.length() || otherFill.path.@fill.length())
 									//&& otherFill.path[0].@stroke.length()==0
-									&& (
-										oppositeFill.is(validContours[fillN].fill) 
+									&& (oppositeFill.is(othContour.fill) 
 										|| noFills
-										|| ( 
-											insideOut
-											&& oppositeFill.style=='noFill'
-										) //???
+										|| (insideOut && oppositeFill.style=='noFill') //???
 									)// && otherFill.path[0].stroke.length()==0
 								){
 									var cutID=String(otherFill.path[0]['@id']);
-									var rev=( sameDir && !insideOut ) || ( insideOut && !sameDir);
+									var rev = ( sameDir!=insideOut );
 									if(rev){
 										s=this._getContour(contours[i],{
 											colorTransform:settings.colorTransform,
@@ -3008,7 +3006,7 @@
 														svgArray[svgArray.length-1].path[0].@d
 													).replace(pA,'').replace(pAO,'');
 
-											}else if(!contours[i].edgeIDs.intersect(validContours[fillN].edgeIDs).length && (validContours[fillN].fill.is(fill) || fill.style=="noFill")/* && oppositeFill.style!="noFill"*/){
+											}else if(!contours[i].edgeIDs.intersect(othContour.edgeIDs).length && (othContour.fill.is(fill) || fill.style=="noFill")/* && oppositeFill.style!="noFill"*/){
 												// this creates composite paths, where a path makes the hole in another filled path
 												if(pA[pA.length-1]!=='z'){
 													pA+='z';
