@@ -223,11 +223,11 @@ extensible.load(
 		'Timer',
 		'Function',
 		'MathUtils',
-		'ArrayUtils'
+		'ArrayUtils',
+		'Geom'
 	],
 	true
 );
-
 
 
 

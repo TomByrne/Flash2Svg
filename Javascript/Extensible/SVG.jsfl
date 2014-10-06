@@ -2922,43 +2922,103 @@
 			}
 			var svgArray=new ext.Array();
 			var filled=new ext.Array();
-			var tobeCut=null;
-			var ii;
+			var edgeIdLists=new ext.Array();
+			var oppFillsLists=new ext.Array();
+			var polygonsList=new ext.Array();
+			var holes=new ext.Array();
+			//var ii;
 			var validContours=new ext.Array([]);
-			for(i=0;i<contours.length;i++){
-				var s=this._getContour(contours[i],{
+			for(i=0; i<contours.length; i++){
+				var contour = contours[i];
+				var s=this._getContour(contour,polygonsList,{
+					otherPaths:svgArray,
+					edgeIdLists:edgeIdLists,
+					contoursList:validContours,
+					nodeList:svgArray,
 					colorTransform:settings.colorTransform,
 					matrix:pathMatrix,
+					holes:holes,
 					dom:dom
 				});
-				if(s){
-					validContours.push(contours[i]);
+			}
+			for(var j=0; j<holes.length; j++){
+				var holeObj = holes[j];
+				var contour = holeObj.contour;
+				var edgeIDs = holeObj.edgeIDs;
+				var pathStr = holeObj.pathStr;
+				var holePoly = holeObj.polygon;
+
+				var oppFills = new ext.Array();;
+				for(var i=0;i<contours.length;i++){
+					var othContour = contours[i];
+					if(othContour==contour)continue;
+
+					if(othContour.edgeIDs.intersect(edgeIDs).length>0){
+						oppFills.push(othContour.fill);
+					}
+				}
+				for(var i=0; i<svgArray.length; i++){
+					var otherG = svgArray[i];
+					var othEdges = edgeIdLists[i];
+					var othContour = validContours[i];
+					var othPolys = polygonsList[i];
+					var paths = otherG.path;
+
+					if(oppFills.length && !edgeIDs.intersect(othEdges).length && oppFills.indexOf(othContour.fill)==-1)continue;
+
+					for(var k=0; k<paths.length(); k++){
+						var pathNode = paths[k];
+						if(pathNode.@fill=="none")continue;
+
+						if(!ext.Geom.intersects(othPolys[k], holePoly)){
+							continue;
+						}
+
+						var d = pathNode.@d.toString();
+						d = d.replace("z", '');
+						d += " "+pathStr;
+
+						if(pathNode.@stroke.length()){
+							var newNode = new XML('<path fill="'+pathNode.@fill+'" d="'+d+'"/>\n');
+							otherG.insertChildBefore(pathNode, newNode);
+							pathNode.@fill = "none";
+							++k;
+						}else{
+							pathNode.@d = d;
+						}
+					}
+				}
+			}
+				/*if(s){
+					validContours.push(contour);
 					svgArray.push(s);
-					if(contours[i].orientation!=0){
-						var oppositeFill=contours[i].oppositeFill;
-						var fill=contours[i].fill;
-						if(
+					if(contour.orientation!=0){
+						var oppositeFill=contour.oppositeFill;
+						var fill = contour.fill;
+						if(false && 
 							filled.length>0 				
 							//&& !(oppositeFill.style=='noFill' &&	fill.style=='noFill')
 							&& s.path.length()
 							//&& s.path[0].fill.length()
 						){
 							var deleted=false;
-							for(var n=filled.length-1;n>-1;n-=1){
+							for(var n = filled.length-1; n>=0; --n){
+									fl.trace("\tcut: "+i+" "+n);
 								var fillN = filled[n];
 								var otherFill = svgArray[fillN];
 								var othContour = validContours[fillN];
 								var noFills = oppositeFill.style=='noFill' && othContour.fill.style=='noFill';
-								var insideOut = !noFills && fill.orientation!=fill.orientation;//fill.is(validContours[fillN].fill);
+								var insideOut = !noFills && othContour.orientation==contour.orientation;//fill.is(validContours[fillN].fill);
 								var sameDir=(
-									contours[i].orientation
-									//+Number(contours[i].getControlPoints( {curveDegree:this.curveDegree} ).isReversed)
+									contour.orientation
+									//+Number(contour.getControlPoints( {curveDegree:this.curveDegree} ).isReversed)
 									<0
 								)==(
 									othContour.orientation
 									//+Number(validContours[fillN].getControlPoints( {curveDegree:this.curveDegree} ).isReversed)
 									<0
 								);
+									fl.trace("\tdo: "+oppositeFill.style+" "+othContour.fill.style+" "+fill.style);
 								if(		otherFill.path.length()
 									&& (otherFill.path.fill.length() || otherFill.path.@fill.length())
 									//&& otherFill.path[0].@stroke.length()==0
@@ -2970,7 +3030,7 @@
 									var cutID=String(otherFill.path[0]['@id']);
 									var rev = ( sameDir!=insideOut );
 									if(rev){
-										s=this._getContour(contours[i],{
+										s=this._getContour(contour,{
 											colorTransform:settings.colorTransform,
 											reversed: true,
 											matrix:pathMatrix,
@@ -2981,7 +3041,7 @@
 										s=svgArray.at(-1);
 									}
 									if(s && s.path.length()){
-										var so=this._getContour(contours[i],{
+										var so=this._getContour(contour,{
 											colorTransform:settings.colorTransform,
 											reversed: !rev,
 											matrix: pathMatrix,
@@ -3006,47 +3066,30 @@
 														svgArray[svgArray.length-1].path[0].@d
 													).replace(pA,'').replace(pAO,'');
 
-											}else if(!contours[i].edgeIDs.intersect(othContour.edgeIDs).length && (othContour.fill.is(fill) || fill.style=="noFill")/* && oppositeFill.style!="noFill"*/){
+											}else if(!contour.edgeIDs.intersect(othContour.edgeIDs).length && (othContour.fill.is(fill) || fill.style=="noFill")){
 												// this creates composite paths, where a path makes the hole in another filled path
 												if(pA[pA.length-1]!=='z'){
 													pA+='z';
 												}
 												otherFill.path[0]['@d'] += pA;
-												if((oppositeFill.style==fill.style) && fill.style!='noFill' && insideOut){
+
+												if(!deleted && (oppositeFill.style==fill.style) && fill.style!='noFill' && (!noFills && othContour.orientation!=contour.orientation)){
 													delete svgArray[svgArray.length-1].path[0];
 													deleted=true;
 												}
 											}										
 										}
-										break;
+										//break;
 									}
 								}
 							}
-							if(oppositeFill.style=='noFill' && fill.style=='noFill' && !deleted){
-								//delete svgArray[svgArray.length-1].path[0];
-							}
-							/*if(
-								fill.style=='noFill' || (
-									insideOut && oppositeFill.style=='noFill'
-								) 
-							){
-								ii=0;
-								var sa=svgArray[svgArray.length-1].copy();
-								for each(var n in sa.*){
-									if(n['@stroke'].length()==0){
-										delete svgArray[svgArray.length-1].path[ii];
-									}
-									ii+=1;
-								}
-								delete sa;
-							}*/
 						}
-						if(contours[i].fill.style!='noFill'){
+						if(contour.fill.style!='noFill'){
 							filled.push(svgArray.length-1);
 						}
 					}
 				}
-			}	
+			}*/
 			var svg=new XML('<g/>');
 			var matrixStr = this._getMatrix(matrix);
 			if(matrixStr!=this.IDENTITY_MATRIX)svg['@transform']=matrixStr;
@@ -3133,7 +3176,7 @@
 			}
 			return svg;		
 		},
-		_getContour:function(contour,options){
+		_getContour:function(contour, polygonsList, options){
 			if(ext.log){
 				var timer=ext.log.startTimer('extensible.SVG._getContour()');	
 			}
@@ -3141,11 +3184,21 @@
 				matrix:null,
 				reversed:false,
 				colorTransform:null,
-				filledOnly:false
+				filledOnly:false,
+				otherPaths:[],
+				edgeIdLists:null,
+				nodeList:null,
+				contoursList:null,
+				holes:null
 			});
 			settings.extend(options);
 			var dom = settings.dom;
 			var curveDeg = this.curveDegree;
+			var otherPaths = settings.otherPaths;
+			var edgeIdLists = settings.edgeIdLists;
+			var contoursList = settings.contoursList;
+			var nodeList = settings.nodeList;
+			var holes = settings.holes;
 
 			var xform='';
 			if(settings.matrix){
@@ -3187,9 +3240,13 @@
 			var strokeMap = {};
 			var currPath;
 			var lastStroke;
+			var edgeIDs = new ext.Array();
 			while (id != iStart) 
 			{ 
 				var e = he.getEdge();
+				if(edgeIDs.indexOf(e.id)<0){
+					edgeIDs.push(e.id);
+				}
 				try{
 					var cubicSegmentIndex = curveDeg==3?e.cubicSegmentIndex:-1;
 				}catch(e){
@@ -3212,7 +3269,7 @@
 				if(e.getHalfEdge(1).id == he.id){
 					cp = cp.reverse();
 				}
-				
+
 				if(!settings.filledOnly && e.stroke && e.stroke.style!='noStroke'){
 					var stroke = " "+this._getStroke(e.stroke, {dom:dom});
 
@@ -3232,6 +3289,7 @@
 				he = he.getNext(); 
 				id = he.id; 
 			}
+			if(!contour.interior && !lastStroke)return;
 
 			if(filledPath && paths.length>1){
 				var firstStroke = paths[1];
@@ -3242,8 +3300,15 @@
 				}
 			}
 
+			var cutHole = contour.interior && !fill && otherPaths!=null;
+			var reverse = settings.reversed || contour.orientation==1;
+			if(cutHole)reverse = !reverse;
+
 			var degPrefix=['M','L','Q','C'];
 			var pathNodes = [];
+			var polygons = [];
+			//fl.trace("\nContour: "+paths.length+" int: "+contour.interior+" ori: "+contour.orientation+" "+fillString+" cut:"+cutHole+" r:"+reverse);
+			//fl.trace("edges: "+edgeIDs+" "+filledPath);
 			for (var i=0; i<paths.length; i++) 
 			{ 
 				currPath = paths[i];
@@ -3251,19 +3316,21 @@
 				var lastDeg = null;
 				var lastPoint = null;
 
-				if(settings.reversed){
+				if(reverse){
 					currPath.contours.reverse();
 				}
 
+				var polygon = [];
 				for(var j=0; j<currPath.contours.length; j++){
 					cp = currPath.contours[j];
-					if(settings.reversed){
+					if(reverse){
 						cp.reverse();
 					}
 					var firstPoint = cp[0];
 					if(!lastPoint || lastPoint.x!=firstPoint.x || lastPoint.y!=firstPoint.y){
 						lastDeg = degPrefix[0];
 						pathStr += lastDeg+this.precision(firstPoint.x)+","+this.precision(firstPoint.y);
+						if(!lastPoint)polygon.push({x:firstPoint.x, y:firstPoint.y});
 					}
 					var deg = degPrefix[cp.length-1];
 					if(deg!=lastDeg){
@@ -3277,18 +3344,30 @@
 						var point = cp[k];
 						pathStr += this.precision(point.x)+","+this.precision(point.y);
 					}
+					polygon.push({x:point.x, y:point.y});
 					lastPoint = point;
 				}
-				pathNodes.push('<path '+currPath.fill + currPath.stroke + opacityString+' d="'+pathStr+'"/>\n');
+				//fl.trace("\t"+currPath.fill + currPath.stroke + opacityString);
+				//fl.trace("\t"+pathStr);
+				if(cutHole && i==0){
+					holes.push({contour:contour, edgeIDs:edgeIDs, pathStr:pathStr, polygon:polygon});
+				}else{
+					polygons.push(polygon);
+					pathNodes.push('<path '+currPath.fill + currPath.stroke + opacityString+' d="'+pathStr+'"/>\n');
+				}
 			}
 
-			var xmlStr  = '<g'+xform+'>'+pathNodes.join("")+"</g>";
+			if(polygons.length){
+				edgeIdLists.push(edgeIDs);
+				contoursList.push(contour);
+				polygonsList.push(polygons);
+				var xmlStr  = '<g'+xform+'>'+pathNodes.join("")+"</g>";
 
-			if(ext.log){
-				ext.log.pauseTimer(timer);	
+				if(ext.log){
+					ext.log.pauseTimer(timer);	
+				}
+				nodeList.push(new XML(xmlStr));
 			}
-			return new XML(xmlStr);
-
 		},
 		/**
 		 * Returns a paint server for the specified fill.
