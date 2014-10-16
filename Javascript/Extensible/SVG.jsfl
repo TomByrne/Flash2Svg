@@ -242,8 +242,13 @@
 		var currentTimeline = ext.doc.getTimeline();
 		while(currentTimeline.libraryItem){
 			ext.doc.exitEditMode();
-			if(ext.doc.selection.length!=1 || (ext.doc.selection[0].libraryItem!=currentTimeline.libraryItem)){
-				alert("Couldn't discover edit path"); // just a precaution at the moment
+			if(ext.doc.selection.length==0){
+				this._originalEditList.unshift(currentTimeline.libraryItem);
+				this._originalFramesList.unshift(0);
+				currentTimeline = null;
+				break;
+			}else if(ext.doc.selection.length!=1 || (ext.doc.selection[0].libraryItem!=currentTimeline.libraryItem)){
+				alert("Couldn't discover edit path: "+ext.doc.selection.length); // just a precaution at the moment
 				return;
 			}
 			var element = ext.doc.selection[0];
@@ -252,8 +257,10 @@
 			this._originalFramesList.unshift(currentTimeline.currentFrame);
 			currentTimeline = ext.doc.getTimeline();
 		}
-		this._originalEditList.unshift(ext.doc.timelines.indexOf(currentTimeline));
-		this._originalFramesList.unshift(currentTimeline.currentFrame);
+		if(currentTimeline){
+			this._originalEditList.unshift(ext.doc.timelines.indexOf(currentTimeline));
+			this._originalFramesList.unshift(currentTimeline.currentFrame);
+		}
 
 		return this;
 	}
@@ -903,9 +910,14 @@
 				ext.doc.editScene(ext.doc.timelines.indexOf(this._origTimeline));
 			}*/
 
-			ext.doc.editScene(this._originalEditList[0]);
-			var frame = this._originalFramesList[0];
-			ext.doc.getTimeline().currentFrame = frame;
+			var initial = this._originalEditList[0];
+			if(!initial.itemType){
+				ext.doc.editScene(this._originalEditList[0]);
+				var frame = this._originalFramesList[0];
+				ext.doc.getTimeline().currentFrame = frame;
+			}else{
+				ext.doc.library.editItem(this._originalEditList[0].name);
+			}
 
 			for(var i=1; i<this._originalEditList.length; i++){
 				var element = this._originalEditList[i];
@@ -1182,7 +1194,7 @@
 			var children = fromNode.children();
 			for(var i=children.length()-1; i>=0; i--){
 				var child = children[i];
-				toNode.appendChild(child);
+				toNode.prependChild(child);
 			}
 		},
 		/**

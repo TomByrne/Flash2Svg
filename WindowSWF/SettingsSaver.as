@@ -294,7 +294,7 @@ package{
 							'extensible.doc.getTimeline().libraryItem.addData(',
 							'	"'+_documentSaveName+'",',
 							'	"string",',
-							'	decodeURIComponent("'+encodeURIComponent(getXml(false).toXMLString())+'")',
+							'	decodeURIComponent("'+encodeURIComponent(getXml(true).toXMLString())+'")',
 							')'
 						].join('\n'));
 					}else{
@@ -302,7 +302,7 @@ package{
 							'extensible.doc.addDataToDocument(',
 							'	"'+_documentSaveName+"_"+MMExecute('extensible.doc.currentTimeline')+'",',
 							'	"string",',
-							'	decodeURIComponent("'+encodeURIComponent(getXml(false).toXMLString())+'")',
+							'	decodeURIComponent("'+encodeURIComponent(getXml(true).toXMLString())+'")',
 							')'
 						].join('\n'));
 					}
