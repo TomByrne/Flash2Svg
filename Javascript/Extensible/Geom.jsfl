@@ -148,7 +148,7 @@
                    onEdge1 = true;
      
                 count1++;
-                lastY1 = p1e.y;
+                lastY1 = p2.y==p1e.y ? p1e.y : p1s.y;
             }
 
             var count2 = 0, k = 0, onEdge2 = false, lastY2 = null;
@@ -166,7 +166,7 @@
                        onEdge2 = true;
          
                     count2++;
-                    lastY2 = p2e.y;
+                    lastY2 = p1.y==p2e.y ? p2e.y : p2s.y;
                 }
                 
                 // Test if two segments intersect, if so then the polygons intersect

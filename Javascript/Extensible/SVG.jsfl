@@ -579,7 +579,7 @@
 			var i=0;
 			if(verbose)fl.trace("\n\nBEFORE:\n"+frameNode.toXMLString());
 			var toDelete = [];
-			var graphChildren = frameNode.g.length() + frameNode.path.length();
+			var graphChildren = frameNode.g.length() + frameNode.path.length() + frameNode.use.length();
 			var canExplode = frameName=="g";
 			while( i<length ){
 				var childNode = frameNode.children()[i];
@@ -685,7 +685,7 @@
 							}*/
 						}
 						var newChildName = newChild.localName();
-						var isGraphic = (newChildName=="g" || newChildName=="path");
+						var isGraphic = (newChildName=="g" || newChildName=="path" || newChildName=="use");
 						for(var j=0; j<childNode.attributes().length(); j++){
 							var attr = childNode.attributes()[j];
 							var name = attr.name();
@@ -703,6 +703,7 @@
 						lastIndex++;
 						//if(verbose)fl.trace("ADD: "+i+"/"+frameNode.children().length()+" "+lastIndex);
 					}
+
 					var lengthWas = frameNode.children().length();
 					delete frameNode.children()[i];
 					if(frameNode.children().length() == lengthWas){
@@ -713,7 +714,7 @@
 
 
 					length = frameNode.children().length();
-					graphChildren = frameNode.g.length() + frameNode.path.length();
+					graphChildren = frameNode.g.length() + frameNode.path.length() + frameNode.use.length();
 					continue;
 
 				}
@@ -1365,7 +1366,6 @@
 					settings.endFrame = settings.startFrame+settings.frameCount;
 				}
 			}
-
 			var timelineName = timeline.libraryItem?timeline.libraryItem.name:timeline.name;
 
 			var symbolIDString = timelineName.split("/").join("_");
@@ -1533,7 +1533,7 @@
 					var animNode = <animate
 								      attributeName="display"/>;
 
-					animNode.@begin = settings.beginAnimation;
+					if(settings.beginAnimation!="0s")animNode.@begin = settings.beginAnimation;
 					animNode.@repeatCount = settings.repeatCount;
 
 
@@ -1684,14 +1684,17 @@
 							if(mainElem.symbolType=="graphic"){
 								var singleFrameStart = this._getPriorFrame(mainElem.libraryItem.timeline, mainElem.firstFrame);
 							}
+							var lastFrame = frame;
 							while(frameEnd<layerEnd){
 								var nextFrame = layer.frames[frameEnd];
 								if(nextFrame){
 									if(nextFrame.startFrame==frameEnd){
 										// keyframe
 										var nextElem = nextFrame.elements[0];
-										if(nextFrame.elements.length!=1){
+										if(nextFrame.elements.length!=1 ||
+											(nextElem.libraryItem!=mainElem.libraryItem && lastFrame.startFrame==frameEnd-1)){ // tweening to a different symbol with no frames between, do not tween
 											break; // tweening to incompatible frame
+
 										}else if(nextElem.libraryItem!=mainElem.libraryItem || mainElem.symbolType!=nextElem.symbolType || 
 														(mainElem.symbolType=="graphic" && mainElem.libraryItem.timeline.frameCount>1 &&
 													    ((nextElem.loop!=mainElem.loop && !((mainElem.loop=="single frame" || frame.duration==1) && (nextElem.loop=="single frame" || nextFrame.duration==1)))
@@ -1708,6 +1711,7 @@
 								}else{
 									break;
 								}
+								lastFrame = nextFrame;
 							}
 							if(ext.log){
 								ext.log.pauseTimer(timer2);
@@ -1754,7 +1758,7 @@
 									elemSettings.frameCount = element.libraryItem.timeline.frameCount;
 									elemSettings.totalDuration = elemSettings.frameCount / ext.doc.frameRate;
 								}
-								elemSettings.repeatCount = "indefinite";
+								elemSettings.repeatCount = settings.repeatCount;
 							}
 							if(this._delayedProcessing){
 								var elementXML=new XML('<g />');
@@ -2071,10 +2075,11 @@
 		},
 		_timelineCopies:null,
 		_getTimelineCopy:function(libraryItem, timeline, startFrame, endFrame){
-			var list = this._timelineCopies[libraryItem.name];
+			var key = (libraryItem==undefined ? ext.doc.timelines.indexOf(timeline.$) : libraryItem.name);
+			var list = this._timelineCopies[key];
 			if(!list){
 				list = [];
-				this._timelineCopies[libraryItem.name] = list;
+				this._timelineCopies[key] = list;
 			}else{
 				for(var i=0; i<list.length; ++i){
 					var pack = list[i];
@@ -2362,7 +2367,7 @@
 			}
 
 
-			animNode.@begin = beginAnimation;
+			if(beginAnimation!="0s")animNode.@begin = beginAnimation;
 			animNode.@repeatCount = repeatCount;
 
 			animNode.@dur = this.precision(totalTime)+"s";
@@ -2886,33 +2891,6 @@
 				matrix = new ext.Matrix();
 				if(this._appVersion<12){
 					// an issue before CS6 resulted in groups having incorrect transforms
-					/*var c=shape.center;
-					var tr=shape.getTransformationPoint();
-					//tr = matrix.transformPoint(tr.x, tr.y, false);
-					tr = ext.MathUtils.transformPoint(matrix, tr.x, tr.y, false);
-
-					var osb=shape.objectSpaceBounds;
-
-					//c = matrix.transformPoint(c.x, c.y, false);
-					
-					osb.left=Math.min(osb.left,c.x+tr.x/2);
-					osb.right=Math.max(osb.right,c.x+tr.x/2);
-					osb.top=Math.min(osb.top,c.y+tr.y/2);
-					osb.bottom=Math.max(osb.bottom,c.y+tr.y/2);
-
-					pathMatrix=new ext.Matrix({
-						tx:-(osb.left+osb.right)/2,
-						ty:-(osb.top+osb.bottom)/2
-					});*/
-
-					/*fl.trace("skew: "+shape.skewX+" "+shape.skewY);
-					fl.trace("shape.m: "+shape.matrix.tx+" "+shape.matrix.ty);
-					fl.trace("met: "+matrix.tx+" "+matrix.ty);
-					fl.trace("tr: "+tr.x+" "+tr.y);
-					fl.trace("c: "+c.x+" "+c.y);
-					fl.trace("pat: "+pathMatrix.tx+" "+pathMatrix.ty);
-					fl.trace("bounds: "+osb.left+" "+osb.right+" - "+osb.top+" "+osb.bottom);
-					fl.trace("bound.c: "+((osb.left+osb.right)/2)+" - "+((osb.top+osb.bottom)/2));*/
 				}else{
 					matrix=fl.Math.concatMatrix(matrix, settings.matrix);
 				}
@@ -3001,160 +2979,11 @@
 					}
 				}
 			}
-				/*if(s){
-					validContours.push(contour);
-					svgArray.push(s);
-					if(contour.orientation!=0){
-						var oppositeFill=contour.oppositeFill;
-						var fill = contour.fill;
-						if(false && 
-							filled.length>0 				
-							//&& !(oppositeFill.style=='noFill' &&	fill.style=='noFill')
-							&& s.path.length()
-							//&& s.path[0].fill.length()
-						){
-							var deleted=false;
-							for(var n = filled.length-1; n>=0; --n){
-									fl.trace("\tcut: "+i+" "+n);
-								var fillN = filled[n];
-								var otherFill = svgArray[fillN];
-								var othContour = validContours[fillN];
-								var noFills = oppositeFill.style=='noFill' && othContour.fill.style=='noFill';
-								var insideOut = !noFills && othContour.orientation==contour.orientation;//fill.is(validContours[fillN].fill);
-								var sameDir=(
-									contour.orientation
-									//+Number(contour.getControlPoints( {curveDegree:this.curveDegree} ).isReversed)
-									<0
-								)==(
-									othContour.orientation
-									//+Number(validContours[fillN].getControlPoints( {curveDegree:this.curveDegree} ).isReversed)
-									<0
-								);
-									fl.trace("\tdo: "+oppositeFill.style+" "+othContour.fill.style+" "+fill.style);
-								if(		otherFill.path.length()
-									&& (otherFill.path.fill.length() || otherFill.path.@fill.length())
-									//&& otherFill.path[0].@stroke.length()==0
-									&& (oppositeFill.is(othContour.fill) 
-										|| noFills
-										|| (insideOut && oppositeFill.style=='noFill') //???
-									)// && otherFill.path[0].stroke.length()==0
-								){
-									var cutID=String(otherFill.path[0]['@id']);
-									var rev = ( sameDir!=insideOut );
-									if(rev){
-										s=this._getContour(contour,{
-											colorTransform:settings.colorTransform,
-											reversed: true,
-											matrix:pathMatrix,
-											dom:dom,
-											filledOnly: true
-										});
-									}else{
-										s=svgArray.at(-1);
-									}
-									if(s && s.path.length()){
-										var so=this._getContour(contour,{
-											colorTransform:settings.colorTransform,
-											reversed: !rev,
-											matrix: pathMatrix,
-											dom:dom
-										});
-										if(so.path.length()){
-											var f=String(otherFill.path[0]['@d']);
-											var fs=f.match(/^[^Zz]*[Zz]?/)[0].trim();
-											var pStr=String(s.path[0]['@d']);
-											var pA=/^[^Zz]*[Zz]?/.exec(pStr)[0].trim();
-
-											if(pA[pA.length-1]!=='z'){pA+='z';}
-
-											var pStrO=String(so.path[0]['@d']).trim();
-											var pAO=/^[^Zz]*[Zz]?/.exec(pStrO)[0].trim();
-
-											if(pAO[pAO.length-1]!=='z'){pAO+='z';}
-
-											if(fs==pAO || fs==pA){
-													otherFill.path[0]['@d']+=pStr.replace(pA,'').replace(pAO,'');
-													svgArray[svgArray.length-1].path[0].@d=String(
-														svgArray[svgArray.length-1].path[0].@d
-													).replace(pA,'').replace(pAO,'');
-
-											}else if(!contour.edgeIDs.intersect(othContour.edgeIDs).length && (othContour.fill.is(fill) || fill.style=="noFill")){
-												// this creates composite paths, where a path makes the hole in another filled path
-												if(pA[pA.length-1]!=='z'){
-													pA+='z';
-												}
-												otherFill.path[0]['@d'] += pA;
-
-												if(!deleted && (oppositeFill.style==fill.style) && fill.style!='noFill' && (!noFills && othContour.orientation!=contour.orientation)){
-													delete svgArray[svgArray.length-1].path[0];
-													deleted=true;
-												}
-											}										
-										}
-										//break;
-									}
-								}
-							}
-						}
-						if(contour.fill.style!='noFill'){
-							filled.push(svgArray.length-1);
-						}
-					}
-				}
-			}*/
 			var svg=new XML('<g/>');
 			var matrixStr = this._getMatrix(matrix);
 			if(matrixStr!=this.IDENTITY_MATRIX)svg['@transform']=matrixStr;
 			for(var i=0;i<svgArray.length;i++){
 				svg.appendChild(svgArray[i]);
-				/*var node = svgArray[i];
-				if(node.path.length()){ // eliminate duplicate paths
-					ii=0; 
-					for each(n in node.path){
-						if(
-							(!n['@stroke'].length() || String(n['@stroke'][0])=='none' || String(n['@stroke'][0])=='') && 
-							(!n['@fill'].length() || String(n['@fill'][0])=='none' ||  String(n['@fill'][0])=='')
-						){
-							delete node.path[ii];
-						}else if(n.localName()=='path' && n['@stroke'].length()){
-							var cs0=String(n['@d']).replace(/[^\d\.\,]/g,' ').replace(/([^\s])(\s\s*?)([^\s])/g,'$1 $3').trim();
-							var ca0=cs0.split(' ');
-							if(ca0[ca0.length-1]==ca0[0]){
-								ca0.pop();
-								cs0=ca0.join(' ');
-							}
-							var s=0;
-							while(s<svg.length()){
-								if(svg[s].localName()=='path' && svg[s]['@stroke'].length()){
-									var cs1=String(svg[s]['@d']).replace(/[^\d\.\,]/g,' ').replace(/([^\s])(\s\s*?)([^\s])/g,'$1 $3').trim();
-									var ca1=cs1.split(' ');
-									if(ca1[ca1.length-1]==ca1[0]){
-										ca1.pop();
-										cs1=ca1.join(' ');
-									}
-									if(ca1[0]!=ca0[0] && ca1[0]!=ca0[ca0.length-1]){
-										ca1=cs1.split(ca0[0]+' '+ca0[1]+' '+ca0[2]);
-										cs1=ca0[0]+' '+ca0[1]+' '+ca0[2]+' '+cs1[1].trim()+' '+cs1[0].trim();
-										ca1=cs1.split(' ');
-									}
-									if(ca0[0]==ca1[ca1.length-1]){
-										ca1=ca1.reverse()
-										cs1=ca1.join(' ');
-									}
-									if(cs0==cs1){
-										delete svg[s];
-										continue;
-									}
-								}
-								++s;
-							}
-						}
-						ii+=1;
-					}
-					for each(var s in svgArray[i].*){
-						svg.appendChild(s);
-					}
-				}*/
 			}
 			if(
 				shape.isGroup && 
