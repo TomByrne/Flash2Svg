@@ -120,6 +120,8 @@
 		if(this.repeatCount==true)this.repeatCount = "indefinite";
 		else if(this.repeatCount==false)this.repeatCount = "1";
 
+		this._showMiterWarning = false;
+
 		if(this.nonAnimatingShow=="start"){
 			this.showStartFrame = true;
 		}else if(this.nonAnimatingShow=="end"){
@@ -777,6 +779,10 @@
 					outputObject.string = outputObject.string.split("</symbol>").join("\n</symbol>");
 				}
 				outputObject.id = document.@id;
+
+				if(this._showMiterWarning){
+					fl.trace("WARNING: Miter joins display incorrectly in current versions of Firefox (Oct 2014)");
+				}
 
 				fl.trace("finalise: "+timeline.filePath);
 				this.qData.push(closure(this.processFixUseLinks, [outputObject], this));
@@ -1870,8 +1876,6 @@
 										skewY -= 360;
 									}
 
-									rot += autoRotate;
-
 									// if there is a rotation tween of up to 45 degrees, we add extra bounds to accomodate it.
 									var rotDif = Math.abs(lastRot - rot)/180*Math.PI;
 									if(rotDif>Math.PI/4)rotDif = Math.PI/4;
@@ -1887,7 +1891,7 @@
 									}
 
 									addTweenKiller = (nextFrame.tweenType=="none" && (!loopAnim || !isLast));
-									this._addAnimFrame(nextFrame, nextElement, invMatrix, time, rot, skewX, skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, alphaList, timeList, splineList, addTweenKiller);
+									this._addAnimFrame(nextFrame, nextElement, invMatrix, time, rot, autoRotate, skewX, skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, alphaList, timeList, splineList, addTweenKiller, i, nextInd);
 									
 									lastFrame = nextFrame;
 									lastRot = rot;
@@ -2133,9 +2137,12 @@
 				return element.rotation;
 			}
 		},
-		_addAnimFrame:function(frame, element, invMatrix, time, rot, skewX, skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, alphaList, timeList, splineList, addTweenKiller){
+		_addAnimFrame:function(frame, element, invMatrix, time, rot, autoRotate, skewX, skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, alphaList, timeList, splineList, addTweenKiller, layerI, frameI){
 
-			var matrix = fl.Math.concatMatrix(element.matrix, invMatrix);
+			if(!isNaN(element.rotation)){
+				element.rotation += 0; // sometimes fixes invalid matrices
+			}
+			var matrix = new ext.Matrix(fl.Math.concatMatrix(element.matrix, invMatrix));
 			var transPoint = element.getTransformationPoint();
 
 
@@ -2157,7 +2164,7 @@
 
 			var rotRad = rot / 180 * Math.PI;
 
-			rotList.push(this.precision(rot));
+			rotList.push(this.precision(rot + autoRotate));
 
 			var rotCos = Math.cos(rotRad) - 1;
 			var rotSin = Math.sin(rotRad);
@@ -2171,7 +2178,6 @@
 			rotMatrix.c = -Math.sin(rotRad);
 			rotMatrix.d = Math.cos(rotRad);
 			
-			//matrix = matrix.concat(rotMatrix.invert());
 			matrix = fl.Math.concatMatrix(matrix, rotMatrix.invert());
 
 			scxList.push(this.precision(matrix.a));
@@ -2633,7 +2639,7 @@
 								var sy=element.matrix.scaleY;
 
 								var feGaussianBlur=<feGaussianBlur />;
-								feGaussianBlur.@stdDeviation=[f.blurX, f.blurY].join(' ');
+								feGaussianBlur.@stdDeviation=[f.blurX / 2, f.blurY / 2].join(' ');
 								feGaussianBlur['@in']=src;
 								feGaussianBlur.@result=src=prefix+'feGaussianBlur';
 								filter.appendChild(feGaussianBlur);
@@ -2664,7 +2670,7 @@
 								filter.appendChild(feComposite);
 
 								var feGaussianBlur=<feGaussianBlur/>;
-								feGaussianBlur.@stdDeviation=[f.blurX,f.blurY].join(' ');
+								feGaussianBlur.@stdDeviation=[f.blurX / 2, f.blurY / 2].join(' ');
 								feGaussianBlur.@result=src=prefix+'feGaussianBlur';
 								filter.appendChild(feGaussianBlur);
 
@@ -3188,13 +3194,15 @@
 					polygon.push({x:point.x, y:point.y});
 					lastPoint = point;
 				}
-				//fl.trace("\t"+currPath.fill + currPath.stroke + opacityString);
-				//fl.trace("\t"+pathStr);
 				if(cutHole && i==0){
 					holes.push({contour:contour, edgeIDs:edgeIDs, pathStr:pathStr, polygon:polygon});
+					if(currPath.stroke){
+						polygons.push(polygon);
+						pathNodes.push('<path fill="none" '+currPath.stroke +' d="'+pathStr+'"/>\n');
+					}
 				}else{
 					polygons.push(polygon);
-					pathNodes.push('<path '+currPath.fill + currPath.stroke + opacityString+' d="'+pathStr+'"/>\n');
+					pathNodes.push('<path ' + currPath.fill + opacityString + currPath.stroke + ' d="' + pathStr + '"/>\n');
 				}
 			}
 
@@ -3427,6 +3435,7 @@
 			);
 			if(stroke.joinType=='miter'){
 				svg.push('stroke-miterlimit="'+stroke.miterLimit+'"');
+				this._showMiterWarning = true;
 			}
 			if(stroke.scaleType=='none' || stroke.thickness<=0.1){
 				svg.push('vector-effect="non-scaling-stroke"');
@@ -3856,15 +3865,21 @@
 				var timer=ext.log.startTimer('extensible.SVG._applyColorEffects()');	
 			}
 			var name=xml.localName();
-			if( name=='filter' || /Gradient/.test(name) || /Color/.test(name)){
-				return;	
+			var skip = false;
+			if( name=='filter' || name=='use' || /Gradient/.test(name) || /Color/.test(name)){
+				//return;	
+				skip = true;
 			}
 			if(name=='mask' && xml..use.length()>0){
 				this.expandUseNow( xml, xml,false,true,defs );
 			}
+			if(xml..use.length()>0){
+				//return;
+				skip = true;
+			}
 			var filter,newFilter;
 			var color=colorX;
-			if(xml.hasOwnProperty('@filter')){
+			if(!skip && xml.hasOwnProperty('@filter')){
 				var filterID=String(xml.@filter).match(/(?:url\(#)(.*?)(?:\))/);
 				if(filterID && filterID.length>1){
 					filter=defs.filter.(@id==filterID[1]);
