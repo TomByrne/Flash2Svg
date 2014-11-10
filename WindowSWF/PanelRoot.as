@@ -150,6 +150,7 @@ package{
 			_exportSettings.addSetting(controlsLayout.discreteEasingCheckBox, "selected", "discreteEasing", true, true, radioGetter, radioSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.removeGroupsCheckBox, "selected", "removeGroups", true, true, radioGetter, radioSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.compactOutputCheckBox, "selected", "compactOutput", true, true, radioGetter, radioSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.avoidMiterCheckBox, "selected", "avoidMiter", true, true, radioGetter, radioSetter, Event.CHANGE);
 
 			this.controlsLayout.flattenMotionCheckBox.addEventListener(Event.CHANGE, onFlattenMotionChanged);
 			this.controlsLayout.discreteEasingCheckBox.addEventListener(Event.CHANGE, onDiscreteEasingChanged);

@@ -57,7 +57,8 @@ package{
 								layout.includeBackgroundCheckBox,
 								layout.loopCheckBox,
 								layout.removeGroupsCheckBox,
-								layout.compactOutputCheckBox];
+								layout.compactOutputCheckBox,
+								layout.avoidMiterCheckBox];
 
 			rightControls = [   layout.helpButton,
 								layout.fileRow.button,
@@ -89,9 +90,10 @@ package{
 						layout.includeBackgroundCheckBox,
 						layout.loopCheckBox,
 						layout.removeGroupsCheckBox,
-						layout.compactOutputCheckBox];
+						layout.compactOutputCheckBox,
+						layout.avoidMiterCheckBox];
 
-			enable = [layout.fileRow.input,
+			enable = [	layout.fileRow.input,
 						layout.sourceRow.input,
 						layout.framesRow.input,
 						layout.outputRow.input,
@@ -117,7 +119,8 @@ package{
 						layout.includeBackgroundCheckBox,
 						layout.loopCheckBox,
 						layout.removeGroupsCheckBox,
-						layout.compactOutputCheckBox];
+						layout.compactOutputCheckBox,
+						layout.avoidMiterCheckBox];
 
 		}
 

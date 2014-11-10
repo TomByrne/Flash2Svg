@@ -68,7 +68,8 @@
 			loopTweens:true,
 			discreteEasing:true,
 			removeGroups:true,
-			compactOutput:true
+			compactOutput:true,
+			avoidMiter:true
 		});
 		if(options instanceof XML || typeof(options)=='string'){
 			ext.Task.apply(this,[settings]);
@@ -2149,11 +2150,12 @@
 			skewX -= rot;
 			skewY -= rot;
 
-			// fl.trace("\trot: "+this.precision(rot)+" "+(rot * matrix.a * matrix.c * matrix.d > 0)+" "+matrix);
-			// fl.trace("\tcheck: ad:"+(matrix.a*matrix.d)+" bc:"+(matrix.b*matrix.c));
-			// fl.trace("\tcheck: sx:"+element.scaleX+" sy:"+element.scaleY);
-			// fl.trace("\tcheck: det:"+matrix.determinant());
-			// fl.trace("\tskew: x:"+element.skewX+" y:"+element.skewY+" r:"+element.rotation);
+			//fl.trace(frame.startFrame+" - "+matrix.a+" "+matrix.b+" "+matrix.c+" "+matrix.d);
+			//fl.trace("\trot: "+this.precision(rot)+" "+(rot * matrix.a * matrix.c * matrix.d > 0)+" "+matrix);
+			//fl.trace("\tcheck: ad:"+(matrix.a*matrix.d)+" bc:"+(matrix.b*matrix.c));
+			//fl.trace("\tcheck: sx:"+element.scaleX+" sy:"+element.scaleY);
+			//fl.trace("\tcheck: det:"+matrix.determinant());
+			//fl.trace("\tskew: x:"+element.skewX+" y:"+element.skewY+" r:"+element.rotation);
 			//if((matrix.b<0) != (matrix.c<0) && (matrix.b<0 || matrix.d>0) && isNaN(element.rotation)){
 			//if(element.skewX * matrix.a * matrix.c * matrix.d > 0 && isNaN(element.rotation)){
 			//if(element.skewY < 0 && isNaN(element.rotation)){
@@ -3429,11 +3431,14 @@
 					svg.push('stroke-width="'+stroke.thickness+'"');
 				}
 			}
+			var joinType = stroke.joinType;
+			if(this.avoidMiter && joinType=='miter')joinType = "round";
+			
 			svg.push(
 				'stroke-linecap="'+(stroke.capType=='none'?'round':stroke.capType)+'"',
-				'stroke-linejoin="'+stroke.joinType+'"'
+				'stroke-linejoin="'+joinType+'"'
 			);
-			if(stroke.joinType=='miter'){
+			if(joinType=='miter'){
 				svg.push('stroke-miterlimit="'+stroke.miterLimit+'"');
 				this._showMiterWarning = true;
 			}
