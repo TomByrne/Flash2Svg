@@ -1244,6 +1244,12 @@
 					result=this._getText(element,settings);
 				}
 			}
+			if(options.lookupName){
+				var symbol = new XML('<symbol/>');
+				symbol['@id'] = options.lookupName;
+				symbol.appendChild(result);
+				return symbol;
+			}
 			return result;
 		},
 
@@ -1699,7 +1705,7 @@
 										// keyframe
 										var nextElem = nextFrame.elements[0];
 										if(nextFrame.elements.length!=1 ||
-											(nextElem.libraryItem!=mainElem.libraryItem && lastFrame.startFrame==frameEnd-1)){ // tweening to a different symbol with no frames between, do not tween
+											(nextElem.libraryItem!=mainElem.libraryItem && (lastFrame.startFrame==frameEnd-1 || lastFrame.tweenType=='none'))){ // tweening to a different symbol with no frames between, do not tween
 											break; // tweening to incompatible frame
 
 										}else if(nextElem.libraryItem!=mainElem.libraryItem || mainElem.symbolType!=nextElem.symbolType || 
@@ -1748,7 +1754,10 @@
 										discreteEasing:this.discreteEasing
 									};
 
-							if(element.symbolType=="graphic"){
+							if(element.elementType=="shape"){
+								elemSettings.lookupName = timelineName+"_"+i+"."+frame.startFrame+(items.length>1?"."+j:"");
+
+							}else if(element.symbolType=="graphic"){
 								elemSettings.frameCount = 1;
 								var childFrame = element.firstFrame;
 								if(element.loop!="single frame")childFrame += (n - frame.startFrame);
@@ -1767,15 +1776,30 @@
 								}
 								elemSettings.repeatCount = settings.repeatCount;
 							}
-							if(this._delayedProcessing){
-								var elementXML=new XML('<g />');
-								this.qData.push(closure(this.processElement, [elementXML, element, elemSettings, dom], this));
+
+							if(!elemSettings.lookupName || !this._symbols[elemSettings.lookupName]){
+								if(this._delayedProcessing){
+									var elementXML = new XML( elemSettings.lookupName ? '<symbol/>' : '<g/>' );
+									this.qData.push(closure(this.processElement, [elementXML, element, elemSettings, dom], this));
+								}else{
+									var elementXML = this._getElement( element, elemSettings );
+								}
 							}else{
-								var elementXML = this._getElement( element, elemSettings );
+								var elementXML = null;
 							}
-							if(elementXML){
+							
+							
+							if(elemSettings.lookupName){
+								var symbol = this._symbols[elemSettings.lookupName];
+								if(elementXML){
+									this._symbols[elemSettings.lookupName] = elementXML;
+									dom.defs.appendChild(elementXML);
+								}
+								frameXML.appendChild( new XML('<use xlink-href="#'+elemSettings.lookupName+'" />') );
+							}else if(elementXML){
 								frameXML.appendChild(elementXML);
 							}
+							
 						}
 
 						if(doAnim){
@@ -2265,8 +2289,8 @@
 					if(thisFrame.startFrame>lastPrior){
 						lastPrior = thisFrame.startFrame;
 					}
-				}else if(layer.frames.length-1>lastPrior){
-					lastPrior = layer.frames.length-1;
+				}else if(layer.frames.length>lastPrior){
+					lastPrior = layer.frames.length;
 				}
 			}
 			if(!failed && lastPrior!=-1){
@@ -2288,7 +2312,7 @@
 			for(var m=0;m<masked.length;m++){
 				mg.appendChild(masked[m]);
 			}
-			xml.appendChild(mg);
+			xml.prependChild(mg);
 			masked.clear();
 		},
 		_addAnimationNode:function(toNode, type, valueLists, times, totalTime, splineList, tweensFound, defaultValue, beginAnimation, repeatCount, forceDiscrete, force){

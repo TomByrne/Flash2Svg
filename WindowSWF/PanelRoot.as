@@ -367,9 +367,77 @@ package{
 		
 		private function browseForFile(e:MouseEvent){
 			var fileURI:String=MMExecute('fl.browseForFileURL("save","Export")');
-			var filePath:String=MMExecute('"'+fileURI+'".relativeToDocument');
-			this.controlsLayout.fileRow.input.text=filePath;
-			_exportSettings.updateSetting(controlsLayout.fileRow, "text");
+			if(fileURI == "null")return;
+
+			fileURI = MMExecute('FLfile.uriToPlatformPath("'+fileURI+'")');
+			if(MMExecute('extensible.doc.path')!=='undefined'){
+				var docURI = MMExecute('extensible.doc.path');
+				var relativePath:String = findRelativePath(fileURI, docURI, 3);
+				if(relativePath){
+					fileURI = relativePath;
+				}
+			}
+			this.controlsLayout.fileRow.input.text = fileURI;
+			_exportSettings.updateSetting(controlsLayout.fileRow.input, "text");
+		}
+
+		private function isUnixPaths():Boolean{
+			return MMExecute('fl.configDirectory.charAt(0)')=="/";
+		}
+
+		private function findRelativePath(path:String, toPath:String, goUpLevels:int):String{
+			var slashType:String = isUnixPaths() ? "/" : "\\";
+
+			var slash:int = toPath.lastIndexOf(slashType);
+			if(slash==-1)return path;
+			toPath = toPath.substr(0, slash);
+
+			var levels:int = 0;
+			var levelPath:String = "";
+			do{
+				if(path.indexOf(toPath)==0){
+					return levelPath + path.substr(toPath.length+1);
+				}
+				slash = toPath.lastIndexOf(slashType);
+				toPath = toPath.substr(0, slash);
+
+				++levels;
+				levelPath += ".."+slashType;
+			}while(levels < goUpLevels)
+
+			return null;
+		}
+
+		private function resolveRelativePath(path:String, toPath:String):String{
+			var slashType:String = isUnixPaths() ? "/" : "\\";
+
+			var upLevel:String = ".."+slashType;
+			var levels:int = 0;
+			while(path.indexOf(upLevel)==0){
+				path = path.substr(upLevel.length);
+				levels++;
+			}
+
+
+			var slash:int = toPath.lastIndexOf(slashType);
+			if(slash==-1)return path;
+			toPath = toPath.substr(0, slash);
+
+			var level:int = 0;
+			while(level < levels){
+				slash = toPath.lastIndexOf(slashType);
+				toPath = toPath.substr(0, slash);
+				++level;
+			}
+			return toPath + slashType + path;
+		}
+
+		private function isRelativePath(path:String):Boolean{
+			if(isUnixPaths()){
+				return path.charAt(0)!="/";
+			}else{
+				return path.charAt(1)!=":";
+			}
 		}
 		
 		private function onSourceChanged(e:Event=null):void{
@@ -406,6 +474,18 @@ package{
 		
 		private function exportSVG(e:Event):void
 		{
+			var filePath = _exportSettings.getSetting("file");
+			if(isRelativePath(filePath)){
+				var docPath:String = MMExecute('extensible.doc.path');
+				if(docPath=='undefined'){
+					Fl.alert("Please specify an absolute path or save the flash file");
+					return;
+				}else{
+					filePath = resolveRelativePath(filePath, docPath);
+				}
+			}
+			filePath = filePath.split("\\").join("\\\\");
+			var fileURI:String = MMExecute('FLfile.platformPathToURI("'+filePath+'")');
 
 			this.controlsLogic.setEnabled(false);
 			this.isCanceled=this.finished=false;
@@ -421,11 +501,11 @@ package{
 			);
 			// Show indeterminate bar until progress starts...
 			this.controlsLayout.progressBar.indeterminate=true;
-			this.controlsLayout.progressBar.mode=ProgressBarMode.EVENT;
+			this.controlsLayout.progressBar.mode = ProgressBarMode.EVENT;
 			//ExternalInterface.addCallback('setProgress',setProgress);
 			ExternalInterface.addCallback('endProgress',endProgress);
 			//Save options
-			var xml = _exportSettings.getXml();
+			var xml:XML = _exportSettings.getXml(true, {file:fileURI});
 			xml.appendChild(<traceLog>{_dev}</traceLog>);
 			xml['swfPanelName']='SVG';
 			if(dev){

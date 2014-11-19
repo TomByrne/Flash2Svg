@@ -191,8 +191,8 @@ package{
 			if(group)setSettingTitle(group.title, true);
 		}
 
-		public function getXml(getAll:Boolean=true):XML{
-			return serialise(_currentSettings, true, getAll);
+		public function getXml(getAll:Boolean=true, overrideProps:Object=null):XML{
+			return serialise(_currentSettings, true, getAll, overrideProps);
 		}
 
 		private function deserialise(xml:XML):SettingGroup{
@@ -211,12 +211,17 @@ package{
 			return ret;
 		}
 
-		private function serialise(group:SettingGroup, includeNonFile:Boolean=true, getDefaultsAlso:Boolean=false):XML{
+		private function serialise(group:SettingGroup, includeNonFile:Boolean=true, getDefaultsAlso:Boolean=false, overrideProps:Object=null):XML{
 			var ret:XML = new XML("<settings></settings>");
 			ret.@title = group.title;
 			ret.@userCreated = group.userCreated;
+			var value:*;
 			for each(var settingDef:SettingDefinition in _settingsDefs){
-				var value = group.getSetting(settingDef.settingName);
+				if(overrideProps && overrideProps[settingDef.settingName]!=null){
+					value = overrideProps[settingDef.settingName];
+				}else{
+					value = group.getSetting(settingDef.settingName);
+				}
 				if(value!=null && (getDefaultsAlso || value!=settingDef.defValue) && (includeNonFile || settingDef.diskSave)){
 					ret.appendChild(new XML("<"+settingDef.settingName+">"+value+"</"+settingDef.settingName+">"));
 				}
@@ -279,6 +284,10 @@ package{
 			checkState();
 
 			DelayedCall.call(checkAutoSave, 0.5); // this collates rapid input (keystrokes, etc)
+		}
+
+		public function getSetting(settingName:String):*{
+			return _currentSettings.getSetting(settingName);
 		}
 
 		public function checkAutoSave():void{
