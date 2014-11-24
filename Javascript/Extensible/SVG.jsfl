@@ -1712,7 +1712,7 @@
 														(mainElem.symbolType=="graphic" && mainElem.libraryItem.timeline.frameCount>1 &&
 													    ((nextElem.loop!=mainElem.loop && !((mainElem.loop=="single frame" || frame.duration==1) && (nextElem.loop=="single frame" || nextFrame.duration==1)))
 													// || (nextElem.loop!="single frame" && nextFrame.duration!=1) 
-													 || (singleFrameStart!=this._getPriorFrame(nextElem.libraryItem.timeline, nextElem.firstFrame + (nextElem.loop=="single frame"?0:nextFrame.duration))))
+													 || (singleFrameStart!=this._getPriorFrame(nextElem.libraryItem.timeline, nextElem.firstFrame/* + (nextElem.loop=="single frame"?0:nextFrame.duration)*/)))
 													    )){
 											//tweening to different symbol
 											++frameEnd;
@@ -2260,13 +2260,13 @@
 			var failed = false;
 			var lastPrior = -1;
 			var layers = timeline.layers;
-			if(frame>timeline.frameCount-1)frame = timeline.frameCount-1;
+			if(frame>timeline.frameCount)frame = timeline.frameCount; // frame is 1-based
 			
 			for(var i=0; i<layers.length && !failed; i++){
 				var layer=layers[i];
 				if(layer.layerType=='guide')continue;
 
-				var thisFrame = layer.frames[frame];
+				var thisFrame = layer.frames[frame-1];
 				if(thisFrame){
 					if(thisFrame.tweenType=="motion"){
 						failed = true;
