@@ -1751,7 +1751,8 @@
 										beginAnimation:"0s",
 										repeatCount:settings.repeatCount,
 										loopTweens:this.loopTweens,
-										discreteEasing:this.discreteEasing
+										discreteEasing:this.discreteEasing,
+										flattenMotion:settings.flattenMotion
 									};
 
 							if(element.elementType=="shape"){
@@ -2170,32 +2171,19 @@
 			var matrix = new ext.Matrix(fl.Math.concatMatrix(element.matrix, invMatrix));
 			var transPoint = element.getTransformationPoint();
 
-
 			skewX -= rot;
 			skewY -= rot;
 
-			//fl.trace(frame.startFrame+" - "+matrix.a+" "+matrix.b+" "+matrix.c+" "+matrix.d);
-			//fl.trace("\trot: "+this.precision(rot)+" "+(rot * matrix.a * matrix.c * matrix.d > 0)+" "+matrix);
-			//fl.trace("\tcheck: ad:"+(matrix.a*matrix.d)+" bc:"+(matrix.b*matrix.c));
-			//fl.trace("\tcheck: sx:"+element.scaleX+" sy:"+element.scaleY);
-			//fl.trace("\tcheck: det:"+matrix.determinant());
-			//fl.trace("\tskew: x:"+element.skewX+" y:"+element.skewY+" r:"+element.rotation);
-			//if((matrix.b<0) != (matrix.c<0) && (matrix.b<0 || matrix.d>0) && isNaN(element.rotation)){
-			//if(element.skewX * matrix.a * matrix.c * matrix.d > 0 && isNaN(element.rotation)){
-			//if(element.skewY < 0 && isNaN(element.rotation)){
-			if(Math.abs(element.skewY - element.skewX) > 90 && isNaN(element.rotation)){
+			var rotRad = rot / 180 * Math.PI;
+
+			if(Math.abs(element.skewY - element.skewX) > 180 && isNaN(element.rotation)){
 				rot = -rot;
 				skewY = -skewY;
 			}
 
-			var rotRad = rot / 180 * Math.PI;
 
-			rotList.push(this.precision(rot + autoRotate));
-
-			var rotCos = Math.cos(rotRad) - 1;
-			var rotSin = Math.sin(rotRad);
-			xList.push(this.precision(matrix.tx + transPoint.x * rotCos - transPoint.y * rotSin));
-			yList.push(this.precision(matrix.ty + transPoint.y * rotCos + transPoint.x * rotSin));
+			var x = matrix.tx;
+			var y = matrix.ty;
 
 
 			var rotMatrix = new ext.Matrix();
@@ -2203,17 +2191,30 @@
 			rotMatrix.b = Math.sin(rotRad);
 			rotMatrix.c = -Math.sin(rotRad);
 			rotMatrix.d = Math.cos(rotRad);
+
+			trxList.push(this.precision(transPoint.x));
+			tryList.push(this.precision(transPoint.y));
 			
-			matrix = fl.Math.concatMatrix(matrix, rotMatrix.invert());
+			matrix = new ext.Matrix(fl.Math.concatMatrix(matrix, rotMatrix.invert()));
+
+			if((matrix.a<0) == (matrix.d<0)){
+				rotList.push(this.precision(rot + autoRotate));
+			}else{
+				rotList.push(this.precision(-rot + autoRotate));
+			}
+
+			transPoint = matrix.transformPoint(transPoint.x, transPoint.y, false);
+
+			var rotCos = Math.cos(rotRad);
+			var rotSin = Math.sin(rotRad);
+			xList.push(this.precision(x + (transPoint.x * rotCos + transPoint.y * -rotSin) - transPoint.x));
+			yList.push(this.precision(y + (transPoint.y * rotCos + transPoint.x * rotSin) - transPoint.y));
 
 			scxList.push(this.precision(matrix.a));
 			scyList.push(this.precision(matrix.d));
 
 			skxList.push(this.precision(this._getClosestRotList(-skewX, skxList)));
 			skyList.push(this.precision(this._getClosestRotList( skewY, skyList)));
-
-			trxList.push(transPoint.x);
-			tryList.push(transPoint.y);
 
 			alphaList.push(element.colorAlphaPercent / 100);
 
@@ -2260,13 +2261,13 @@
 			var failed = false;
 			var lastPrior = -1;
 			var layers = timeline.layers;
-			if(frame>timeline.frameCount)frame = timeline.frameCount; // frame is 1-based
-			
+			if(frame>timeline.frameCount-1)frame = timeline.frameCount-1;
+
 			for(var i=0; i<layers.length && !failed; i++){
 				var layer=layers[i];
 				if(layer.layerType=='guide')continue;
 
-				var thisFrame = layer.frames[frame-1];
+				var thisFrame = layer.frames[frame];
 				if(thisFrame){
 					if(thisFrame.tweenType=="motion"){
 						failed = true;
@@ -2942,7 +2943,7 @@
 			if(!(contours && contours.length) && !shape.isGroup){
 				return;	
 			}
-			var svgArray=new ext.Array();
+			var pathList=new ext.Array();
 			var filled=new ext.Array();
 			var edgeIdLists=new ext.Array();
 			var oppFillsLists=new ext.Array();
@@ -2953,10 +2954,9 @@
 			for(i=0; i<contours.length; i++){
 				var contour = contours[i];
 				var s=this._getContour(contour,polygonsList,{
-					otherPaths:svgArray,
 					edgeIdLists:edgeIdLists,
 					contoursList:validContours,
-					nodeList:svgArray,
+					pathList:pathList,
 					colorTransform:settings.colorTransform,
 					matrix:pathMatrix,
 					holes:holes,
@@ -2979,8 +2979,8 @@
 						oppFills.push(othContour.fill);
 					}
 				}
-				for(var i=0; i<svgArray.length; i++){
-					var otherG = svgArray[i];
+				for(var i=0; i<pathList.length; i++){
+					var otherG = pathList[i].node;
 					var othEdges = edgeIdLists[i];
 					var othContour = validContours[i];
 					var othPolys = polygonsList[i];
@@ -3014,8 +3014,8 @@
 			var svg=new XML('<g/>');
 			var matrixStr = this._getMatrix(matrix);
 			if(matrixStr!=this.IDENTITY_MATRIX)svg['@transform']=matrixStr;
-			for(var i=0;i<svgArray.length;i++){
-				svg.appendChild(svgArray[i]);
+			for(var i=0;i<pathList.length;i++){
+				svg.appendChild(pathList[i].node);
 			}
 			if(
 				shape.isGroup && 
@@ -3038,7 +3038,8 @@
 							beginAnimation:settings.beginAnimation,
 							repeatCount:settings.repeatCount,
 							loopTweens:this.loopTweens,
-							discreteEasing:this.discreteEasing
+							discreteEasing:this.discreteEasing,
+							flattenMotion:this.flattenMotion
 						}
 					);
 					if(e)svg.appendChild(e);
@@ -3058,19 +3059,17 @@
 				reversed:false,
 				colorTransform:null,
 				filledOnly:false,
-				otherPaths:[],
 				edgeIdLists:null,
-				nodeList:null,
+				pathList:null,
 				contoursList:null,
 				holes:null
 			});
 			settings.extend(options);
 			var dom = settings.dom;
 			var curveDeg = this.curveDegree;
-			var otherPaths = settings.otherPaths;
 			var edgeIdLists = settings.edgeIdLists;
 			var contoursList = settings.contoursList;
-			var nodeList = settings.nodeList;
+			var pathList = settings.pathList;
 			var holes = settings.holes;
 
 			var xform='';
@@ -3103,7 +3102,7 @@
 			}else{
 				var fillString = ' fill="none"';
 			}
-			filledPath = {stroke:"", fill:fillString, contours:[]};
+			filledPath = {stroke:"", fill:fill, fillString:fillString, contours:[]};
 			paths.push(filledPath);
 
 			var he = contour.$.getHalfEdge(); 
@@ -3149,7 +3148,7 @@
 					if(!currPath || stroke!=lastStroke){
 						currPath = strokeMap[stroke];
 						if(!currPath){
-							currPath = {stroke:stroke, fill:" fill='none'", contours:[]};
+							currPath = {stroke:stroke, fillString:" fill='none'", contours:[]};
 							paths.push(currPath);
 							strokeMap[stroke] = currPath;
 						}
@@ -3173,7 +3172,15 @@
 				}
 			}
 
-			var cutHole = contour.interior && !fill && otherPaths!=null;
+			var hasOtherFills = false;
+			for(var i=0; i<pathList.length; ++i){
+				if(pathList[i].fill!=null){
+					hasOtherFills = true;
+					break;
+				}
+			}
+
+			var cutHole = contour.interior && !fill && hasOtherFills;
 			var reverse = settings.reversed || contour.orientation==1;
 			if(cutHole)reverse = !reverse;
 
@@ -3228,7 +3235,7 @@
 					}
 				}else{
 					polygons.push(polygon);
-					pathNodes.push('<path ' + currPath.fill + opacityString + currPath.stroke + ' d="' + pathStr + '"/>\n');
+					pathNodes.push('<path ' + currPath.fillString + opacityString + currPath.stroke + ' d="' + pathStr + '"/>\n');
 				}
 			}
 
@@ -3241,7 +3248,8 @@
 				if(ext.log){
 					ext.log.pauseTimer(timer);	
 				}
-				nodeList.push(new XML(xmlStr));
+				filledPath.node = new XML(xmlStr);
+				pathList.push(filledPath);
 			}
 		},
 		/**

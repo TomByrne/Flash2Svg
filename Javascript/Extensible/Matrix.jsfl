@@ -102,8 +102,8 @@
 		},
 		transformPoint:function (x, y, doTranslate) {
 		    var result = new ext.Point(
-		        (x*this.a)+(y*this.c),
-		        (x*this.b)+(y*this.d)
+		        (x*this.a)+(y*this.b),
+		        (x*this.c)+(y*this.d)
 		    );
 		    if(doTranslate==null || doTranslate){
 		    	result.x += this.tx;
