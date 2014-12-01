@@ -141,14 +141,29 @@
             fl.trace("\t"+Geom.doIntersect(p1s, p1e, p2, extreme2));*/
             if (p1s.y!=lastY1 && Geom.doIntersect(p1s, p1e, p2, extreme2))
             {
-                // If the point 'p' is colinear with line segment 'i-next1',
-                // then check if it lies on segment. If it lies, return true,
-                // otherwise false
-                if (Geom.orientation(p1s, p2, p1e) == 0 && Geom.onSegment(p1s, p2, p1e))
-                   onEdge1 = true;
-     
-                count1++;
-                lastY1 = p2.y==p1e.y ? p1e.y : p1s.y;
+                var ignorePoint = false;
+                var onStart = (p1s.x==p2.x && p1s.y==p2.y);
+                var onEnd = (p1e.x==p2.x && p1e.y==p2.y);
+                if(onStart || onEnd){
+                    // point is on one end of line
+                    var nextNext = onStart ? (i==0? n1-1 : i-1) : (i+2)%n1;
+                    var next = polygon1[nextNext];
+                    if( (onStart && (p1e.y<p2.y)==(next.y<p2.y)) ||
+                        (onEnd && (p1s.y<p2.y)==(next.y<p2.y))){
+
+                        ignorePoint = true;
+                    }
+                }
+                if(!ignorePoint){
+                    // If the point 'p' is colinear with line segment 'i-next1',
+                    // then check if it lies on segment. If it lies, return true,
+                    // otherwise false
+                    if (Geom.orientation(p1s, p2, p1e) == 0 && Geom.onSegment(p1s, p2, p1e))
+                       onEdge1 = true;
+         
+                    count1++;
+                    lastY1 = p2.y==p1e.y ? p1e.y : p1s.y;
+                }
             }
 
             var count2 = 0, k = 0, onEdge2 = false, lastY2 = null;
@@ -162,11 +177,26 @@
                 // The same sort of point test for the other poly
                 if (p2s.y!=lastY2 && Geom.doIntersect(p2s, p2e, p1, extreme1))
                 {
-                    if (Geom.orientation(p2s, p1, p2e) == 0 && Geom.onSegment(p2s, p1, p2e))
-                       onEdge2 = true;
-         
-                    count2++;
-                    lastY2 = p1.y==p2e.y ? p2e.y : p2s.y;
+                    var ignorePoint = false;
+                    var onStart = (p2s.x==p1.x && p2s.y==p1.y);
+                    var onEnd = (p2e.x==p1.x && p2e.y==p1.y);
+                    if(onStart || onEnd){
+                        // point is on one end of line
+                        var nextNext = onStart ? (k==0? n2-1 : k-1) : (k+2)%n2;
+                        var next = polygon2[nextNext];
+                        if( (onStart && (p2e.y<p1.y)==(next.y<p1.y)) ||
+                            (onEnd && (p2s.y<p1.y)==(next.y<p1.y))){
+
+                            ignorePoint = true;
+                        }
+                    }
+                    if(!ignorePoint){
+                        if (Geom.orientation(p2s, p1, p2e) == 0 && Geom.onSegment(p2s, p1, p2e))
+                           onEdge2 = true;
+             
+                        count2++;
+                        lastY2 = p1.y==p2e.y ? p2e.y : p2s.y;
+                    }
                 }
                 
                 // Test if two segments intersect, if so then the polygons intersect
