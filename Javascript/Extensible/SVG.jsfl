@@ -619,10 +619,14 @@
 							group apart will actually increase file size.
 						*/
 						var noTransCount = 0;
+						var maskCount = 0;
 						var sameTrans = true;
 						var childTrans = null;
 						for(var k=0; k<grandchild; k++){
 							var newChild = childNode.children()[k];
+							if(newChild.@mask.length()==0){
+								maskCount++;
+							}
 							if(newChild.@transform.length()==0){
 								noTransCount++;
 								sameTrans = false;
@@ -634,7 +638,7 @@
 								}
 							}
 						}
-						if(grandchild>1 && sameTrans && !animTransNodes){
+						if(grandchild>1 && sameTrans && !animTransNodes && !childNode.@mask.length()){
 							/*
 								Here we can check if all children have the same transform and, if so,
 								move it to the parent (and skip expansion by setting noTransCount).
@@ -648,7 +652,7 @@
 							//fl.trace("SAME TRANS: "+childTrans+"\n"+frameNode.toXMLString());
 							parentTakenTrans = true;
 						}
-						if(noTransCount > 2){
+						if(noTransCount > 2 || maskCount>0){
 							/*
 								If a group has many children without transforms, it's not worth expanding.
 							*/
@@ -1417,6 +1421,21 @@
 						includeGuidedTweens:true,
 						includeGraphicChanges:true
 					});
+
+
+
+				// deselect all
+				if(ext.log){
+					var timer2=ext.log.startTimer('extensible.SVG._getTimeline() >> Deselect all');	
+				}
+				ext.doc.library.editItem(settings.libraryItem.name);
+				timeline.setSelectedFrames(0, timeline.frameCount-1, true);
+				timeline.setSelectedFrames(0,0);
+				ext.doc.selectNone();
+				ext.doc.exitEditMode();
+				if(ext.log){
+					ext.log.pauseTimer(timer2);
+				}
 
 				/*
 				 * Create temporary timelines where tweens exist & convert to
@@ -2481,13 +2500,6 @@
 			var dom = settings.dom;
 			//settings.matrix = instance.matrix.concat(settings.matrix);
 			settings.matrix = fl.Math.concatMatrix(instance.matrix, settings.matrix);
-
-			// deselect all
-			ext.doc.library.editItem(instance.libraryItem.name);
-			instance.timeline.setSelectedFrames(0, instance.timeline.frameCount-1, true);
-			instance.timeline.setSelectedFrames(0,0);
-			ext.doc.selectNone();
-			ext.doc.exitEditMode();
 
 			var xml = this._getTimeline(instance.timeline, settings);
 			var filterID=this._getFilters(instance, options, dom.defs);
