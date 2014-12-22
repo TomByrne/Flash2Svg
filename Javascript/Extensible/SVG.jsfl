@@ -1428,11 +1428,11 @@
 				if(ext.log){
 					var timer2=ext.log.startTimer('extensible.SVG._getTimeline() >> Deselect all');	
 				}
-				ext.doc.library.editItem(settings.libraryItem.name);
+				if(settings.libraryItem)ext.doc.library.editItem(settings.libraryItem.name);
 				timeline.setSelectedFrames(0, timeline.frameCount-1, true);
 				timeline.setSelectedFrames(0,0);
 				ext.doc.selectNone();
-				ext.doc.exitEditMode();
+				if(settings.libraryItem)ext.doc.exitEditMode();
 				if(ext.log){
 					ext.log.pauseTimer(timer2);
 				}
