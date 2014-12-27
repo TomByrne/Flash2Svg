@@ -102,8 +102,8 @@
 		},
 		transformPoint:function (x, y, doTranslate) {
 		    var result = new ext.Point(
-		        (x*this.a)+(y*this.b),
-		        (x*this.c)+(y*this.d)
+		        (x*this.a)+(y*this.c),
+		        (x*this.b)+(y*this.d)
 		    );
 		    if(doTranslate==null || doTranslate){
 		    	result.x += this.tx;
@@ -117,6 +117,9 @@
 		},
 		determinant:function() {
 			return this.a * this.d - this.b * this.c;
+		},
+		toString:function() {
+			return "[Matrix a:"+this.a+" b:"+this.b+" c:"+this.c+" d:"+this.d+" tx:"+this.tx+" ty:"+this.ty+"]";
 		}
 	}
 	ext.extend({Matrix:ExtensibleMatrix});

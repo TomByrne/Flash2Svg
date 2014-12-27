@@ -10,7 +10,7 @@
 		this.DEFAULT_BITMAP_SCALE=1/20;
 		this.MAX_INLINE_CALL_COUNT=2999; // Max recursions
 		this.IDENTITY_MATRIX='matrix(1 0 0 1 0 0)';
-		this.NO_TWEEN_SPLINE='1 0 1 0';
+		this.NO_TWEEN_SPLINE='.1 .1 .9 .9';
 		this.DOCUMENT_DATA='SVGExportOptions';
 		this.MODULO_STAND_IN='.__';
 
@@ -1643,8 +1643,8 @@
 						isMasked = true; 
 					}
 					var frames = layer.frames;
-					for(var n=settings.startFrame; n<layerEnd; ++n){
-
+					var n=settings.startFrame;
+					while( n<layerEnd ){
 						if(ext.log){
 							var timer2=ext.log.startTimer('extensible.SVG._getTimeline() >> Get frame items');	
 						}
@@ -1652,7 +1652,10 @@
 						var tweenType = frame.tweenType;
 
 						var items = this._getItemsByFrame(frame, settings.selection);
-						if(items.length==0)continue;
+						if(items.length==0){
+							n++;
+							continue;
+						}
 						var itemBounds = this._getBoundingBox(items);
 						if(boundingBox.left>itemBounds.left)boundingBox.left = itemBounds.left;
 						if(boundingBox.top>itemBounds.top)boundingBox.top = itemBounds.top;
@@ -1663,6 +1666,7 @@
 						var startType = layer.frames[frame.startFrame].tweenType;
 						if(this.animated && (animatedFrames[i+"-"+n] || (frame.startFrame!=n && n!=settings.startFrame && (startType=='none' || (!settings.flattenMotion && startType=="motion"))))){
 							// Skip frames that haven't changed or are motion tweens (when in animation mode).
+							n++;
 							continue;
 						}
 
@@ -1686,7 +1690,7 @@
 								//filtered = frameXML;
 								if(!this._maskFilter){
 									this._maskFilter=this._getFilters(
-										null,{
+										null,frameXML,{
 											color:colorX,
 											boundingBox:boundingBox
 										}, dom.defs
@@ -1844,53 +1848,96 @@
 								var timeList = [];
 								var splineList = [];
 
+								// skewX scale lists
+								var skxScaleXList = [];
+								var skxScaleYList = [];
+								var skxTimeList = [];
+								var skxSplineList = [];
+
+								// skewY scale lists
+								var skyScaleXList = [];
+								var skyScaleYList = [];
+								var skyTimeList = [];
+								var skySplineList = [];
+
+								var transXList = [];
+								var transYList = [];
+
 								var tweensFound = (frame.tweenType!="none" && frame.duration>1);
 
 								var matrix;
-								var invMatrix;
+								/*var invMatrix;
 								var firstRot;
+								var firstScX;
+								var firstScY;
 								var firstSkX;
-								var firstSkY;
-								if(this.showEndFrame){
-									for(var nextInd = n/*+1*/; nextInd<frameEnd; ++nextInd){
-										var nextFrame = layer.frames[nextInd];
-										if(nextFrame.startFrame!=nextInd)continue;
-										var nextElement = nextFrame.elements[0];
+								var firstSkY;*/
+								var allowRotateList = [];
+								var lastElement;
+								for(var nextInd = n; nextInd<frameEnd; ++nextInd){
+									var nextFrame = layer.frames[nextInd];
+									if(nextFrame.startFrame!=nextInd)continue;
+									var nextElement = nextFrame.elements[0];
+									if(lastElement){
+										allowRotateList.push(/*!isNaN(nextElement.rotation) || */(nextElement.skewX > nextElement.skewY) == (lastElement.skewX > lastElement.skewY));
+										//fl.trace(">>>>\n"+lastElement.rotation+" "+lastElement.skewX+" "+lastElement.skewY+" "+(lastElement.skewX - lastElement.skewY)+"\n"+nextElement.rotation+" "+nextElement.skewX+" "+nextElement.skewY+" "+(nextElement.skewX - nextElement.skewY));
 									}
-									matrix = new ext.Matrix(nextElement.matrix).clone();
-
-									firstRot = this._getRotation(nextElement);
-									firstSkX = nextElement.skewX;
-									firstSkY = nextElement.skewY;
-								}else{
-									matrix = element.matrix.clone();
-
-									firstRot = this._getRotation(element);
-									firstSkX = element.skewX;
-									firstSkY = element.skewY;
+									lastElement = nextElement;
 								}
+								allowRotateList.push(allowRotateList[allowRotateList.length-1]);
+								if(this.showEndFrame){
+									matrix = new ext.Matrix(lastElement.matrix);
+								}else{
+									nextElement = element;
+									matrix = element.matrix.clone();
+								}
+								/*firstSkX = nextElement.skewX;
+								firstSkY = nextElement.skewY;
+								firstScX = nextElement.scaleX;
+								firstScY = nextElement.scaleY;
+								firstRot = this._getRotation(nextElement);
+								if(isNaN(firstRot))firstRot = 0;
+
+								var transPoint = nextElement.getTransformationPoint();
+								//if(firstRot)matrix = this.rotateMatrix(matrix, firstRot, Math.sin(firstRot), Math.cos(firstRot), transPoint);
 								var invMatrix = matrix.invert();
+								//invMatrix.tx -= transPoint.x;
+								//invMatrix.ty -= transPoint.y;*/
+								var invMatrix = new ext.Matrix();
+								var firstRot = 0;
+								var firstScX = 0;
+								var firstScY = 0;
+								var firstSkX = 0;
+								var firstSkY = 0;
+
 
 								var time = settings.timeOffset+(n/ext.doc.frameRate)/animDur;
-								//this._addAnimFrame(frame, element, invMatrix, time, 0, 0, 0, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, alphaList, timeList, splineList);
 								
 								var lastRot = 0;
 								var lastFrame = frame;
 								var autoRotate = 0;
+								var lastSkX = null;
+								var lastSkY = null;
+								var lastTime;
 
 								var mainElem = frame.elements[0];
 								var loopAnim = (settings.loopTweens && n==settings.startFrame && frameEnd==settings.endFrame && settings.repeatCount=="indefinite" && layer.frames[frameEnd-1].startFrame==frameEnd-1);
 								var addTweenKiller = false;
+								var keyframeI = 0;
 								for(var nextInd = n/*+1*/; nextInd<frameEnd; ++nextInd){
 									var nextFrame = layer.frames[nextInd];
 									if(nextFrame.startFrame!=nextInd)continue;
+
+									var allowSkewRot = allowRotateList[keyframeI];
+									keyframeI++;
 
 									var attemptForeRot = true;
 									var attemptBackRot = true;
 									var time = (settings.timeOffset+nextInd/ext.doc.frameRate)/animDur;
 									var isLast = (nextFrame.duration + nextInd >= frameEnd);
 									if(addTweenKiller){
-										timeList.push(this.precision(time-0.0000001));
+										var smallT = this.precision(time-1/Math.pow(10, this.decimalPointPrecision));
+										timeList.push(smallT);
 									}else if(lastFrame.tweenType=="motion"){
 										tweensFound = true;
 										switch(lastFrame.motionTweenRotate){
@@ -1906,7 +1953,7 @@
 									}
 
 									var nextElement = nextFrame.elements[0];
-									var rot = this._getRotation(nextElement) - firstRot;
+									var rot = this._getRotation(nextElement, allowSkewRot) - firstRot;
 									var skewX = nextElement.skewX - firstSkX;
 									var skewY = nextElement.skewY - firstSkY;
 
@@ -1920,7 +1967,6 @@
 										skewX -= 360;
 										skewY -= 360;
 									}
-
 									// if there is a rotation tween of up to 45 degrees, we add extra bounds to accomodate it.
 									var rotDif = Math.abs(lastRot - rot)/180*Math.PI;
 									if(rotDif>Math.PI/4)rotDif = Math.PI/4;
@@ -1935,20 +1981,38 @@
 										if(boundingBox.bottom<swingBottom)boundingBox.bottom = swingBottom;
 									}
 
+									if(isNaN(rot)){
+										rot = rotList.length ? rotList[rotList.length-1] : 0;
+									}
+									skewX -= rot;
+									skewY -= rot;
+			 						//fl.trace("\nframe: "+nextFrame.startFrame);
 									addTweenKiller = (nextFrame.tweenType=="none" && (!loopAnim || !isLast));
-									this._addAnimFrame(nextFrame, nextElement, invMatrix, time, rot, autoRotate, skewX, skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, alphaList, timeList, splineList, addTweenKiller, i, nextInd);
+									var transPoint = nextElement.getTransformationPoint();
+									this.checkSkewQuadrant(skewX, time, lastSkX, lastTime, skxScaleYList, skxScaleXList, skxTimeList, skxSplineList, transPoint.x, transPoint.y)
+									this.checkSkewQuadrant(skewY, time, lastSkY, lastTime, skyScaleXList, skyScaleYList, skyTimeList, skySplineList, transPoint.y, transPoint.x)
+									this._addAnimFrame(nextFrame, nextElement, invMatrix, time, rot, skewX, skewY, autoRotate, xList, yList, transXList, transYList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, alphaList, timeList, splineList, addTweenKiller, i, nextInd);
 									
 									lastFrame = nextFrame;
 									lastRot = rot;
+									lastSkX = skewX;
+									lastSkY = skewY;
+									lastTime = time;
 
 									if(!transToDiff || nextInd<frameEnd-1)animatedFrames[i+"-"+nextInd] = true;
 									if(nextFrame.elements.length>1 || nextElement.libraryItem!=element.libraryItem)break;
 								}
 								if(addTweenKiller || loopAnim){
-									timeList.push((settings.timeOffset+nextInd/ext.doc.frameRate)/animDur);
+									var t = (settings.timeOffset+nextInd/ext.doc.frameRate)/animDur;
+									timeList.push(t);
 									if(loopAnim){
-										if(settings.loopTweens && splineList[splineList.length-1]==this.NO_TWEEN_SPLINE){
-											splineList[splineList.length-1] = splineList[0];
+										skxTimeList.push(t);
+										skyTimeList.push(t);
+
+										if(settings.loopTweens){
+											if(splineList[splineList.length-1]==this.NO_TWEEN_SPLINE) splineList[splineList.length-1] = splineList[0];
+											if(skxTimeList[skxTimeList.length-1]==this.NO_TWEEN_SPLINE) skxTimeList[skxTimeList.length-1] = skxTimeList[0];
+											if(skySplineList[skySplineList.length-1]==this.NO_TWEEN_SPLINE) skySplineList[skySplineList.length-1] = skySplineList[0];
 										}
 										// this code joins the end of the animation up with the start for seemless looping
 										xList.push(xList[0]);
@@ -1962,15 +2026,45 @@
 										tryList.push(tryList[0]);
 										alphaList.push(alphaList[0]);
 										splineList.push(splineList[0]);
+										transXList.push(transXList[0]);
+										transYList.push(transYList[0]);
+
+										skxScaleXList.push(skxScaleXList[0]);
+										skxScaleYList.push(skxScaleYList[0]);
+										skyScaleXList.push(skyScaleXList[0]);
+										skyScaleYList.push(skyScaleYList[0]);
+
+										skxSplineList.push(skxSplineList[0]);
+										skySplineList.push(skySplineList[0]);
 									}
 								}
-								// the ordering of these animation nodes is important
-								this._addAnimationNode(elementXML, "translate", [xList, yList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete)
-								this._addAnimationNode(elementXML, "scale", [scxList, scyList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, scxList.length>1)
-								this._addAnimationNode(elementXML, "rotate", [rotList, trxList, tryList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete, rotList.length>1)
-								this._addAnimationNode(elementXML, "skewX", [skxList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete)
-								this._addAnimationNode(elementXML, "skewY", [skyList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete)
-								this._addAnimationNode(elementXML, "opacity", [alphaList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete)
+								var combineSkewScales = false;
+								if(skxTimeList.length == skyTimeList.length){
+									combineSkewScales = true;
+									for(var p=0; p<skxTimeList.length; p++){
+										if(skxTimeList[p]!=skyTimeList[p]){
+											combineSkewScales = false;
+											break;
+										}
+									}
+								}
+								if(this.hasDifferent(xList, yList, rotList, skyList, skxList, scxList, scyList)){
+									// the ordering of these animation nodes is important
+									this._addAnimationNode(elementXML, "translate", [xList, yList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete)
+									this._addAnimationNode(elementXML, "rotate", [rotList, trxList, tryList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete, false)
+									this._addAnimationNode(elementXML, "skewX", [skxList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete)
+									this._addAnimationNode(elementXML, "skewY", [skyList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete)
+									this._addAnimationNode(elementXML, "scale", [scxList, scyList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true)
+									if(combineSkewScales){
+										this._addAnimationNode(elementXML, "scale", [skyScaleXList, skxScaleYList], skxTimeList, animDur, skxSplineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true)
+									}else{
+										this._addAnimationNode(elementXML, "scale", [skxScaleXList, skxScaleYList], skxTimeList, animDur, skxSplineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true)
+										this._addAnimationNode(elementXML, "scale", [skyScaleXList, skyScaleYList], skyTimeList, animDur, skySplineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true)
+									}
+									this._addAnimationNode(elementXML, "translate", [transXList, transYList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete)
+								}
+								
+								if(this.hasDifferent(alphaList))this._addAnimationNode(elementXML, "opacity", [alphaList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete)
 
 								elementXML.@transform = this._getMatrix(matrix);
 
@@ -1987,9 +2081,10 @@
 
 							var lastFrameInd = (transToDiff?frameEnd-1:frameEnd)
 							//lastFrameInd    += (lastFrameInd==layerEnd?1:0);
-							var frameTimeStart = this.precision((settings.timeOffset + (n - settings.startFrame)/ext.doc.frameRate)/animDur);
-							var frameTimeEnd = this.precision((settings.timeOffset + (lastFrameInd - settings.startFrame)/ext.doc.frameRate)/animDur);
 
+							// use precision before devision because animDur has already been rounded and fractions that should be 1 can end up being 0.999 otherwise
+							var frameTimeStart = this.precision(this.precision(settings.timeOffset + (n - settings.startFrame)/ext.doc.frameRate)/animDur);
+							var frameTimeEnd = this.precision(this.precision(settings.timeOffset + (lastFrameInd - settings.startFrame)/ext.doc.frameRate)/animDur);
 
 							if(frameTimeStart>1)fl.trace("START TIME WARNING: "+frameTimeStart+" "+settings.timeOffset+" "+animDur+" "+n+" "+settings.startFrame+" "+((n - settings.startFrame)*(1/ext.doc.frameRate)));
 							if(frameTimeEnd>1)fl.trace("END TIME WARNING: "+timeline.name+" "+((settings.timeOffset + (lastFrameInd - settings.startFrame)/ext.doc.frameRate) * ext.doc.frameRate)+" / "+(animDur * ext.doc.frameRate)+" = "+frameTimeEnd);
@@ -2034,6 +2129,8 @@
 						}else{
 							xml.prependChild(frameXML);
 						}
+
+						n = transToDiff ? frameEnd-1 : frameEnd;
 					}
 					if(layer.visible!=lVisible) layer.visible=lVisible;
 					if(layer.locked!=lLocked) layer.locked=lLocked;
@@ -2122,6 +2219,20 @@
 				return instanceXML;
 			}
 		},
+		hasDifferent:function(){
+			for(var i=0; i<arguments.length; i++){
+				var list = arguments[i];
+				var firstVal;
+				for(var x=0; x<list.length; x++){
+					if(x==0){
+						firstVal = list[x];
+					}else if(firstVal != list[x]){
+						return true;
+					}
+				}
+			}
+			return false;
+		},
 		_timelineCopies:null,
 		_getTimelineCopy:function(libraryItem, timeline, startFrame, endFrame){
 			var key = (libraryItem==undefined ? ext.doc.timelines.indexOf(timeline.$) : libraryItem.name);
@@ -2175,70 +2286,141 @@
 			}
 			return timeline;
 		},
-		_getRotation:function(element){
-			if(isNaN(element.rotation) || element.rotation==0){
+		_getRotation:function(element, allowSkewRotate){
+			if((isNaN(element.rotation) || element.rotation==0) && allowSkewRotate){
+				//fl.trace("--------------- TAKE SKEW");
 				return element.skewX;
 			}else{
 				return element.rotation;
 			}
 		},
-		_addAnimFrame:function(frame, element, invMatrix, time, rot, autoRotate, skewX, skewY, xList, yList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, alphaList, timeList, splineList, addTweenKiller, layerI, frameI){
+		_addAnimFrame:function(frame, element, invMatrix, time, rot, skewX, skewY, autoRotate,
+								xList, yList, transXList, transYList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, alphaList,
+								timeList, splineList,
+								addTweenKiller, layerI, frameI){
 
 			if(!isNaN(element.rotation)){
 				element.rotation += 0; // sometimes fixes invalid matrices
 			}
-			var matrix = new ext.Matrix(fl.Math.concatMatrix(element.matrix, invMatrix));
+			var matrix = new ext.Matrix(element.matrix);
 			var transPoint = element.getTransformationPoint();
 
-			skewX -= rot;
-			skewY -= rot;
+			transXList.push(-transPoint.x);
+			transYList.push(-transPoint.y);
 
-			var rotRad = rot / 180 * Math.PI;
+			//transPoint = matrix.transformPoint(transPoint.x, transPoint.y, false);
+			var outerTransPoint = matrix.transformPoint(transPoint.x, transPoint.y, true);
+			xList.push(this.precision(outerTransPoint.x));
+			yList.push(this.precision(outerTransPoint.y));
 
-			if(Math.abs(element.skewY - element.skewX) > 180 && isNaN(element.rotation)){
-				rot = -rot;
-				skewY = -skewY;
-			}
+			if(!isNaN(rot) && rot!=0){
+				var rotRad = rot / 180 * Math.PI;
 
+				if(isNaN(element.rotation)){
+					var spin = Math.abs(element.skewY - element.skewX);
+					if((spin > 90 && spin < 270) || (spin < -90 && spin > -270)){
+					//if(spin > 180){
+						rot = -rot;
+						//transPoint.x = -transPoint.x;
+						//transPoint.y = -transPoint.y;
+					}
+				}
 
-			var x = matrix.tx;
-			var y = matrix.ty;
+				var rotCos = Math.cos(rotRad);
+				var rotSin = Math.sin(rotRad);
+				matrix = this.rotateMatrix(matrix, rot, rotSin, rotCos, transPoint);
+				matrix = new ext.Matrix(fl.Math.concatMatrix(matrix, invMatrix));
 
-
-			var rotMatrix = new ext.Matrix();
-			rotMatrix.a = Math.cos(rotRad);
-			rotMatrix.b = Math.sin(rotRad);
-			rotMatrix.c = -Math.sin(rotRad);
-			rotMatrix.d = Math.cos(rotRad);
-
-			trxList.push(this.precision(transPoint.x));
-			tryList.push(this.precision(transPoint.y));
-			
-			matrix = new ext.Matrix(fl.Math.concatMatrix(matrix, rotMatrix.invert()));
-
-			if((matrix.a<0) == (matrix.d<0)){
-				rotList.push(this.precision(rot + autoRotate));
+				if((matrix.a<0) == (matrix.d<0)){
+					rotList.push(this.precision(rot + autoRotate));
+				}else{
+					rotList.push(this.precision(-rot + autoRotate));
+					matrix.a = -matrix.a;
+					matrix.d = -matrix.d;
+				}
 			}else{
-				rotList.push(this.precision(-rot + autoRotate));
+				rotList.push(0);
+				var rotCos = Math.cos(0);
+				var rotSin = Math.sin(0);
+				matrix = new ext.Matrix(fl.Math.concatMatrix(matrix, invMatrix));
 			}
+			//fl.trace("mat: "+matrix);
 
-			transPoint = matrix.transformPoint(transPoint.x, transPoint.y, false);
+			var skewXRads = skewX / 180 * Math.PI;
+			var skewYRads = skewY / 180 * Math.PI;
+			var skewXSin = Math.sin(skewXRads);
+			var skewYSin = Math.sin(skewYRads);
+			var skewXCos = Math.cos(skewXRads);
+			var skewYCos = Math.cos(skewYRads);
+			// var transX = (transPoint.x * skewYCos * element.scaleX + transPoint.y * skewXSin * element.scaleY);
+			// var transY = (transPoint.y * skewXCos * element.scaleY + transPoint.x * skewYSin * element.scaleX);
+			// xList.push(this.precision(matrix.tx + transX));
+			// yList.push(this.precision(matrix.ty + transY));
+			// fl.trace("Y: "+matrix.ty + " "+transY+" "+yList[yList.length-1]);
+			
+			// var x = matrix.tx;
+			// var y = matrix.ty;
+			// xList.push(this.precision(x + (transPoint.x * rotCos + transPoint.y * -rotSin) - transPoint.x));
+			// yList.push(this.precision(y + (transPoint.y * rotCos + transPoint.x * rotSin) - transPoint.y));
+			// fl.trace("rot: "+element.rotation+" "+element.skewX+" "+element.skewY);
+			 //fl.trace("trans: "+transPoint.x+" "+transPoint.y);
+			 //fl.trace("otrans: "+element.getTransformationPoint().x+" "+element.getTransformationPoint().y);
+			 //fl.trace("matII: "+matrix.invert());
+			 //fl.trace("omat: "+new ext.Matrix(element.matrix));
+			 //fl.trace("imat: "+invMatrix);
+			// fl.trace("x: "+x+" "+(transPoint.x * rotCos)+" "+(transPoint.y * -rotSin)+" "+(-transPoint.x));
+			// fl.trace("y: "+y+" "+(transPoint.y * rotCos)+" "+(transPoint.x * rotSin)+" "+(-transPoint.y));
 
-			var rotCos = Math.cos(rotRad);
-			var rotSin = Math.sin(rotRad);
-			xList.push(this.precision(x + (transPoint.x * rotCos + transPoint.y * -rotSin) - transPoint.x));
-			yList.push(this.precision(y + (transPoint.y * rotCos + transPoint.x * rotSin) - transPoint.y));
+			//fl.trace("C: "+Math.cos(matrix.b)+" "+Math.sin(matrix.b)+" "+Math.cos(matrix.c)+" "+Math.sin(matrix.c));
+			//transPoint = element.getTransformationPoint();
+			//trxList.push(this.precision(transPoint.x/* * Math.cos(matrix.c) + Math.sin(matrix.c) * transPoint.y*/));
+			//tryList.push(this.precision(transPoint.y/* * Math.cos(matrix.b) + Math.sin(matrix.b) * transPoint.x*/));
+			trxList.push(0);
+			tryList.push(0);
 
-			scxList.push(this.precision(matrix.a));
-			scyList.push(this.precision(matrix.d));
+			//scxList.push(this.precision(matrix.a / skewYCos));
+			//scyList.push(this.precision(matrix.d / skewXCos));
+			//matrix.scale(1/matrix.a, 1/matrix.d);
+			scxList.push(this.precision(element.scaleX));
+			scyList.push(this.precision(element.scaleY));
 
-			skxList.push(this.precision(this._getClosestRotList(-skewX, skxList)));
-			skyList.push(this.precision(this._getClosestRotList( skewY, skyList)));
+
+			//scxList.push(this.precision(matrix.a * matrix.a + matrix.b * matrix.b));
+			//scyList.push(this.precision(matrix.c * matrix.c + matrix.d * matrix.d));
+
+			//skxList.push(this.precision(this._getClosestRotList(-skewX, skxList)));
+			//skyList.push(this.precision(this._getClosestRotList( skewY, skyList)));
+			/* fl.trace("mat: "+matrix);
+			fl.trace("> "+(40 / 180 * Math.PI));
+			fl.trace(">> "+matrix.c+" "+(matrix.c * matrix.c));
+			var skx = this.precision(matrix.c * 180 / Math.PI);
+			//if(matrix.c < 0)skx = -skx;
+			fl.trace("skx: "+skx);
+			var sky = this.precision(matrix.b * 180 / Math.PI);*/
+
+			/*var px = matrix.transformPoint(0, 1, false);
+			var py = matrix.transformPoint(1, 0, false);
+
+			var sky = ((180/Math.PI) * Math.atan2(px.y, px.x) - 90);
+			var skx = ((180/Math.PI) * Math.atan2(py.y, py.x));
+			fl.trace("skew: "+skx+" "+sky+" "+rot);
+			skxList.push(this.precision(skx));
+			skyList.push(this.precision(sky));*/
+
+			//if(matrix.d < 0)sky = -sky;
+			 skxList.push(this.precision(-skewX));
+			 skyList.push(this.precision(skewY));
+			//skxList.push(0);
+			//if(skewY)skyList.push(this.precision(matrix.c));
+			//else skyList.push(0);
 
 			alphaList.push(element.colorAlphaPercent / 100);
 
-			splineList.push(this._getSplineData(frame));
-			timeList.push(this.precision(time));
+			var spline = this._getFrameSpline(frame);
+			splineList.push(spline);
+
+			var time = this.precision(time);
+			timeList.push(time);
 
 			if(addTweenKiller){
 				xList.push(xList[xList.length-1]);
@@ -2250,9 +2432,124 @@
 				rotList.push(rotList[rotList.length-1]);
 				trxList.push(trxList[trxList.length-1]);
 				tryList.push(tryList[tryList.length-1]);
+				transXList.push(transXList[transXList.length-1]);
+				transYList.push(transYList[transYList.length-1]);
 				alphaList.push(alphaList[alphaList.length-1]);
 				splineList.push(splineList[splineList.length-1]);
 			}
+		},
+		rotateMatrix:function(matrix, angle, rotSin, rotCos, transPoint){
+			var radians = angle / 180 * Math.PI;
+			var rotMatrix = new ext.Matrix();
+			rotMatrix.a = Math.cos(radians);
+			rotMatrix.b = Math.sin(radians);
+			rotMatrix.c = -Math.sin(radians);
+			rotMatrix.d = Math.cos(radians);
+			var ret = new ext.Matrix(fl.Math.concatMatrix(matrix, rotMatrix.invert()));
+			ret.tx = matrix.tx + (transPoint.x * rotCos + transPoint.y * -rotSin) - transPoint.x;
+			ret.ty = matrix.ty + (transPoint.y * rotCos + transPoint.x * rotSin) - transPoint.y;
+			return ret;
+		},
+		checkSkewQuadrant:function(skew, time, oldSkew, oldTime, scaleList, othScaleList, scaleTimeList, scaleSplineList, transPointDim1, transPointDim2){
+			var quad = Math.floor((skew) / 90);
+			var oldQuad = Math.floor((oldSkew) / 90);
+
+			if(oldSkew!=null){
+				//skew = this._getClosestRot(skew, oldSkew);
+				var diff = quad - oldQuad;
+				if(diff){
+					var startsOnQuad = (oldSkew % 90) == 0;
+					var endsOnQuad = (skew % 90) == 0;
+					var dir = diff > 0 ? 1 : -1;
+					if(dir==-1)diff = -diff;
+					if(skew % 90 == 0 || startsOnQuad) diff--;
+
+					var startTime = oldTime;
+					var endTime = time;
+					var timePerDegs = (time - oldTime) / (skew - oldSkew);
+					if(!startsOnQuad){
+						var fract = oldSkew / 90;
+						while(fract<0)fract += 1;
+						fract = fract%1;
+						if(dir==-1) fract = (1 - fract);
+
+						var extra = fract * 90;
+						startTime += extra * timePerDegs;
+					}
+					if(!endsOnQuad){
+						var fract = skew / 90;
+						while(fract<0)fract += 1;
+						fract = fract%1;
+						if(dir==1) fract = (1 - fract);
+
+						var extra = fract * 90;
+						endTime -= extra * timePerDegs;
+					}
+					
+					var timeDiff = endTime - startTime;
+					var timeInc = timeDiff / (diff + 1);
+
+
+					var q = oldQuad;
+
+					if(dir==-1 && !startsOnQuad)q++;
+					for(var i=0; i<diff; i++){
+						q += dir;
+						q = q%4;
+
+						var t = this.precision(startTime + timeInc * (i+1));
+						if(i==diff-1){
+							if(skew < 0){
+								fract = ((-skew)%90) / 90;
+							}else{
+								fract = (skew%90) / 90;
+							}
+							if(!fract)fract = 1;
+							if(dir<0)fract = 1-fract;
+						}else{
+							fract = 1;
+						}
+						//var sk;
+						var sc;
+						var ease;
+						while(q<0) q += 4;
+						var rads = q * Math.PI / 2;
+						switch(q){
+							case 0:
+								//sk = 0;
+								sc = 1;
+								ease = -1;
+								break;
+							case 1:
+								//sk = 90 * dir;
+								sc = 0;
+								ease = 1;
+								break;
+							case 2:
+								//sk = 0;
+								sc = -1;
+								ease = -1;
+								break;
+							case 3:
+								//sk = -90 * dir;
+								sc = 0;
+								ease = 1;
+								break;
+						}
+						scaleList.push(sc);
+						othScaleList.push(1);
+						scaleTimeList.push(t);
+						scaleSplineList.push(this._getFractSpline(ease));
+					}
+				}
+			}
+			var rads = skew / 180 * Math.PI;
+			scaleList.push(this.precision(Math.cos(rads)));
+			othScaleList.push(1);
+			scaleTimeList.push(this.precision(time));
+			scaleSplineList.push(this._getFractSpline(0));
+
+			return diff>0;
 		},
 		_getClosestRotList:function(rot, rotList){
 			if(rotList.length==0){
@@ -2335,10 +2632,9 @@
 			xml.prependChild(mg);
 			masked.clear();
 		},
-		_addAnimationNode:function(toNode, type, valueLists, times, totalTime, splineList, tweensFound, defaultValue, beginAnimation, repeatCount, forceDiscrete, force){
-
+		_addAnimationNode:function(toNode, type, valueLists, times, totalTime, splineList, tweensFound, defaultValue, beginAnimation, repeatCount, forceDiscrete, validateAllLists){
+			if(validateAllLists==null)validateAllLists = true;
 			if(defaultValue==null)defaultValue = 0;
-
 			var getValue = function(valueLists, i){
 				var ret = valueLists[0][i].toString();
 				for(var j=1; j<valueLists.length; ++j){
@@ -2347,24 +2643,33 @@
 				return ret;
 			}
 			var found = false;
-			var hasDifVals;
-			for(var i=0; i<valueLists.length; ++i){
+			var n = (validateAllLists ? valueLists.length : 1);
+			for(var i=0; i<n; ++i){
 				var list = valueLists[i];
 				var firstVal = list[0];
 				for(var j=0; j<list.length; ++j){
 					var val = list[j];
-					if(j!=0 && firstVal!=val){
+					/*if(j!=0 && firstVal!=val){
 						hasDifVals = true;
-					}
+					}*/
 					if(val!=defaultValue){
 						found = true;
+						break;
 					}
-					if(hasDifVals && found)break;
+					//if(hasDifVals && found)break;
 				}
-				if(hasDifVals && found)break;
+				if(/*hasDifVals && */found)break;
 			}
-			if(!found || !hasDifVals){
+			if(!found/* || !hasDifVals*/){
 				return false;
+			}
+			var n = splineList.length;
+			var hasEasing = false;
+			for(var i=0; i<n; ++i){
+				if(splineList[i]!=this.NO_TWEEN_SPLINE){
+					hasEasing = true;
+					break;
+				}
 			}
 			while(times.length>splineList.length){
 				// we use this so that scale values can use the short spline list (improves easing)
@@ -2390,10 +2695,10 @@
 				lastTime = times[i];
 				if(lastTime>1)lastTime = 1;
 
-				var noneTween = (splineList[i]==this.NO_TWEEN_SPLINE);
-				if(newVal==lastVal && (endPointMode || noneTween)){
+				//var noneTween = (splineList[i]==this.NO_TWEEN_SPLINE);
+				if(newVal==lastVal && (endPointMode/* || noneTween*/)){
 					if(endPointMode)validT[validT.length-1] = lastTime;
-					if(noneTween)validS[validT.length-1] = this.NO_TWEEN_SPLINE; 
+					//if(noneTween)validS[validT.length-1] = this.NO_TWEEN_SPLINE; 
 				}else{
 					endPointMode = (newVal==lastVal);
 					lastVal = newVal;
@@ -2403,6 +2708,9 @@
 				}
 			}
 			if(validT[validT.length-1]<1){
+				if(validV.length==2 && validV[0]==validV[1]){
+					validT[1] = 0.9; // reduces unneeded decimal points
+				}
 				validV.push(lastVal);
 				validT.push(1);
 			}else{
@@ -2416,19 +2724,22 @@
 				var animNode = <animateTransform
 						      attributeName="transform" additive="sum" />;
 				animNode.@type = type;
+				if(toNode.animateTransform.length()==0)animNode.@additive = "replace";
 			}
 
 
 			if(beginAnimation!="0s")animNode.@begin = beginAnimation;
-			animNode.@repeatCount = repeatCount;
+			if(repeatCount!=1)animNode.@repeatCount = repeatCount;
 
 			animNode.@dur = this.precision(totalTime)+"s";
 			animNode.@keyTimes = validT.join(";");
 			animNode.@values = validV.join(";");
 
 			if(tweensFound && !forceDiscrete){
-				animNode.@keySplines = validS.join(";");
-				animNode.@calcMode="spline";
+				if(hasEasing){
+					animNode.@keySplines = validS.join(";");
+					animNode.@calcMode="spline";
+				}
 			}else{
 				animNode.@calcMode="discrete";
 			}
@@ -2440,9 +2751,7 @@
 		 * Gets the spline points for a motion tweened frame.
 		 * Spline data is in the format 'x1 y1 x2 y2;' (per frame)
 		 */
-		_getSplineData:function(frame, incr){
-
-			if(incr==null)incr = 1;
+		_getFrameSpline:function(frame){
 
 			// Tween support warnings, remove these as different tween settings gain support
 			if(frame.hasCustomEase)ext.warn('Custom easing is not yet supported (at frame '+frame.startFrame+")");
@@ -2452,13 +2761,25 @@
 			if(frame.tweenType=="none"){
 				return this.NO_TWEEN_SPLINE;
 			}
-			
-			var fract = (frame.tweenEasing/100) * 0.8; // this number determines the severness of easing (should match flash IDE, between 0-1)
-			if(frame.tweenEasing<0){
-				return '0.01 0.01 1 '+this.precision(1+fract);
+			return this._getFractSpline(frame.tweenEasing/100);
+		},
+		_getFractSpline:function(fract){
+			if(fract==0)return this.NO_TWEEN_SPLINE;
+
+			fract = fract * 0.5; // this number determines the severeness of easing (should match flash IDE, between 0-1)
+			var halfFract = fract/2;
+			if(fract<0){
+				// ease in
+				return this._removeLeadingZero(-fract)+' 0 '+this._removeLeadingZero(0.5-halfFract)+' .5';
 			}else{
-				return '0 '+this.precision(fract)+' 0.99 0.99';
+				// ease out
+				return this._removeLeadingZero(0.5 - halfFract)+' .5 '+this._removeLeadingZero(1-fract)+' 1';
 			}
+		},
+		_removeLeadingZero:function(num){
+			var str = this.precision(num).toString();
+			if(str.indexOf("0.")==0)str = str.substr(1);
+			return str;
 		},
 		/**
 		 * Retrieves the a list of items, masked by another list if specified
@@ -2502,7 +2823,7 @@
 			settings.matrix = fl.Math.concatMatrix(instance.matrix, settings.matrix);
 
 			var xml = this._getTimeline(instance.timeline, settings);
-			var filterID=this._getFilters(instance, options, dom.defs);
+			var filterID=this._getFilters(instance, xml, options, dom.defs);
 			if(filterID && dom.defs.filter.(@id==filterID).length()){
 				xml['@filter']='url(#'+filterID+')';
 			}
@@ -2512,7 +2833,7 @@
 			}
 			return xml;
 		},
-		_getFilters:function(element,options,defs){
+		_getFilters:function(element, xml ,options,defs){
 			var settings=new ext.Object({
 				frame:0,
 				color:undefined,
@@ -2774,7 +3095,15 @@
 						feComposite.@result='tint_feComposite';
 						*/
 					}else{
-						if(!color.percent.is([100,100,100,100])){
+						if(	color.percent[0]==100 &&
+							color.percent[1]==100 &&
+							color.percent[2]==100){
+
+							if(color.percent[3]!=100){
+								xml.@opacity = color.percent[3]/100;
+							}
+
+						}else{
 							feColorMatrix=<feColorMatrix />;
 							feColorMatrix.@type="matrix";
 							feColorMatrix['@in']=src;
