@@ -1,18 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<macromedia-extension name="flash2svg" version="1.0">
+<macromedia-extension name="flash2svg" version="3.0">
   <author name="David Belais &amp; Tom Byrne"/>
   <products>
     <product name="Flash" version="11"/>
+    <product name="Flash" version="12"/>
   </products>
   <!-- <ui-access></ui-access>
   <description></description> -->
   <license-agreement>GNU Public License: http://www.gnu.org/licenses/gpl.html</license-agreement> 
   <files>
     <!--<file source="Commands/Export SVG.jsfl" destination="$flash/Commands"/>-->
-    <file source="Javascript/Extensible" destination="$flash/Javascript"/>
-    <file source="Tools/extensible.jsfl" destination="$flash/Tools"/>
-    <file source="Commands/Deselect all shapes in timeline.jsfl" destination="$flash/Commands"/>
-    <file source="WindowSWF/SVG.swf" destination="$flash/WindowSWF"/>
-    <file source="WindowSWF/svg-help.xml" destination="$flash/WindowSWF"/>
+    <file source="html/ExtensionContent/Extensible" destination="$flash/Javascript"/>
+    <file source="flash/SVG.swf" destination="$flash/WindowSWF"/>
+    <file source="flash/svg-help.xml" destination="$flash/WindowSWF"/>
   </files>
 </macromedia-extension>

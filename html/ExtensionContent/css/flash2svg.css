@@ -1,0 +1,201 @@
+.shown{
+	display:inherit;
+}
+.hidden{
+	display:none;
+}
+#settings-bar{
+	position:absolute;
+	top:0;
+	left:0;
+	right:0;
+	padding: 4px 28px 4px 68px;
+	max-width: 205px;
+}
+#settings-title{
+	position: absolute;
+	width: 55px;
+	text-align: right;
+	left: 10px;
+	top: 8px;
+}
+#settings-save-button{
+	position:absolute;
+	top: 5px;
+	right:4px;
+	background-position: -16px -129px;
+}
+#settings-select{
+	width: 100%;
+}
+#preview-frame-bar{
+	width: 100%;
+}
+#preview-frame-bar span:not([class]){
+	margin:0 0px 0 10px;
+}
+#preview-frame{
+	text-align:center;
+	display:inline-table;
+}
+#preview-next-button, #preview-prev-button{
+	display:inline-table;
+	margin-bottom: -4px;
+}
+#preview-frame{
+    width: 30px;
+}
+#preview-issue{
+	position:absolute;
+	right:10px;
+}
+#preview-area{
+	width:100%;
+	height:200px;
+	margin: 10px 0 0 0;
+	outline: 1px solid #151515;
+	box-shadow: 0 1px 0 1px #505050;
+	background-image: url(img/preview-grid.png);
+}
+#preview-expander{
+	width:100%;
+	height: 16px;
+	text-align: center;
+	cursor: ns-resize;
+}
+#preview-expander span{
+	display:inline-table;
+}
+
+#export-bar{
+	position:absolute;
+	top:31px;
+	left:0;
+	right:0;
+	height: 23px;
+	border-top:1px solid #202020;
+	padding: 4px;
+}
+#export-progress{
+	position: absolute;
+	right: 63px;
+	left: 4px;
+	top: 4px;
+	bottom: 4px;
+	height: 20px;
+}
+#export-progress-label{
+	position: absolute;
+	z-index: 100;
+	text-transform: uppercase;
+	font-size: 1.4em;
+	font-weight: bold;
+	width: 100%;
+	height: 100%;
+	padding-top: 2px;
+}
+#export-button{
+    right: 4px;
+    position: absolute;
+}
+#settings-add-panel{
+	position: absolute;
+	z-index: 200;
+	left: 0;
+	right: 0;
+	background: #424242;
+	padding: 10px;
+	border-bottom: 1px solid #111;
+	box-shadow: 0 3px 5px 1px rgba(0, 0, 0, 0.2);
+}
+#settings-add-panel label:not([for]) {
+    width: 100%;
+	display: block;
+	padding: 5px;
+	position: relative;
+}
+#settings-add-buttonbar{
+    width: 100%;
+	padding: 5px;
+	text-align: right;
+}
+#settings-add-panel h3{
+	font-size: 1.4em;
+	margin: 3px;
+}
+#settings-save-name{
+	width:100%;
+}
+
+#accordion-resizer{
+	position:absolute;
+	overflow: auto;
+	border:none;
+	top: 64px;
+	left:0;
+	bottom:0;
+	right:0;
+	overflow-x: hidden;
+	border-width: 1px 0 1px 0;
+	border-style: solid;
+	border-color: #6C6C6C;
+}
+.option-hint{
+	color:#888;
+	width: 100%;
+	display: block;
+}
+#accordion-resizer label:not([for]) {
+    display: block;
+	position:relative;
+	max-width:210px;
+	clear:both;
+	padding:0 10px 10px 74px; 
+}
+
+form label>span:not([class]) {
+    position: absolute;
+    width: 60px;
+    text-align: right;
+	left:10px;
+	top: 3px;
+}
+form label input, form label textarea, form label select{
+    width: 100%;
+}
+.ui-accordion .ui-accordion-content{
+	position:relative;
+}
+.section-help{
+	display:none;
+	position:absolute;
+	top:-18px;
+	right:3px;
+}
+.section-help:hover, #settings-save-button:hover, #preview-next-button:hover, #preview-prev-button:hover{
+	background-color:#777;
+	border-radius:10px;
+	cursor:pointer;
+}
+
+#customFrameRange{
+	padding-left:90px;
+}
+#customFrameRange input{
+	width:30px;
+	text-align:center;
+}
+#animation-warning{
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	text-align: center;
+	background: rgba(200, 200, 200, 0.8);
+	z-index: 1;
+	color: black;
+	font-size: 2em;
+	padding: 1.3em;
+	font-style: italic;
+}

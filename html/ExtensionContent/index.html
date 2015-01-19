@@ -1,0 +1,291 @@
+<!doctype html>
+
+<html>
+<head>
+	<meta charset="utf-8">
+	<script src="./js/main.js"></script>
+	<script src="./js/Classes.js"></script>
+	<script src="./lib/CSInterface-4.0.0.js"></script>
+	<script src="./lib/jquery-1.11.2.js"></script>
+	<script src="./lib/jquery-ui-1.10.4.min.js"></script>
+	<script src="./lib/jquery.multi-accordion-1.5.3-modded.js"></script>
+	
+	<link rel="stylesheet" type="text/css" href="./css/flash-cc.css">
+	<link rel="stylesheet" type="text/css" href="./css/icons.css">
+	<link rel="stylesheet" type="text/css" href="./css/flash2svg.css">
+	<link rel="stylesheet" id="brightnessStyle" type="text/css" href="./css/flash-cc-dark.css"/>
+	  
+	<title>SVG</title> 
+</head>
+
+
+<body onLoad="onLoaded()" class="ui-widget-content">
+<form>
+
+<div id="settings-bar">
+	<span id="settings-title">Presets:</span>
+	 <div class="select-wrapper">
+	    <select id="settings-select" name="source" title="Load settings" onchange="onPresetSelected()"></select>
+	 </div>
+	 <span id="settings-save-button" class="ui-icon ui-icon-plus" title="Save settings" onclick="doShowSavePanel()"></span>
+	 <div id="settings-add-panel" style="display:none;">
+		  
+		  <h3>Preset name:</h3>
+		  <input id="settings-save-name" type="text">
+		  
+		  
+		  <h3 id="settings-add-text">Which settings should be saved?</h3>
+	 
+		  <label>
+			  <input id="settings-save-source" type="checkbox"/>
+			  <label for="settings-save-source">Source settings</label>
+		  </label>
+		  
+		  <label>
+			  <input id="settings-save-output" type="checkbox"/>
+			  <label for="settings-save-output">Output settings</label>
+		  </label>
+		  
+		  <label>
+			  <input id="settings-save-graphics" type="checkbox"/>
+			  <label for="settings-save-graphics">Graphics settings</label>
+		  </label>
+		  
+		  <label>
+			  <input id="settings-save-animation" type="checkbox"/>
+			  <label for="settings-save-animation">Animation settings</label>
+		  </label>
+		  
+		  <div id="settings-add-buttonbar">
+		  	<input id="settings-save-cancel" type="button" value="Cancel" onclick="doCancelPreset()"/>
+		  	<input id="settings-save-submit" type="submit" value="Save" onclick="doSavePreset()" />
+		  </div>
+		  
+	 </div>
+</div>
+
+<div id="export-bar">
+	<div id="export-progress">
+		<div class="ui-progressbar-value"></div>
+		<div id="export-progress-label" class="progress-label"></div>
+	</div>
+	<input id="export-button" type="button" value="Export" onclick="doExport()" disabled="disabled" />
+</div>
+
+<div id="accordion-resizer">
+	<div id="accordion" role="tablist">
+		<h3><a href="#">Timeline settings</a></h3>
+		<div>
+			<span class="section-help ui-icon ui-icon-help"></span>
+		    <label>
+		  		<input id="settings-autosave" type="checkbox" disabled="disabled"/>
+		  		<label for="output-ungroup">Auto-save settings in timelines</label>
+		        <span class="option-hint">Each scene/symbol will retain it's settings.</span>
+		    </label>
+		    <label>
+		        <div class="settings-button-row">
+					<input id="settings-save" type="button" value="Save settings in timeline" onclick="doSaveSettings()" disabled="disabled" />
+		        </div>
+		    </label>
+		    <label>
+		        <div class="settings-button-row">
+					<input id="settings-load" type="button" value="Load settings from timeline" onclick="doLoadSettings()" disabled="disabled" />
+		        </div>
+		    </label>
+		</div>
+		<h3><a href="#">Source</a></h3>
+		<div>
+			<span class="section-help ui-icon ui-icon-help"></span>
+		    <label>
+		        <span>Source:</span>
+		        <div class="select-wrapper">
+			        <select id="source-timelines" disabled="disabled">
+		                <option value="current">Current Timeline</option>
+		                <option value="libraryItems">Selected Library Items</option>
+		            </select>
+		        </div>
+		    </label>
+		    
+		    <label>
+		        <span>Frames:</span>
+		        <div class="select-wrapper">
+			        <select id="source-frames" disabled="disabled">
+		                <option value="all">All frames</option>
+		                <option value="current">Current frame</option>
+		                <option value="custom">Custom range</option>
+		            </select>
+		        </div>
+		    </label>
+		    
+		    <div id="customFrameRange" class="form-group">
+		    	<label>Custom Frame Range</label>
+		        <input id="frameRangeStart" type="number" min="0" value="1" disabled="disabled">
+		        <span>to</span>
+		        <input id="frameRangeEnd" type="number" min="0" value="20" disabled="disabled">
+		    </div>
+		    
+		    <!-- <label>
+		        <span>Output:</span>
+		        <input type = "radio"
+	                 name = "radSize"
+	                 id = "sizeMed"
+	                 value = "medium" disabled="disabled" />
+		    </label> -->
+		</div>
+		<h3><a href="#">Output Format</a></h3>
+		<div>
+			<span class="section-help ui-icon ui-icon-help"></span>
+		    <label>
+		        <span>Type:</span>
+		        <div class="select-wrapper">
+			        <select id="output-type" disabled="disabled">
+		                <option value="animation">Animated SVG</option>
+		                <option value="images">SVG Images</option>
+		            </select>
+		        </div>
+		    </label>
+		    <label>
+		        <span>Output File:</span>
+		        <input type="text" id="output-file" disabled="disabled"/>
+		        <span class="option-hint">Leave blank to use generated filename.</span>
+		    </label>
+		    <label>
+		        <span>Decimal Places:</span>
+		        <input id="output-decimal" type="number" min="0" value="3" max="20" disabled="disabled">
+		        <span id="output-decimal-hint" class="option-hint"></span>
+		    </label>
+		    <label>
+		        <span>Rendering:</span>
+		        <div class="select-wrapper">
+			        <select id="output-rendering" disabled="disabled">
+		                <option value="auto">Auto</option>
+		                <option value="optimizeSpeed">For Speed</option>
+		                <option value="optimizeQuality">For Quality</option>
+		                <option value="inherit">Inherit</option>
+		            </select>
+		        </div>
+		    </label>
+		    <label>
+		        <span>Expand Symbols:</span>
+		        <div class="select-wrapper">
+			        <select id="output-expand" disabled="disabled">
+		                <option value="usedOnce">Once Used Symbols</option>
+		                <option value="all">All</option>
+		                <option value="none">None</option>
+		                <option value="nested">Nested</option>
+		            </select>
+		        </div>
+		        <span class="option-hint">Which links to break between symbols and instances.<br/> 'Once Used Symbols' will give the smallest output file-size.</span>
+		    </label>
+		    <label>
+		  		<input id="output-ungroup" type="checkbox" disabled="disabled"/>
+		  		<label for="output-ungroup">Simplify structure</label>
+		        <span class="option-hint">Expands unneeded groups</span>
+		    </label>
+		    <label>
+		  		<input id="output-compact" type="checkbox" disabled="disabled"/>
+		  		<label for="output-compact">Remove whitespace</label>
+		        <span class="option-hint">Reduces filesize</span>
+		    </label>
+		    <label>
+		  		<input id="output-remove-miter" type="checkbox" disabled="disabled"/>
+		  		<label for="output-remove-miter">Remove Miter Joins</label>
+		        <span class="option-hint">Fixes Firefox rendering issues</span>
+		    </label>
+		</div>
+		<h3><a href="#">Graphics</a></h3>
+		<div>
+			<span class="section-help ui-icon ui-icon-help"></span>
+		    <label>
+		        <span>Masks:</span>
+		        <div class="select-wrapper">
+			        <select id="graphics-masks" disabled="disabled">
+		                <option value="clipping">Clipping</option>
+		                <option value="alpha">Alpha</option>
+		                <option value="luminance">Luminance</option>
+		            </select>
+		        </div>
+		    </label>
+		    <label>
+		        <span>Curves:</span>
+		        <div class="select-wrapper">
+			        <select id="graphics-curves" disabled="disabled">
+		                <option value="2">Quadratic</option>
+		                <option value="3">Cubic</option>
+		            </select>
+		        </div>
+		    </label>
+		    <label>
+		  		<input id="graphics-patterns" type="checkbox" disabled="disabled"/>
+		  		<label for="graphics-patterns">Convert patterns to Symbols</label>
+		    </label>
+		    <label>
+		  		<input id="graphics-background" type="checkbox" disabled="disabled"/>
+		  		<label for="graphics-background">Include background colour</label>
+		    </label>
+		</div>
+		<h3><a href="#">Animation</a></h3>
+		<div>
+			<div id="animation-warning">These settings are not available when exporting as images.</div>
+			<span class="section-help ui-icon ui-icon-help"></span>
+		    <label>
+		        <span>Tween Export:</span>
+		        <div class="select-wrapper">
+			        <select id="anim-tween" disabled="disabled">
+		                <option value="highKeyframe">High FPS keyframes</option>
+		                <option value="highAllFrames">High FPS all frames</option>
+		                <option value="low">Low FPS (no inter-frame easing)</option>
+		            </select>
+		        </div>
+		    </label>
+		    <label>
+		  		<input id="anim-loop" type="checkbox" name="anim-loop" disabled="disabled"/>
+		  		<label for="anim-loop">Loop animation</label>
+		    </label>
+		    <label>
+		  		<input id="anim-looptweens" type="checkbox" name="anim-looptweens" disabled="disabled"/>
+		  		<label for="anim-looptweens">Tween final frame into first frame.</label>
+		    </label>
+		    <label>
+		        <span>Begin Animation:</span>
+		        <div class="select-wrapper">
+			        <select id="anim-begin" disabled="disabled">
+		                <option value="0s">Auto (0s)</option>
+		                <option value="click">On Click</option>
+		                <option value="indefinite">On .beginElement()</option>
+		            </select>
+		        </div>
+		    </label>
+		    <!-- <label>
+		        <span>Before/After Anim:</span>
+		        <div class="select-wrapper">
+			        <select id="anim-outside" disabled="disabled">
+		                <option>Show First Frame</option>
+		                <option>Show Last Frame</option>
+		                <option>Show Neither</option>
+		            </select>
+		        </div>
+		    </label>-->
+		</div>
+		<!-- <h3><a href="#">Preview</a></h3>
+		<div>
+			<div id="preview-frame-bar">
+		    	<span>Frame:</span>
+				<span id="preview-prev-button" class="ui-icon ui-icon-carat-1-w"></span>
+				<input id="preview-frame" type="number" value="0" />
+				<span id="preview-next-button" class="ui-icon ui-icon-carat-1-e"></span>
+				<input id="preview-issue" type="button" value="Submit Issue" />
+			</div>
+			<div id="preview-area">
+			</div>
+			<div id="preview-expander">
+				<span class="ui-icon ui-icon-grip-dotted-horizontal"></span>
+			</div>
+		</div> -->
+	</div>
+</div>
+	
+</form>
+</body>
+
+</html>

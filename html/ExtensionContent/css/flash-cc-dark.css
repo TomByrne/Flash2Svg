@@ -1,0 +1,101 @@
+
+#settings-add-panel{
+	background: #424242;
+	border-bottom: 1px solid #111;
+}
+
+body{
+	color: #d5d5d5;
+}
+.ui-state-default, input[type="submit"], input[type="button"], input[type="checkbox"],
+.ui-widget-content .ui-state-default,
+.ui-widget-header .ui-state-default,
+.ui-widget-content .ui-state-active,
+select{
+	color: #d5d5d5;
+	text-shadow: 0px -1px 0px #353535;
+	border-color: #565656;
+}
+select:focus{
+	outline: 1px solid #c69100;
+}
+select option{
+	background: #454545;
+	color: #d5d5d5;
+}
+a:link {
+	color: #d5d5d5;
+}
+::-webkit-input-placeholder {
+	color: #555;
+}
+.ui-state-focus,
+.ui-widget-content .ui-state-focus,
+.ui-widget-header .ui-state-focus {
+    box-shadow: 0 0 0 2px #c69100;
+}
+.ui-state-highlight,
+.ui-widget-content .ui-state-highlight,
+.ui-widget-header .ui-state-highlight,
+input:focus[type="radio"] {
+	border-color: #c69100;
+}
+
+.ui-icon,
+.ui-widget-content .ui-icon,
+.ui-widget-header .ui-icon,
+.ui-state-default .ui-icon,
+.ui-state-hover .ui-icon,
+.ui-state-focus .ui-icon,
+.ui-state-highlight .ui-icon,
+.ui-state-error .ui-icon,
+.ui-state-error-text .ui-icon,
+::-webkit-scrollbar-button {
+	background-image:url(img/ui-icons_flashcc_dark_256x240.png);
+}
+
+.ui-accordion .ui-accordion-header{
+	outline-color: #454545;
+	border-color: #111111;
+}
+.ui-button, input[type="submit"], input[type="button"], input[type="checkbox"], select{
+	outline-color: #151515;
+	box-shadow: 0 1px 0 1px #505050;
+}
+input[type="checkbox"]:checked:after{
+	background-image: url("img/check-dark.png");
+}
+.ui-progressbar-value{
+	background: #c48f00 -webkit-linear-gradient(top, #c48f00 0%,#775700 100%) 50% 50% repeat-x;
+}
+
+.form-group{
+	box-shadow: 0 -1px 0 0 rgba(255, 255, 255, 0.23), 0 -2px 0 0 rgba(0, 0, 0, 0.5);
+}
+.form-group label{
+	background: #424242;
+}
+
+.select-wrapper:after{
+	background: url("img/dropdown-arrow-dark.png") no-repeat;
+}
+
+input:not([type]), input[type="text"], input[type="password"], input[type="number"], input[type="url"], input[type="email"]{
+	background:#a0a0a0;
+	border-color: #070707;
+    box-shadow: 0 1px 0 0px #505050;
+}
+input:focus{
+	outline-color: #c69100;
+}
+
+::-webkit-scrollbar {
+	border-color: #020202;
+	background: #383838;
+	outline-color: #333333;
+}
+::-webkit-scrollbar-thumb{
+	background: #424242;
+	border-color: #020202;
+	outline-color: #515151;
+}
