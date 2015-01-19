@@ -138,19 +138,18 @@
 			this.isProcessing=true;
 			if(this.currentTask){
 				var result=this.currentTask.process.attempt(this.currentTask,undefined,undefined,true);
-				var success=result!=undefined && !(result instanceof Error);
-				if(success){
-					this.isProcessing=false;
-					return true;
-				}else{
+				var success = result!=undefined && !(result instanceof Error);
+				if(!success){
 					if(result instanceof Error){
 						fl.trace(result);
 					}
-					return false;
+				}
+				if(result===false){
+					this.next();
 				}
 			}
 			this.isProcessing=false;
-			return true;
+			return (this.currentTask!=null);
 		},
 		/**
 		 * Kills the current task.

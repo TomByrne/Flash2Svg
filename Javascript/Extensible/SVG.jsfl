@@ -17,29 +17,29 @@
 		// Processing states
 		this.STATE_PRE_INIT = 0;
 		this.STATE_TIMELINES = 1;
-		this.STATE_ELEMENT_READING = 2;
-		this.STATE_DELETE_EXISTING_FILES = 3;
-		this.STATE_EXPANDING_USE_NODES = 4;
-		this.STATE_REMOVING_UNUSED_SYMBOLS = 5;
-		this.STATE_SIMPLIFYING_FRAMES = 6;
-		this.STATE_FINALISING_FILES = 7;
-		this.STATE_CLEANUP = 8;
-		this.STATE_DONE = 9;
+		this.STATE_DELETE_EXISTING_FILES = 2;
+		this.STATE_EXPANDING_USE_NODES = 3;
+		this.STATE_REMOVING_UNUSED_SYMBOLS = 4;
+		this.STATE_SIMPLIFYING_FRAMES = 5;
+		this.STATE_FINALISING_FILES = 6;
+		this.STATE_CLEANUP = 7;
+		this.STATE_DONE = 8;
 
 		var settings=new ext.Object({
 			file:undefined,
 			decimalPointPrecision:3,
-			expandSymbols:'usedOnce', // 'nested', 'all', 'none', usedOnce
+			expandSymbols:'usedOnce', // 'nested', 'all', 'none', 'usedOnce'
 			rendering:'auto', // 'auto', 'optimizeSpeed', 'optimizeQuality', 'inherit'
+			tweenType:null, // 'highKeyframe', 'highAllFrames', 'low'
 			convertPatternsToSymbols:true,
 			applyTransformations:true,
 			applyColorEffects:false,
 			flattenMotion:true,
 			curveDegree:3,
-			maskingType:'clipping',
+			maskingType:'clipping', // 'clipping', 'alpha', 'luminance'
 			frames:'all', // 'custom', 'all', 'current'
-			startFrame:undefined,
-			endFrame:undefined,
+			startFrame:undefined, // only relevant when frames=='custom'
+			endFrame:undefined, // only relevant when frames=='custom'
 			animated:false,
 			timelines:new ext.Array([]),
 			backgroundColor:ext.doc.backgroundColor,
@@ -64,7 +64,8 @@
 			clipToBoundingBox:false, // only relevant when source=='Selected Library Items'
 			beginAnimation:"0s",
 			repeatCount:"indefinite",
-			nonAnimatingShow:"start",
+			loop:null,
+			nonAnimatingShow:"end",
 			loopTweens:true,
 			discreteEasing:true,
 			removeGroups:true,
@@ -75,8 +76,14 @@
 			ext.Task.apply(this,[settings]);
 			this.loadSettings(options);
 		}else{
+			if(options.version && options.props){
+				options = options.props;
+			}
 			settings.extend(options);
 			ext.Task.apply(this,[settings]);
+		}
+		if(this.loop==true){
+			this.repeatCount = "indefinite";
 		}
 		if(!options && ext.doc.documentHasData(this.DOCUMENT_DATA)
 		){
@@ -91,6 +98,23 @@
 		var extIndex = this.file.indexOf(".svg");
 		if(extIndex==this.file.length - 4){
 			this.file = this.file.substr(0, this.file.length - 4);
+		}
+		
+		if(this.tweenType){
+			switch(this.tweenType){
+				case "highKeyframe":
+					this.discreteEasing = false;
+					this.flattenMotion = false;
+					break;
+				case "highAllFrames":
+					this.discreteEasing = false;
+					this.flattenMotion = true;
+					break;
+				case "low":
+					this.discreteEasing = true;
+					this.flattenMotion = true;
+					break;
+			}
 		}
 
 		var timeline;
@@ -135,7 +159,12 @@
 		if(this.animated)this.applyTransformations = false;
 		
 		if(typeof(this.curveDegree)=='string'){
-			this.curveDegree=['','','Quadratic','Cubic'].indexOf(this.curveDegree);
+			var num = parseInt(this.curveDegree);
+			if(num.toString() == this.curveDegree){
+				this.curveDegree = num;
+			}else{
+				this.curveDegree=['','','Quadratic','Cubic'].indexOf(this.curveDegree);
+			}
 		}
 		this.swfPanel=ext.swfPanel(this.swfPanelName); // the swfPanel
 		this._timer=undefined;
@@ -323,7 +352,7 @@
 		 */
 		nextState:function(){
 			this.currentState++;
-			this.doState();
+			return this.doState();
 		},
 		end:function(){
 			this.currentState = STATE_DONE;
@@ -357,7 +386,7 @@
 					break;
 				default:
 					// done all
-					return true;
+					return false;
 			}
 
 			return true;
@@ -498,7 +527,7 @@
 			}
 			//fl.trace("checkExpand:"+element.localName()+" "+element.@id+" "+element.childIndex());
 			var id;
-			if(element.localName()=="use" && (id = element['@xlink-href'])){
+			if(element.localName()=="use" && (id = element['@xlink-href'].toString())){
 				var allUseNodes = root..use;
 				var useList = [];
 				for(var i=0; i<allUseNodes.length(); i++){
@@ -508,8 +537,7 @@
 					}
 				}
 
-				//fl.trace("Ex: "+id+" "+useList.length);
-				var symbol=defs.symbol.("#"+@id==id);
+				var symbol=defs.symbol.("#"+@id.toString()==id);
 				if(symbol && symbol.length() && (!nested || (symbol[0]..use && symbol[0]..use.length()))
 					&& (!onceUsed || useList.length==1)){
 
@@ -757,7 +785,7 @@
 				var trans = document.@transform;
 				if(trans.length()){
 					// transform doesn't work on the root node, so transfer it to it's children
-					var transMat = new ext.Matrix(trans);
+					var transMat = new ext.Matrix(trans.toString());
 					var children = document.children().length();
 					for(var i=0; i<children; i++){
 						var child = document.children()[i];
@@ -783,7 +811,7 @@
 					// Some older versions of Chrome (and possibly others) have a bug that requires a newline before closing the symbol tag
 					outputObject.string = outputObject.string.split("</symbol>").join("\n</symbol>");
 				}
-				outputObject.id = document.@id;
+				outputObject.id = document.@id.toString();
 
 				if(this._showMiterWarning){
 					fl.trace("WARNING: Miter joins display incorrectly in current versions of Firefox (Oct 2014)");
@@ -981,7 +1009,7 @@
 			}
 			for(var id in useNodes){
 
-				var symbol=defs.symbol.(@id==id);
+				var symbol=defs.symbol.(@id.toString()==id);
 
 				if(!symbol || !symbol.length() || (recursive=='nested' && !(symbol[0]..use && symbol[0]..use.length()))){
 					continue;
@@ -1006,7 +1034,6 @@
 			if(ext.log){
 				var timer=ext.log.startTimer('extensible.SVG.executeExpandUse()');	
 			}
-
 			var doRemove =  true;
 			for(var i=0; i<useList.length; ++i){
 				var useNode = useList[i];
@@ -1029,7 +1056,7 @@
 					delete symbol['@viewBox'];
 					delete symbol['@overflow'];
 
-					if(useNode.@transform && useNode.@transform!=this.IDENTITY_MATRIX)symbol.@transform = useNode.@transform;
+					if(useNode.@transform.length() && useNode.@transform!=this.IDENTITY_MATRIX)symbol.@transform = useNode.@transform;
 					delete useNode.parent().children()[useNode.childIndex()];
 
 					useNode = symbol;
@@ -1051,14 +1078,14 @@
 						delete useNode['@transform'];
 					}
 					for each(var node in useNode..*){
-						if(node.hasOwnProperty('@id') && node.localName()!='mask'){
+						if(node.@id.length() && node.localName()!='mask'){
 							node.@id=this._uniqueID(String(node.@id));
 						}
-						if(node.hasOwnProperty('@mask')){
+						if(node.@mask.length()){
 							var oldID=String(node.@mask).match(/(?:url\(#)(.*?)(?:\))/);
 							if(oldID && oldID.length>1){
 								var newID=this._uniqueID(oldID[1]);
-								var old=useNode.(@id==oldID[1]);
+								var old=useNode.(@id.toString()==oldID[1]);
 								if(old.length()){
 									old[0].@id=newID;
 									node.@mask='url(#'+newID+')';
@@ -1069,7 +1096,7 @@
 							if(attr.name()!='id'){
 								var ida=String(attr).match(/(?:url\(#)(.*?)(?:\))/);
 								if(ida && ida.length>1){
-									var origDef=defs.*.(@id==ida[1]);
+									var origDef=defs.*.(@id.toString()==ida[1]);
 									if(origDef && origDef.length()){
 										var newDef=origDef[0].copy();
 										var newID=this._uniqueID(ida[1]);
@@ -1186,7 +1213,7 @@
 		processElement:function(node, element, settings, dom){
 			var elementXML=this._getElement(element,settings);
 			if(elementXML){
-				//var list = dom..g.(@id==id);
+				//var list = dom..g.(@id.toString()==id);
 				//if(list.length()==1){
 					//var node = list[0];
 					var parent = node.parent();
@@ -1402,7 +1429,7 @@
 			if(this._symbols[symbolIDString]){
 				isNew=false;
 				xml = this._symbols[symbolIDString];
-				id = xml.@id;
+				id = xml.@id.toString();
 				boundingBox = this._symbolBounds[symbolIDString];
 			}else{
 				isNew=true;
@@ -2200,14 +2227,14 @@
 				instanceXML['@height']=String(Math.ceil(boundingBox.bottom-boundingBox.top));
 				instanceXML['@x']=Math.floor(boundingBox.left);
 				instanceXML['@y']=Math.floor(boundingBox.top);
-				if(boundingBox.left!=instanceXML['@x'] || boundingBox.top!=instanceXML['@y']){
+				/*if(boundingBox.left!=instanceXML['@x'] || boundingBox.top!=instanceXML['@y']){
 					// if there are rounding errors we add the dif to the transform (greatly scaled objects can be affected dramatically)
 					// var offset = settings.matrix.transformPoint(boundingBox.left-instanceXML['@x'], boundingBox.top-instanceXML['@y'], false);
 					// settings.matrix.tx += offset.x;
 					// settings.matrix.ty += offset.y;
 
 					// not sure if this is really helping, must test more
-				}
+				}*/
 				if(trans) instanceXML['@transform'] = trans;
 				// if(settings.isRoot && settings.libraryItem){
 				// 	dom.@viewBox = viewBox;
@@ -2824,7 +2851,7 @@
 
 			var xml = this._getTimeline(instance.timeline, settings);
 			var filterID=this._getFilters(instance, xml, options, dom.defs);
-			if(filterID && dom.defs.filter.(@id==filterID).length()){
+			if(filterID && dom.defs.filter.(@id.toString()==filterID).length()){
 				xml['@filter']='url(#'+filterID+')';
 			}
 
@@ -4018,7 +4045,7 @@
 			defs=defs||xml.defs;
 			var bApplyVertices=true;
 			var transform,mxs,matrix;
-			if(xml.hasOwnProperty('@transform')){
+			if(xml.@transform.length()){
 				transform=String(xml['@transform']);
 				var mxa=transform.match(/matrix\(.*?\)/g);
 				if(mxa && mxa.length){
@@ -4042,13 +4069,13 @@
 			}else{
 				strokeX=new ext.Matrix();
 			}
-			if(xml.hasOwnProperty('@filter') && matrix){
+			if(xml.@filter.length() && matrix){
 				this._transformFilter(matrix,xml,defs);
 			}	
 			
 			for each(var child in (xml.defs.symbol.*+xml.*)){
 				var childName=String(child.localName());
-				var cid=child.hasOwnProperty('@id')?String(child['@id']):'';
+				var cid=child.@id.length() ? String(child['@id']) : '';
 				var cmx=undefined;
 				var tr= String(child['@transform']);
 				var nmx;
@@ -4078,7 +4105,7 @@
 						child['@transform']=nmxString;
 					}
 				}				
-				if(child.hasOwnProperty('@filter') && child.localName()!='g'){
+				if(child.@filter.length() && child.localName()!='g'){
 					this._transformFilter(nmx,child,defs);
 				}
 				if(bApplyVertices){
@@ -4094,7 +4121,7 @@
 							}
 						}
 						if(gradientID!==undefined){
-							var gradient=defs.*.(@id==gradientID);
+							var gradient=defs.*.(@id.toString()==gradientID);
 							if(gradient && gradient.length()){
 								gradient=gradient[0].copy();
 								gradientID=this._uniqueID(String(gradient.@id));
@@ -4184,7 +4211,7 @@
 							}
 						}
 					}
-					if(child.hasOwnProperty('@d')){
+					if(child.@d.length()){
 						var curveData=child['@d'];
 						var points=curveData.match(/[A-Ya-y]?[\d\.\-]*[\d\.\-][\s\,]*[\d\.\-]*[\d\.\-][Zz]?/g);
 						if(points && points.length){
@@ -4211,7 +4238,7 @@
 							}
 						}
 					}
-					if(child.hasOwnProperty('@stroke')){
+					if(child.@stroke.length()){
 						var strokeW = String(child['@stroke-width']);
 						if(strokeW)strokeW = Number(strokeW);
 						else strokeW = 1;
@@ -4257,10 +4284,10 @@
 			}
 			var filter,newFilter;
 			var color=colorX;
-			if(!skip && xml.hasOwnProperty('@filter')){
+			if(!skip && xml.@filter.length()){
 				var filterID=String(xml.@filter).match(/(?:url\(#)(.*?)(?:\))/);
 				if(filterID && filterID.length>1){
-					filter=defs.filter.(@id==filterID[1]);
+					filter=defs.filter.(@id.toString()==filterID[1]);
 					if(filter){
 						if(filter.length()){
 							filter=filter[0];
@@ -4281,10 +4308,10 @@
 									newFilter.@id=newFilterID;
 									xml.@filter="url(#"+newFilterID+")";
 									if(!color.amount.is([0,0,0,0])){
-										delete newFilter.feComponentTransfer.(@result=='colorEffect_amount');
+										delete newFilter.feComponentTransfer.(@result.toString()=='colorEffect_amount');
 									}
 									if(!color.percent.is([100,100,100,100])){
-										delete newFilter.feColorMatrix.(@result=='colorEffect_percent');
+										delete newFilter.feColorMatrix.(@result.toString()=='colorEffect_percent');
 									}
 									defs.appendChild(newFilter);
 									filter=newFilter;
@@ -4303,19 +4330,19 @@
 					'stroke'
 				];
 				for(var i=0;i<paintProperties.length;i++){
-					if(xml.hasOwnProperty('@'+paintProperties[i])){
+					if(xml['@'+paintProperties[i]].length()){
 						painted=true;
 						var paintStr=String(xml['@'+paintProperties[i]]);
 						var paintID=paintStr.match(/(?:url\(#)(.*?)(?:\))/);
 						if(paintID && paintID.length>1){
 							paintID=paintID[1];
-							var paint=defs.*.(@id==paintID);
+							var paint=defs.*.(@id.toString()==paintID);
 							if(paint && paint.length()){
 								for each(var stop in paint[0].stop){
 									var stopColor=new ext.Color(
 										String(stop['@stop-color'])
 									);
-									if(stop.hasOwnProperty('@stop-opacity')){
+									if(stop['@stop-opacity'].length()){
 										stopColor.amount[3]=Number(stop['@stop-opacity'])*255;
 									}else{
 										stopColor.amount[3]=255;
@@ -4327,7 +4354,7 @@
 							}
 						}else if(paintStr[0]=='#'){
 							var newColor=new ext.Color(paintStr);
-							if(xml.hasOwnProperty('@'+paintProperties[i]+'-opacity')){
+							if(xml['@'+paintProperties[i]+'-opacity'].length()){
 								newColor.amount[3]=Number(xml['@'+paintProperties[i]+'-opacity'])*255;
 							}else{
 								newColor.amount[3]=255;
@@ -4347,8 +4374,8 @@
 			}
 		},
 		_colorFromEffect:function(filter){
-			var feAmount=filter.feComponentTransfer.(@result=='colorEffect_amount');
-			var fePercent=filter.feColorMatrix.(@result=='colorEffect_percent');
+			var feAmount=filter.feComponentTransfer.(@result.toString()=='colorEffect_amount');
+			var fePercent=filter.feColorMatrix.(@result.toString()=='colorEffect_percent');
 			if(!(feAmount.length() || fePercent.length())){
 				return;
 			}
@@ -4358,22 +4385,22 @@
 				n+=1;
 				feAmount=feAmount[feAmount.length()-1];
 				if(feAmount.feFuncR.length()){
-					if(feAmount.feFuncR.hasOwnProperty('@intercept')){
+					if(feAmount.feFuncR.@intercept.length()){
 						color.amount[0]=Number(feAmount.feFuncR.@intercept)*255;
 					}
 				}
 				if(feAmount.feFuncG.length()){
-					if(feAmount.feFuncG.hasOwnProperty('@intercept')){
+					if(feAmount.feFuncG.@intercept.length()){
 						color.amount[1]=Number(feAmount.feFuncG.@intercept)*255;
 					}
 				}
 				if(feAmount.feFuncB.length()){
-					if(feAmount.feFuncB.hasOwnProperty('@intercept')){
+					if(feAmount.feFuncB.@intercept.length()){
 						color.amount[2]=Number(feAmount.feFuncB.@intercept)*255;
 					}
 				}
 				if(feAmount.feFuncA.length()){
-					if(feAmount.feFuncA.hasOwnProperty('@intercept')){
+					if(feAmount.feFuncA.@intercept.length()){
 						color.amount[3]=Number(feAmount.feFuncA.@intercept)*255;
 					}
 				}
@@ -4400,7 +4427,7 @@
 			var sy=matrix.scaleY;
 			if(sx==1 && sy==1)return;
 
-			if(element.hasOwnProperty('@filter')){
+			if(element.@filter.length()){
 				var filterID=String(
 					element.@filter
 				).match(
@@ -4410,7 +4437,7 @@
 					filterID &&
 					filterID.length>1
 				){
-					var filter=defs.filter.(@id==filterID[1]);
+					var filter=defs.filter.(@id.toString()==filterID[1]);
 					if(filter && filter.length()){
 						for each(var primitive in filter[0].*){
 							switch(primitive.localName()){

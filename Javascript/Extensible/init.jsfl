@@ -1,8 +1,3 @@
-﻿/* 
- * DAVID BELAIS 2010 DAVID@DISSENTGRAPHICS.COM
- * EXTENSIBLE : A javascript Framework for extending Flash.
- */
- 
 (function(dom){
 	function Extensible(options){
 		BridgeTalk.apply(this,[]);
@@ -43,6 +38,7 @@
 				for(var i=0;i<mods.length;i++){
 					if(force || this._modules.indexOf[mods[i]]<0){
 						var file=this.dir+"/"+mods[i]+".jsfl";
+						alert("file: "+file);
 						if(file!=fl.scriptURI && FLfile.exists(file)){
 							try{
 								fl.runScript(file);
@@ -175,59 +171,140 @@
 		},
 		message:function(message){
 			fl.trace(message);	
+		},
+		
+		SETTINGS_EXTENSION:".settings",
+		saveAppSettings:function(saveName, dir, str){
+			if(!FLfile.exists(dir)){
+				FLfile.createFolder(dir);
+			}
+			var path = dir + saveName + extensible.SETTINGS_EXTENSION;
+			FLfile.write(path, str);
+		},
+		loadAppSettings:function(saveName, dir){
+			var path = dir + saveName + extensible.SETTINGS_EXTENSION;
+			if(FLfile.exists(path)){
+				var fileData = FLfile.read(path);
+				if(fileData.length==0)return null;
+				return fileData;
+			}else{
+				return null;
+			}
+		},
+		
+		saveTimelineSettings:function(saveName, str){
+			if(extensible.doc==null)return null;
+			
+			if(extensible.doc.getTimeline().libraryItem){
+				extensible.doc.getTimeline().libraryItem.addData(saveName, "string", str);
+			}else{
+				saveName += "_"+extensible.doc.currentTimeline;
+				extensible.doc.addDataToDocument(saveName, "string", str);
+			}
+		},
+		loadTimelineSettings:function(saveName){
+			if(extensible.doc==null)return null;
+			
+			if(extensible.doc.getTimeline().libraryItem!=null){
+				if(extensible.doc.getTimeline().libraryItem.hasData(saveName)){
+					return extensible.doc.getTimeline().libraryItem.getData(saveName);
+				}else{
+					return null;
+				}
+			}else{
+				saveName += "_"+extensible.doc.currentTimeline;
+				if(extensible.doc.documentHasData(saveName)){
+					return extensible.doc.getDataFromDocument(saveName);
+				}else{
+					return null;
+				}
+			}
+		},
+		getDefaultTimelineFileName:function(){
+			var fileName;
+			if(!extensible.doc){
+				return "";
+			}
+			/*if(extensible.doc.pathURI){
+				fileName = extensible.doc.pathURI.relativeToDocument.stripExtension();
+			}else{*/
+				fileName = extensible.doc.name.stripExtension();
+			//}
+			if(extensible.doc.getTimeline().libraryItem!=null || extensible.doc.timelines.length>1){
+				fileName += "_"+extensible.doc.getTimeline().name;
+			}
+			fileName += ".svg";
+			return fileName;
+		},
+		loadSettingsListing:function(dir){
+			this.presetsDir = dir;
+			if(!FLfile.exists(dir)){
+				FLfile.createFolder(dir);
+				return [];
+			}
+			var files = FLfile.listFolder(dir, "files");
+			var ret = [];
+			for(var i=0; i<files.length; i++){
+				var fileName = files[i];
+				if(fileName.indexOf(extensible.SETTINGS_EXTENSION) == fileName.length - extensible.SETTINGS_EXTENSION.length){
+					ret.push(fileName.substr(0, fileName.length - extensible.SETTINGS_EXTENSION.length));
+				}
+			}
+			return ret;
 		}
 	};
 	dom.extensible=new Extensible({
 		builderURI:(dom.extensible?dom.extensible.builderURI:undefined)
 	});
 })(this);
-extensible.load(
-	[
-		'String',
-		'Object',
-		'Array',
-		'Matrix',
-		'Color',
-		'HalfEdge',
-		'Point',
-		'Curve',
-		'Vertex',
-		'Edge',
-		'Fill',
-		'Stroke',
-		'Contour',
-		'Element',
-		'Shape',
-		'OvalObject',
-		'RectangleObject',
-		'Instance',
-		'SymbolInstance',
-		'BitmapInstance',
-		'Text',
-		'TLFText',
-		'Frame',
-		'Layer',
-		'Timeline',
-		'Selection',
-		'LibraryItem',
-		'BitmapItem',
-		'FolderItem',
-		'SymbolItem',
-		'Library',
-		'Clipboard',
-		'Math',
-		'Task',
-		'SVG',
-		'Log',
-		'Que',
-		'Timer',
-		'Function',
-		'MathUtils',
-		'ArrayUtils',
-		'Geom'
-	],
-	true
-);
 
-
-
+if(fl.scriptURI && fl.scriptURI!="unknown:"){
+	// This is only run for the flash version of the plugin
+	extensible.load(
+		[
+			'String',
+			'Object',
+			'Array',
+			'Matrix',
+			'Color',
+			'HalfEdge',
+			'Point',
+			'Curve',
+			'Vertex',
+			'Edge',
+			'Fill',
+			'Stroke',
+			'Contour',
+			'Element',
+			'Shape',
+			'OvalObject',
+			'RectangleObject',
+			'Instance',
+			'SymbolInstance',
+			'BitmapInstance',
+			'Text',
+			'TLFText',
+			'Frame',
+			'Layer',
+			'Timeline',
+			'Selection',
+			'LibraryItem',
+			'BitmapItem',
+			'FolderItem',
+			'SymbolItem',
+			'Library',
+			'Clipboard',
+			'Math',
+			'Task',
+			'SVG',
+			'Log',
+			'Que',
+			'Timer',
+			'Function',
+			'MathUtils',
+			'ArrayUtils',
+			'Geom'
+		],
+		true
+	);
+}

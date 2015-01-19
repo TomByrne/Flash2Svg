@@ -36,15 +36,16 @@
 		process:function(){
 			if(this.que && this.que.isPaused){
 				this.que.resumeCmd='process';
-				return;
+				return true;
 			}
 			if(qData.length){
 				/* processing instructions */
 				qData.shift();	
+				return true;
 			}else{
 				this.end();	
+				return false;
 			}
-			return true;
 		},
 		/**
 		 * 
@@ -55,9 +56,9 @@
 				return;
 			}
 			/* finish */
-			if(this.qID){
+			/*if(this.qID){
 				this.que.next();
-			}
+			}*/
 		}
 	};
 	ext.extend({Task:Task});

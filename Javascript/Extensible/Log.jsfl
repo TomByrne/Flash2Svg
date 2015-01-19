@@ -24,7 +24,6 @@
 		__proto__:ext.Object.prototype,
 		type:Log,
 		append:function(s){
-			fl.trace("write: "+s);
 			FLfile.write(this.url,s,'append');
 		},
 		pauseTimer:function(id){
