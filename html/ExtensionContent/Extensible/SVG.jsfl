@@ -82,9 +82,20 @@
 			settings.extend(options);
 			ext.Task.apply(this,[settings]);
 		}
+		var fileUri;
+		var fileDir;
+		if(ext.doc.pathURI){
+			if(ext.doc.pathURI.toLowerCase().indexOf(".xfl")==ext.doc.pathURI.length - 4){
+				fileUri = ext.doc.pathURI.dir;
+				fileDir = fileUri.dir;
+			}else{
+				fileUri = ext.doc.pathURI.stripExtension();
+				fileDir = ext.doc.pathURI.dir;
+			}
+		}
 		if(!this.log){
 			if(ext.doc.pathURI){
-				this.log = ext.doc.pathURI.stripExtension()+'.log.csv';
+				this.log = fileUri+'.log.csv';
 			}else{
 				this.log = fl.configURI+'SvgAnimation.log.csv';
 			}
@@ -106,7 +117,7 @@
 				alert("Can't use relative export path with unsaved document.\nPlease save the document or use an absolute path");
 				return;
 			}else{
-				this.file = this.file.absoluteURI(ext.doc.pathURI.dir);		
+				this.file = this.file.absoluteURI(fileDir);		
 			}	
 		}
 		var extIndex = this.file.indexOf(".svg");
@@ -3568,6 +3579,7 @@
 
 			var cutHole = contour.interior && !fill && hasOtherFills;
 			var reverse = settings.reversed || contour.orientation==1;
+			if(opacityString!="" || (fill && fill.name().toString().indexOf("Gradient")!=-1))cutHole = true;
 			if(cutHole)reverse = !reverse;
 
 			var degPrefix=['M','L','Q','C'];
@@ -3615,9 +3627,9 @@
 				}
 				if(cutHole && i==0){
 					holes.push({contour:contour, edgeIDs:edgeIDs, pathStr:pathStr, polygon:polygon});
-					if(currPath.stroke){
+					if(fill || currPath.stroke){
 						polygons.push(polygon);
-						pathNodes.push('<path fill="none" '+currPath.stroke +' d="'+pathStr+'"/>\n');
+						pathNodes.push('<path ' + currPath.fillString + opacityString + currPath.stroke + ' d="' + pathStr + '"/>\n');
 					}
 				}else{
 					polygons.push(polygon);
