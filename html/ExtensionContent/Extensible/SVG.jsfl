@@ -56,7 +56,7 @@
 			docString:'<?xml version="1.0" encoding="utf-8"?>\n',
 			version:'1.1',
 			baseProfile:'basic',
-			log:ext.doc.pathURI.stripExtension()+'.log.csv', // debugging log
+			log:null, // debugging log
 			traceLog:false,
 			source:'current',// 'current', 'libraryItems'
 			output: 'animation',// 'animation', 'images'
@@ -82,6 +82,13 @@
 			settings.extend(options);
 			ext.Task.apply(this,[settings]);
 		}
+		if(!this.log){
+			if(ext.doc.pathURI){
+				this.log = ext.doc.pathURI.stripExtension()+'.log.csv';
+			}else{
+				this.log = fl.configURI+'SvgAnimation.log.csv';
+			}
+		}
 		if(this.loop==true){
 			this.repeatCount = "indefinite";
 		}
@@ -89,11 +96,18 @@
 		){
 			this.settingsXML=this.loadSettings(ext.doc.getDataFromDocument(this.DOCUMENT_DATA));
 		}
-		if(
-			this.file &&
-			!/^file\:/.test(this.file)
-		){
-			this.file = this.file.absoluteURI(ext.doc.pathURI.dir);			
+
+		var isWindows = (fl.version.indexOf("WIN")!=-1);
+		if((isWindows && this.file.charAt(1)==":") || (!isWindows && this.file.charAt(0)=="/")){
+			this.file = FLfile.platformPathToURI(this.file);
+		}
+		if(this.file && !/^file\:/.test(this.file)){
+			if(!ext.doc.pathURI){
+				alert("Can't use relative export path with unsaved document.\nPlease save the document or use an absolute path");
+				return;
+			}else{
+				this.file = this.file.absoluteURI(ext.doc.pathURI.dir);		
+			}	
 		}
 		var extIndex = this.file.indexOf(".svg");
 		if(extIndex==this.file.length - 4){
@@ -141,7 +155,10 @@
 					}
 				}
 			}
+		}else if(this.frames=='custom'){
+			this.startFrame--; // So that 1>1 actually equates to 0>1
 		}
+
 		if(this.repeatCount==true)this.repeatCount = "indefinite";
 		else if(this.repeatCount==false)this.repeatCount = "1";
 
@@ -1574,10 +1591,11 @@
 				instanceXML['@height']=0;
 				instanceXML['@x']=0;
 				instanceXML['@y']=0;
-				instanceXML['@overflow']="visible";
+				//instanceXML['@overflow']="visible";
 
 				xml=new XML('<symbol/>');
 				xml['@id']=id;
+				xml['@overflow']="visible";
 
 				if(!settings.isRoot){
 					this._symbols[symbolIDString] = xml;
@@ -1779,8 +1797,8 @@
 							if(ext.log){
 								ext.log.pauseTimer(timer2);
 							}
-						}else if(tweenType=='none'){
-							while(frameEnd<layer.frames.length && layer.frames[frameEnd].startFrame==n){
+						}else if(doAnim && tweenType=='none'){
+							while(frameEnd<layerEnd && layer.frames[frameEnd].startFrame==frame.startFrame){
 								frameEnd++;
 								// this will add in extra time for frames with non changing content (which won't be included as a real frame)
 							}
@@ -1830,7 +1848,7 @@
 
 							if(!elemSettings.lookupName || !this._symbols[elemSettings.lookupName]){
 								if(this._delayedProcessing){
-									var elementXML = new XML( elemSettings.lookupName ? '<symbol/>' : '<g/>' );
+									var elementXML = new XML( elemSettings.lookupName ? '<symbol overflow="visible"/>' : '<g/>' );
 									this.qData.push(closure(this.processElement, [elementXML, element, elemSettings, dom], this));
 								}else{
 									var elementXML = this._getElement( element, elemSettings );
@@ -2118,7 +2136,7 @@
 
 
 							if(frameTimeEnd>1)frameTimeEnd = 1;
-							
+
 							if(items.length>0 && (frameTimeStart!=0 || frameTimeEnd!=1)){ // don't bother if element is always there
 								var fAnimNode = animNode.copy();
 								if(frameTimeStart==0){
@@ -2172,7 +2190,7 @@
 				instanceXML['@height']=vb[3];
 				instanceXML['@x']=vb[0];
 				instanceXML['@y']=vb[1];
-				instanceXML['@overflow']="visible";
+				//instanceXML['@overflow']="visible";
 				//this._symbolToUseNodes[symbolIDString].push(instanceXML);
 			}
 			/*

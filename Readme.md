@@ -28,7 +28,7 @@ Note, this extension will also work on CC versions of Flash Pro but the user int
 - Install with extension manager
 
 ### To Use ###
-- Open panel through menus, Window > Other Panels > SVG
+- Open panel through menus, Window > Extensions > SVG Animation
 - Open the FLA you wish to use and navigate to the timeline you wish to export
 - Select suitable options
 - Click export button

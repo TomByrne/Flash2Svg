@@ -87,7 +87,7 @@ function onLoaded() {
     }});
     
     dir = removeLastPathPart(window.location.href);
-	settingsDir = removeLastPathPart(removeLastPathPart(removeLastPathPart(dir))) + "/SvgAnimationSettings/";
+	settingsDir = "SvgAnimationSettings/";
 	presetsDir = settingsDir + "presets/";
     
 
@@ -263,11 +263,16 @@ function onSettingsChanged(){
 	}
 	onBaseSettingsChanged();
 }
+var saveWarned = false;
 function onBaseSettingsChanged(){
 	var settings = this.baseSettings.stringify();
 	evalScript("extensible.saveAppSettings('svgPanel', '"+settingsDir+"', '"+settings+"')",
 		function(res) {
-			// done
+			res = (res==true || res=="true");
+			if(!res && !saveWarned){
+				saveWarned = true;
+				evalScript("fl.trace('There was a problem saving SVG settings')");
+			}
 		}
 	);
 }

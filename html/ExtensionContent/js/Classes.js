@@ -112,6 +112,10 @@ Settings.parse = function(str){
 Settings.replacer = function(key, value) {
   if(value instanceof Settings){
 	  return value.toObject();
+  }else if(typeof(value) == "string"){
+	  value = value.split('\\').join('\\\\');
+	  value = value.split('"').join('\\"');
+	  return value;
   }else{
 	  return value;
   }

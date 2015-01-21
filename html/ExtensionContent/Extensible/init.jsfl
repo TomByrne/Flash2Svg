@@ -174,13 +174,17 @@
 		
 		SETTINGS_EXTENSION:".settings",
 		saveAppSettings:function(saveName, dir, str){
+			dir = fl.configURI + dir;
 			if(!FLfile.exists(dir)){
-				FLfile.createFolder(dir);
+				if(!FLfile.createFolder(dir)){
+					return false;
+				}
 			}
 			var path = dir + saveName + extensible.SETTINGS_EXTENSION;
-			FLfile.write(path, str);
+			return FLfile.write(path, str);
 		},
 		loadAppSettings:function(saveName, dir){
+			dir = fl.configURI + dir;
 			var path = dir + saveName + extensible.SETTINGS_EXTENSION;
 			if(FLfile.exists(path)){
 				var fileData = FLfile.read(path);
@@ -236,7 +240,7 @@
 			return fileName;
 		},
 		loadSettingsListing:function(dir){
-			this.presetsDir = dir;
+			dir = fl.configURI + dir;
 			if(!FLfile.exists(dir)){
 				FLfile.createFolder(dir);
 				return [];
