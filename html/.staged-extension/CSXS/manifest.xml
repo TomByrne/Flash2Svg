@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<ExtensionManifest Version="4.0" ExtensionBundleId="org.tbyrne.SvgAnimationForFlash" ExtensionBundleVersion="3.0.0"
+<ExtensionManifest Version="4.0" ExtensionBundleId="org.tbyrne.SvgAnimationForFlash" ExtensionBundleVersion="3.1.0"
 		ExtensionBundleName="SvgAnimationForFlash" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 	<Author>
 		<![CDATA[tbyrne.org]]>
@@ -9,7 +9,7 @@
 	</ExtensionList>
 	<ExecutionEnvironment>
 		<HostList>
-			<Host Name="FLPR" Version="[13.1,14.9]" />
+			<Host Name="FLPR" Version="[13.1,14.0]" />
 		</HostList>
 		<LocaleList>
 			<Locale Code="All" />

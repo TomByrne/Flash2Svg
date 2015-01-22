@@ -81,7 +81,8 @@ function onLoaded() {
 	loadSettingsButton = $("#settings-load");
 	
 	progBar.progressbar({value:0});
-    accordion.multiAccordion({change:function(){
+    accordion.multiAccordion({active:[],
+    	change:function(){
     	var list = accordion.multiAccordion("option", "active");
     	if(self.baseSettings)self.baseSettings.setProp(Settings.ACTIVE_PANELS, list.join(","));
     }});
@@ -554,6 +555,7 @@ function onPresetSelected(){
 }
 
 function onTimelineChanged(event){
+	if(isProcessing)return;
 	doLoadSettings();
 	evalScript("extensible.getDefaultTimelineFileName()",
 			function(res) {

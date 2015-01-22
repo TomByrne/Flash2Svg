@@ -147,7 +147,7 @@
 			this.frames=new ext.Array([]);
 			if(this.source=='current'){
 				this.startFrame=ext.frame;
-				this.endFrame=ext.frame;
+				this.endFrame=ext.frame+1;
 			}else{
 				this.startFrame=0;
 				this.endFrame=1;
@@ -156,13 +156,13 @@
 			this.startFrame=0;
 
 			if(this.source=='current'){
-				this.endFrame = ext.timeline.$.frameCount-1;
+				this.endFrame = ext.timeline.$.frameCount;
 			}else if(this.source=='libraryItems'){
 				this.endFrame=0;
 				for(var i=0;i<selectedItems.length;i++){
 					timeline=selectedItems[i].timeline;
 					if(timeline.$.frameCount-1>this.endFrame){
-						this.endFrame = timeline.$.frameCount-1;
+						this.endFrame = timeline.$.frameCount;
 					}
 				}
 			}
@@ -217,7 +217,7 @@
 				this.endFrame=this.startFrame;
 			}
 			this.frames = [];
-			for(var i=this.startFrame; i<this.endFrame+1; i++){
+			for(var i=this.startFrame; i<this.endFrame; i++){
 				this.frames.push(i);
 			}
 		}
@@ -1312,18 +1312,33 @@
 			return result;
 		},
 
-		_getBoundingBox:function(items){
+		_getBoundingBox:function(items, timeline, layerInd, frameInd){
 			var ret;
 			for(var i=0; i<items.length; ++i){
 				var item = items[i];
-				if(item.right - item.left > 0 && item.bottom - item.top > 0){
+
+				var bounds = item;
+
+				if(item.right - item.left < 0 || item.bottom - item.top < 0 || item.left - item.right > 6500000 || item.bottom - item.top > 6500000){
+					// element bounds are invalid, attempt to correct
+
+					if(timeline){
+						// If this element is in a newly cloned timeline sometimes the correct bounds haven't been calculated
+						ext.doc.library.editItem(timeline.libraryItem.name);
+						timeline.setSelectedLayers(layerInd, true);
+						timeline.currentFrame = frameInd;
+						bounds = {top:item.top, left:item.left, right:item.right, bottom:item.bottom};
+						ext.doc.exitEditMode();
+					}
+				}
+				if(bounds.right - bounds.left > 0 && bounds.bottom - bounds.top > 0){
 					if(ret==null){
-						ret = {left:item.left, right:item.right, top:item.top, bottom:item.bottom};
+						ret = {left:bounds.left, right:bounds.right, top:bounds.top, bottom:bounds.bottom};
 					}else{
-						if(ret.left>item.left)ret.left = item.left;
-						if(ret.top>item.top)ret.top = item.top;
-						if(ret.right<item.right)ret.right = item.right;
-						if(ret.bottom<item.bottom)ret.bottom = item.bottom;
+						if(ret.left>bounds.left)ret.left = bounds.left;
+						if(ret.top>bounds.top)ret.top = bounds.top;
+						if(ret.right<bounds.right)ret.right = bounds.right;
+						if(ret.bottom<bounds.bottom)ret.bottom = bounds.bottom;
 					}
 				}
 			}
@@ -1594,7 +1609,7 @@
 				}
 				this._symbolBounds[symbolIDString] = boundingBox;
 			}
-			//ext.message("getTimeline: "+symbolIDString+" "+settings.startFrame+" "+settings.endFrame+" "+settings.frameCount+" "+isNew+" "+settings.timeOffset+" "+layers.length);
+			//ext.message("\ngetTimeline: "+symbolIDString+" "+settings.startFrame+" "+settings.endFrame+" "+settings.frameCount+" "+isNew);
 			//var instanceID = this._uniqueID(id);
 			instanceXML=new XML('<use xlink-href="#'+id+'" />');
 			if(isNew){
@@ -1712,7 +1727,7 @@
 							n++;
 							continue;
 						}
-						var itemBounds = this._getBoundingBox(items);
+						var itemBounds = this._getBoundingBox(items, timeline, i, n);
 						if(boundingBox.left>itemBounds.left)boundingBox.left = itemBounds.left;
 						if(boundingBox.top>itemBounds.top)boundingBox.top = itemBounds.top;
 						if(boundingBox.right<itemBounds.right)boundingBox.right = itemBounds.right;
