@@ -146,6 +146,8 @@ function onLoaded() {
     	nextLoad = createLoader(dir+'/Extensible/'+files[i]+".jsfl", nextLoad, i);
     }
     nextLoad();
+    
+    $(document.body).children().css("display", "");
 }
 
 function removeLastPathPart(uri){

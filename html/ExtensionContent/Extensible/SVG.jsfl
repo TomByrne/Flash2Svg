@@ -18,12 +18,13 @@
 		this.STATE_PRE_INIT = 0;
 		this.STATE_TIMELINES = 1;
 		this.STATE_DELETE_EXISTING_FILES = 2;
-		this.STATE_EXPANDING_USE_NODES = 3;
-		this.STATE_REMOVING_UNUSED_SYMBOLS = 4;
-		this.STATE_SIMPLIFYING_FRAMES = 5;
-		this.STATE_FINALISING_FILES = 6;
-		this.STATE_CLEANUP = 7;
-		this.STATE_DONE = 8;
+		this.STATE_REUSING_SYMBOLS = 3;
+		this.STATE_EXPANDING_USE_NODES = 4;
+		this.STATE_REUSING_FRAMES = 5;
+		this.STATE_SIMPLIFYING_FRAMES = 6;
+		this.STATE_FINALISING_FILES = 7;
+		this.STATE_CLEANUP = 8;
+		this.STATE_DONE = 9;
 
 		var settings=new ext.Object({
 			file:undefined,
@@ -203,6 +204,9 @@
 		this._origSelection=new ext.Selection([]);
 		this._delayedProcessing=true;// If true, a timeline is processed one level deep in it's entirety before progressing to descendants.
 		this.currentState=0;
+		this._layerCacheLists = [];
+		this._symbolLists = [];
+		this._useNodeMaps = [];
 
 		this._origTimeline = ext.doc.getTimeline();
 
@@ -397,11 +401,14 @@
 				case this.STATE_DELETE_EXISTING_FILES:
 					this.qData.push(closure(this.deleteExistingFiles, [], this));
 					break;
+				case this.STATE_REUSING_SYMBOLS:
+					this.qData.push(closure(this.doReuseSymbols, [0, 0], this));
+					break;
 				case this.STATE_EXPANDING_USE_NODES:
 					this.qData.push(closure(this.processExpandUseNodes, [], this));
 					break;
-				case this.STATE_REMOVING_UNUSED_SYMBOLS:
-					//this.qData.push(closure(this.processRemoveUnused, [], this));
+				case this.STATE_REUSING_FRAMES:
+					this.qData.push(closure(this.doReuseFrames, [0, 0], this));
 					break;
 				case this.STATE_SIMPLIFYING_FRAMES:
 					this.qData.push(closure(this.processSimplifyFrames, [], this));
@@ -451,6 +458,11 @@
 			this._symbolBounds={};
 			this._fillMap={};
 			this._maskFilter = null;
+			this._symbolList = [];
+			this._symbolLists.push(this._symbolList);
+
+			this._useNodeMap = {};
+			this._useNodeMaps.push(this._useNodeMap);
 
 			var timelineIndex = this._timelineIndex;
 
@@ -1307,6 +1319,7 @@
 				var symbol = new XML('<symbol/>');
 				symbol['@id'] = options.lookupName;
 				symbol.appendChild(result);
+				this._symbolList.push(symbol);
 				return symbol;
 			}
 			return result;
@@ -1425,7 +1438,8 @@
 				libraryItem:undefined,
 				color:undefined,
 				isRoot:false,
-				timeOffset:0
+				timeOffset:0,
+				referenceShapes:false
 			});
 			settings.extend(options);
 			if(typeof(settings.color)=='string'){
@@ -1498,11 +1512,15 @@
 				if(ext.log){
 					var timer2=ext.log.startTimer('extensible.SVG._getTimeline() >> Deselect all');	
 				}
-				if(settings.libraryItem)ext.doc.library.editItem(settings.libraryItem.name);
+				if(settings.libraryItem){
+					ext.doc.library.editItem(settings.libraryItem.name);
+				}
 				timeline.setSelectedFrames(0, timeline.frameCount-1, true);
 				timeline.setSelectedFrames(0,0);
 				ext.doc.selectNone();
-				if(settings.libraryItem)ext.doc.exitEditMode();
+				if(settings.libraryItem){
+					ext.doc.exitEditMode();
+				}
 				if(ext.log){
 					ext.log.pauseTimer(timer2);
 				}
@@ -1624,8 +1642,9 @@
 				xml['@overflow']="visible";
 
 				if(!settings.isRoot){
+					this._symbolList.push(xml);
 					this._symbols[symbolIDString] = xml;
-					//this._symbolToUseNodes[symbolIDString] = [instanceXML];
+					this._useNodeMap[symbolIDString] = [instanceXML];
 				}
 
 				var forceDiscrete = settings.flattenMotion && settings.discreteEasing;
@@ -1695,6 +1714,7 @@
 						this._doMask(xml, masked, maskId);
 					}
 
+					var frameCacheList = [];
 
 					var colorX=null;
 					var isMask = false;
@@ -1830,6 +1850,8 @@
 							}
 						}
 
+						var frameHasAnimated = false;
+
 						for(var j=0; j<items.length; ++j){
 							var element = items[j];
 							element.timeline = timeline;
@@ -1849,7 +1871,7 @@
 										flattenMotion:settings.flattenMotion
 									};
 
-							if(element.elementType=="shape"){
+							if(element.elementType=="shape" && settings.referenceShapes){
 								elemSettings.lookupName = timelineName+"_"+i+"."+frame.startFrame+(items.length>1?"."+j:"");
 
 							}else if(element.symbolType=="graphic"){
@@ -1885,12 +1907,21 @@
 							
 							
 							if(elemSettings.lookupName){
-								var symbol = this._symbols[elemSettings.lookupName];
+								//var symbol = this._symbols[elemSettings.lookupName];
 								if(elementXML){
 									this._symbols[elemSettings.lookupName] = elementXML;
 									dom.defs.appendChild(elementXML);
+									this._symbolList.push(elementXML);
 								}
-								frameXML.appendChild( new XML('<use xlink-href="#'+elemSettings.lookupName+'" />') );
+								var useNode = new XML('<use xlink-href="#'+elemSettings.lookupName+'" />');
+								frameXML.appendChild( useNode );
+								var useList = this._useNodeMap[elemSettings.lookupName];// = [useNode];
+								if(!useList){
+									this._useNodeMap[elemSettings.lookupName] = [useNode];
+								}else{
+									useList.push(useNode);
+								}
+
 							}else if(elementXML){
 								frameXML.appendChild(elementXML);
 							}
@@ -2120,6 +2151,7 @@
 									}
 								}
 								if(this.hasDifferent(xList, yList, rotList, skyList, skxList, scxList, scyList)){
+									frameHasAnimated = true;
 									// the ordering of these animation nodes is important
 									this._addAnimationNode(elementXML, "translate", [xList, yList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete)
 									this._addAnimationNode(elementXML, "rotate", [rotList, trxList, tryList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete, false)
@@ -2135,7 +2167,10 @@
 									this._addAnimationNode(elementXML, "translate", [transXList, transYList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete)
 								}
 								
-								if(this.hasDifferent(alphaList))this._addAnimationNode(elementXML, "opacity", [alphaList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete)
+								if(this.hasDifferent(alphaList)){
+									frameHasAnimated = true;
+									this._addAnimationNode(elementXML, "opacity", [alphaList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+								}
 
 								elementXML.@transform = this._getMatrix(matrix);
 
@@ -2200,11 +2235,18 @@
 						}else{
 							xml.prependChild(frameXML);
 						}
+						if(!frameHasAnimated && (n!=0 || frameEnd!=layer.frameCount)){
+							frameCacheList.push(frameXML);
+						}
 
 						n = transToDiff ? frameEnd-1 : frameEnd;
 					}
 					if(layer.visible!=lVisible) layer.visible=lVisible;
 					if(layer.locked!=lLocked) layer.locked=lLocked;
+
+					if(frameCacheList.length > 1){
+						this._layerCacheLists.push(frameCacheList);
+					}
 				}
 				if(masked.length){
 					// masked layers have ended group
@@ -2217,7 +2259,7 @@
 				instanceXML['@x']=vb[0];
 				instanceXML['@y']=vb[1];
 				//instanceXML['@overflow']="visible";
-				//this._symbolToUseNodes[symbolIDString].push(instanceXML);
+				this._useNodeMap[symbolIDString].push(instanceXML);
 			}
 			/*
 			 *  If this is a temporary scene, delete it and return to the original.
@@ -2885,7 +2927,8 @@
 				frameCount: timeline.frames.length,
 				matrix: new ext.Matrix(),
 				colorTransform: null,
-				libraryItem:instance.libraryItem
+				libraryItem:instance.libraryItem,
+				referenceShapes:instance.symbolType=="graphic"
 			});
 			settings.extend(options);
 			//ext.message("_getSymbolInstance: "+instance.libraryItem.name+" - loop:"+instance.loop+" frameCount:"+settings.frameCount+" startFrame:"+settings.startFrame);
@@ -4509,6 +4552,132 @@
 						}
 					}							
 				}
+			}
+		},
+
+		/*
+			If multiple symbols have identical contents, we combine them into one
+			node here.
+		*/
+		doReuseSymbols:function(timelineIndex, symbolIndex, map){
+			if(!map){
+				map = {};
+			}
+			var symbolList = this._symbolLists[timelineIndex];
+			var symbol = symbolList[symbolIndex];
+			if(symbol.parent()){
+				var symbolCopy = symbol.copy();
+				delete symbolCopy.@id;
+				var key = symbolCopy.toXMLString().hashCode();
+				var existing = map[key];
+				if(existing){
+					var useNodes = this._useNodeMaps[timelineIndex][symbol.@id.toString()];
+					if(useNodes){
+						fl.trace("\tCOMBINE: "+existing.@id+" "+symbol.@id+" "+(useNodes!=null));
+
+						delete symbol.parent().children()[symbol.childIndex()];
+						for(var i=0; i<useNodes.length; i++){
+							var useNode = useNodes[i];
+							useNode['@xlink-href'] = "#"+existing.@id;
+						}
+					}else{
+						fl.trace("\nCOULDN'T COMBINE: "+symbol.toXMLString());
+					}
+				}else{
+					map[key] = symbol;
+				}
+			}
+
+			if(symbolIndex==symbolList.length-1){
+				if(timelineIndex==this._symbolLists.length-1){
+					return; // next state
+				}else{
+					this.qData.unshift(closure(this.doReuseSymbols, [timelineIndex+1, 0], this));
+				}
+			}else{
+				this.qData.unshift(closure(this.doReuseSymbols, [timelineIndex, symbolIndex+1, map], this));
+			}
+		},
+
+		/*
+			If multiple frames in the same layer have identical contents, we combine them into one
+			node here.
+		*/
+		doReuseFrames:function(listIndex, frameIndex, cache){
+			if(!this._layerCacheLists.length)return;
+
+			var list = this._layerCacheLists[listIndex];
+
+			if(!cache){
+				cache = {};
+			}
+
+			var frameNode = list[frameIndex];
+			var frameCopy = frameNode.copy();
+			delete frameCopy.animate;
+			delete frameCopy.@style;
+			delete frameCopy.@id;
+
+			var idDesc = frameCopy.descendants().(['@id']);
+			for(var i=0; i<idDesc.length(); ++i){
+				delete idDesc.@id;
+			}
+			var key = frameCopy.toXMLString().hashCode();
+			var cached = cache[key];
+			if(cached){
+				if(cached.@style.length() && !frameNode.@style.length()){
+					delete cached.@style;
+				}
+				var anim1 = cached.animate;
+				var anim2 = frameNode.animate;
+				var times1 = anim1.@keyTimes.toString().split(";");
+				var times2 = anim2.@keyTimes.toString().split(";");
+				var values1 = anim1.@values.toString().split(";");
+				var values2 = anim2.@values.toString().split(";");
+
+				var i=0;
+				var j=0;
+				var time2;
+				var lastWasOn = false;
+				while( j<times1.length ){
+					var time = times1[j];
+					var value = values1[j]=="inline";
+					if(lastWasOn && !value){
+						times1.splice(j, 1);
+						values1.splice(j, 1);
+						continue;
+					}
+					var skip = 0;
+
+					while((time2 = times2[i]) < time ){
+						if(!value){
+							var value2 = values2[i];
+							if(value2=="inline" || lastWasOn){
+								times1.splice(j+skip, 0, time2);
+								values1.splice(j+skip, 0, value2);
+								lastWasOn = value2=="inline";
+								skip++;
+							}
+						}
+						i++;
+					}
+					j += skip+1;
+				}
+				anim1.@keyTimes = times1.join(";");
+				anim1.@values = values1.join(";");
+				delete frameNode.parent().children()[frameNode.childIndex()];
+			}else{
+				cache[key] = frameNode;
+			}
+
+			if(frameIndex==list.length-1){
+				if(listIndex==this._layerCacheLists.length-1){
+					return; // next state
+				}else{
+					this.qData.unshift(closure(this.doReuseFrames, [listIndex+1, 0], this));
+				}
+			}else{
+				this.qData.unshift(closure(this.doReuseFrames, [listIndex, frameIndex+1, cache], this));
 			}
 		}
 	};

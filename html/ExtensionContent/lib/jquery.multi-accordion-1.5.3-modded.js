@@ -41,7 +41,9 @@
 				var $this = $(this);
 				$this.addClass(options._classes.h3).prepend('<span class="{class}"></span>'.replace(/{class}/, options._classes.span));
 				if(self._isActive(index)) {
-					self._showTab($this);
+					self._showTab($this, false, false);
+				}else{
+					self._hideTab($this, false, false);
 				}
 			}); // end h3 each
 			
@@ -95,13 +97,15 @@
 		},
 		
 		// private helper method that used to show tabs
-		_showTab: function($this, addToActive) {
+		_showTab: function($this, addToActive, animate) {
+			if(animate===undefined)animate = true;
+			
 			var $span = $this.children('span.ui-icon');
 			var $div = $this.next();
 			var options = this.options;
 			$this.removeClass('ui-state-default ui-corner-all').addClass('ui-state-active ui-corner-top');
 			$span.removeClass('ui-icon-triangle-1-e').addClass('ui-icon-triangle-1-s');
-			$div.slideDown('fast', function(){
+			$div.slideDown(animate?'fast':0, function(){
 				$div.addClass(options._classes.divActive);
 			});
 			var ui = {
@@ -123,13 +127,15 @@
 		},
 		
 		// private helper method that used to show tabs 
-		_hideTab: function($this, removeFromActive) {
+		_hideTab: function($this, removeFromActive, animate) {
+			if(animate===undefined)animate = true;
+			
 			var $span = $this.children('span.ui-icon');
 			var $div = $this.next();
 			var options = this.options;
 			$this.removeClass('ui-state-active ui-corner-top').addClass('ui-state-default ui-corner-all');
 			$span.removeClass('ui-icon-triangle-1-s').addClass('ui-icon-triangle-1-e');
-			$div.slideUp('fast', function(){
+			$div.slideUp(animate?'fast':0, function(){
 				$div.removeClass(options._classes.divActive);
 			});
 			var ui = {
