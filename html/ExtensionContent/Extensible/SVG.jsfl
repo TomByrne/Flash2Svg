@@ -101,8 +101,10 @@
 				this.log = fl.configURI+'SvgAnimation.log.csv';
 			}
 		}
-		if(this.loop==true){
+		if(this.loop===true){
 			this.repeatCount = "indefinite";
+		}else if(this.loop===false){
+			this.repeatCount = "1";
 		}
 		if(!options && ext.doc.documentHasData(this.DOCUMENT_DATA)
 		){
@@ -171,8 +173,8 @@
 			this.startFrame--; // So that 1>1 actually equates to 0>1
 		}
 
-		if(this.repeatCount==true)this.repeatCount = "indefinite";
-		else if(this.repeatCount==false)this.repeatCount = "1";
+		if(this.repeatCount===true)this.repeatCount = "indefinite";
+		else if(this.repeatCount===false)this.repeatCount = "1";
 
 		this._showMiterWarning = false;
 
