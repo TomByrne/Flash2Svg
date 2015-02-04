@@ -838,12 +838,12 @@
 					}
 					delete document.@transform;
 				}
-				document['@viewBox']=String(this.x)+' '+String(this.y)+' '+String(this.width)+' '+String(this.height);
+				//document['@viewBox']=String(this.x)+' '+String(this.y)+' '+String(this.width)+' '+String(this.height);
 				document.@width = this.width;
 				document.@height = this.height;
 
 				if(this.includeBackground){
-					document['@enable-background']='new '+document['@viewBox'];
+					document['@enable-background']='new '+String(this.x)+' '+String(this.y)+' '+String(this.width)+' '+String(this.height);
 				}
 				var outputObject = {};
 				outputObject.string= this.docString + document.toXMLString();
@@ -1089,13 +1089,13 @@
 					// if(useNode.@x)symbol.@x = useNode.@x;
 					// if(useNode.@y)symbol.@id = useNode.@y;
 					delete useNode['@xlink-href'];
-					delete useNode['@width'];
-					delete useNode['@height'];
-					delete useNode['@x'];
-					delete useNode['@y'];
+					// delete useNode['@width'];
+					// delete useNode['@height'];
+					// delete useNode['@x'];
+					// delete useNode['@y'];
 					this.copyNodeContents(useNode, symbol);
 					delete useNode['@id'];
-					delete symbol['@viewBox'];
+					// delete symbol['@viewBox'];
 					delete symbol['@overflow'];
 
 					if(useNode.@transform.length() && useNode.@transform!=this.IDENTITY_MATRIX)symbol.@transform = useNode.@transform;
@@ -1110,11 +1110,11 @@
 					useNode.setName('g');
 					//useNode['@id']=this._uniqueID(String(symbol['@id'])+'_1');
 					delete useNode['@xlink-href'];
-					delete useNode['@width'];
-					delete useNode['@height'];
-					delete useNode['@x'];
-					delete useNode['@y'];
-					delete useNode['@viewBox'];
+					// delete useNode['@width'];
+					// delete useNode['@height'];
+					// delete useNode['@x'];
+					// delete useNode['@y'];
+					// delete useNode['@viewBox'];
 					delete useNode['@overflow'];
 					if(useNode['@transform']==this.IDENTITY_MATRIX){
 						delete useNode['@transform'];
@@ -1633,10 +1633,10 @@
 			//var instanceID = this._uniqueID(id);
 			instanceXML=new XML('<use xlink-href="#'+id+'" />');
 			if(isNew){
-				instanceXML['@width']=0;
-				instanceXML['@height']=0;
-				instanceXML['@x']=0;
-				instanceXML['@y']=0;
+				// instanceXML['@width']=0;
+				// instanceXML['@height']=0;
+				// instanceXML['@x']=0;
+				// instanceXML['@y']=0;
 				//instanceXML['@overflow']="visible";
 
 				xml=new XML('<symbol/>');
@@ -2255,11 +2255,11 @@
 					this._doMask(xml, masked, maskId);
 				}
 			}else{
-				var vb=String(xml['@viewBox']).split(' ');
+				/*var vb=String(xml['@viewBox']).split(' ');
 				instanceXML['@width']=vb[2];
 				instanceXML['@height']=vb[3];
 				instanceXML['@x']=vb[0];
-				instanceXML['@y']=vb[1];
+				instanceXML['@y']=vb[1];*/
 				//instanceXML['@overflow']="visible";
 				this._useNodeMap[symbolIDString].push(instanceXML);
 			}
@@ -2289,7 +2289,7 @@
 					dom.defs.appendChild(xml);
 				}
 			}
-			var viewBox=(
+			/*var viewBox=(
 				String(this.precision(boundingBox.left))+' '+
 				String(this.precision(boundingBox.top))+' '+
 				String(this.precision(boundingBox.right-boundingBox.left))+' '+
@@ -2299,7 +2299,7 @@
 				xml['@viewBox'] = viewBox;
 			}else if(xml['@viewBox']!=viewBox){
 				instanceXML['@viewBox'] = viewBox;
-			}
+			}*/
 			var trans = this._getMatrix(settings.matrix);
 			if(trans==this.IDENTITY_MATRIX)trans = null;
 
@@ -2311,10 +2311,10 @@
 				delete xml['@xlink-href'];
 				return xml;
 			}else{
-				instanceXML['@width']=String(Math.ceil(boundingBox.right-boundingBox.left));
-				instanceXML['@height']=String(Math.ceil(boundingBox.bottom-boundingBox.top));
-				instanceXML['@x']=Math.floor(boundingBox.left);
-				instanceXML['@y']=Math.floor(boundingBox.top);
+				// instanceXML['@width']=String(Math.ceil(boundingBox.right-boundingBox.left));
+				// instanceXML['@height']=String(Math.ceil(boundingBox.bottom-boundingBox.top));
+				// instanceXML['@x']=Math.floor(boundingBox.left);
+				// instanceXML['@y']=Math.floor(boundingBox.top);
 				/*if(boundingBox.left!=instanceXML['@x'] || boundingBox.top!=instanceXML['@y']){
 					// if there are rounding errors we add the dif to the transform (greatly scaled objects can be affected dramatically)
 					// var offset = settings.matrix.transformPoint(boundingBox.left-instanceXML['@x'], boundingBox.top-instanceXML['@y'], false);
@@ -3639,7 +3639,10 @@
 
 			var cutHole = contour.interior && !fill && hasOtherFills;
 			var reverse = settings.reversed || contour.orientation==1;
-			if(opacityString!="" || (fill && fill.name().toString().indexOf("Gradient")!=-1))cutHole = true;
+			if(opacityString!="" || (fill && fill.name().toString().indexOf("Gradient")!=-1 && fill..stop.( @["stop-opacity"].toString() != "1" ).length())){
+				// Fills with an alpha channel should cut holes in fills so that the other fill doesn't show through
+				cutHole = true;
+			}
 			if(cutHole)reverse = !reverse;
 
 			var degPrefix=['M','L','Q','C'];
@@ -4566,31 +4569,33 @@
 				map = {};
 			}
 			var symbolList = this._symbolLists[timelineIndex];
-			var symbol = symbolList[symbolIndex];
-			if(symbol.parent()){
-				var symbolCopy = symbol.copy();
-				delete symbolCopy.@id;
-				var key = symbolCopy.toXMLString().hashCode();
-				var existing = map[key];
-				if(existing){
-					var useNodes = this._useNodeMaps[timelineIndex][symbol.@id.toString()];
-					if(useNodes){
-						fl.trace("\tCOMBINE: "+existing.@id+" "+symbol.@id+" "+(useNodes!=null));
+			if(symbolList.length){
+				var symbol = symbolList[symbolIndex];
+				if(symbol.parent()){
+					var symbolCopy = symbol.copy();
+					delete symbolCopy.@id;
+					var key = symbolCopy.toXMLString().hashCode();
+					var existing = map[key];
+					if(existing){
+						var useNodes = this._useNodeMaps[timelineIndex][symbol.@id.toString()];
+						if(useNodes){
+							fl.trace("\tCOMBINE: "+existing.@id+" "+symbol.@id+" "+(useNodes!=null));
 
-						delete symbol.parent().children()[symbol.childIndex()];
-						for(var i=0; i<useNodes.length; i++){
-							var useNode = useNodes[i];
-							useNode['@xlink-href'] = "#"+existing.@id;
+							delete symbol.parent().children()[symbol.childIndex()];
+							for(var i=0; i<useNodes.length; i++){
+								var useNode = useNodes[i];
+								useNode['@xlink-href'] = "#"+existing.@id;
+							}
+						}else{
+							fl.trace("\nCOULDN'T COMBINE: "+symbol.toXMLString());
 						}
 					}else{
-						fl.trace("\nCOULDN'T COMBINE: "+symbol.toXMLString());
+						map[key] = symbol;
 					}
-				}else{
-					map[key] = symbol;
 				}
 			}
 
-			if(symbolIndex==symbolList.length-1){
+			if(symbolIndex>=symbolList.length-1){
 				if(timelineIndex==this._symbolLists.length-1){
 					return; // next state
 				}else{

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<macromedia-extension name="flash2svg" version="3.1.0">
+<macromedia-extension name="flash2svg" version="3.2.0">
   <author name="David Belais &amp; Tom Byrne"/>
   <products>
     <product name="Flash" version="11"/>
