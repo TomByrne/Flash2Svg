@@ -10,6 +10,7 @@
 		this.DEFAULT_BITMAP_SCALE=1/20;
 		this.MAX_INLINE_CALL_COUNT=2999; // Max recursions
 		this.IDENTITY_MATRIX='matrix(1 0 0 1 0 0)';
+		this.NO_TWEEN_SPLINE_TOKEN='DISC';
 		this.NO_TWEEN_SPLINE='.1 .1 .9 .9';
 		this.DOCUMENT_DATA='SVGExportOptions';
 		this.MODULO_STAND_IN='.__';
@@ -2090,11 +2091,15 @@
 									}
 									skewX -= rot;
 									skewY -= rot;
+
+									skewX = this._getClosestRotList(-skewX, skxList);
+									skewY = this._getClosestRotList(skewY, skyList);
+
 			 						//fl.trace("\nframe: "+nextFrame.startFrame);
-									addTweenKiller = (nextFrame.tweenType=="none" && (!loopAnim || !isLast));
+									//addTweenKiller = (nextFrame.tweenType=="none" && (!loopAnim || !isLast));
 									var transPoint = nextElement.getTransformationPoint();
-									this.checkSkewQuadrant(skewX, time, lastSkX, lastTime, skxScaleYList, skxScaleXList, skxTimeList, skxSplineList, transPoint.x, transPoint.y)
-									this.checkSkewQuadrant(skewY, time, lastSkY, lastTime, skyScaleXList, skyScaleYList, skyTimeList, skySplineList, transPoint.y, transPoint.x)
+									this.checkSkewQuadrant(skewX, time, lastSkX, lastTime, skxScaleYList, skxScaleXList, skxTimeList, skxSplineList, transPoint.x, transPoint.y, lastFrame.tweenType!="none")
+									this.checkSkewQuadrant(skewY, time, lastSkY, lastTime, skyScaleXList, skyScaleYList, skyTimeList, skySplineList, transPoint.y, transPoint.x, lastFrame.tweenType!="none")
 									this._addAnimFrame(nextFrame, nextElement, invMatrix, time, rot, skewX, skewY, autoRotate, xList, yList, transXList, transYList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, alphaList, timeList, splineList, addTweenKiller, i, nextInd);
 									
 									lastFrame = nextFrame;
@@ -2114,9 +2119,9 @@
 										skyTimeList.push(t);
 
 										if(settings.loopTweens){
-											if(splineList[splineList.length-1]==this.NO_TWEEN_SPLINE) splineList[splineList.length-1] = splineList[0];
-											if(skxTimeList[skxTimeList.length-1]==this.NO_TWEEN_SPLINE) skxTimeList[skxTimeList.length-1] = skxTimeList[0];
-											if(skySplineList[skySplineList.length-1]==this.NO_TWEEN_SPLINE) skySplineList[skySplineList.length-1] = skySplineList[0];
+											if(splineList[splineList.length-1]==this.NO_TWEEN_SPLINE_TOKEN) splineList[splineList.length-1] = splineList[0];
+											if(skxTimeList[skxTimeList.length-1]==this.NO_TWEEN_SPLINE_TOKEN) skxTimeList[skxTimeList.length-1] = skxTimeList[0];
+											if(skySplineList[skySplineList.length-1]==this.NO_TWEEN_SPLINE_TOKEN) skySplineList[skySplineList.length-1] = skySplineList[0];
 										}
 										// this code joins the end of the animation up with the start for seemless looping
 										xList.push(xList[0]);
@@ -2459,14 +2464,13 @@
 				var rotSin = Math.sin(0);
 				matrix = new ext.Matrix(fl.Math.concatMatrix(matrix, invMatrix));
 			}
-			//fl.trace("mat: "+matrix);
 
-			var skewXRads = skewX / 180 * Math.PI;
-			var skewYRads = skewY / 180 * Math.PI;
-			var skewXSin = Math.sin(skewXRads);
-			var skewYSin = Math.sin(skewYRads);
-			var skewXCos = Math.cos(skewXRads);
-			var skewYCos = Math.cos(skewYRads);
+			// var skewXRads = -skewX / 180 * Math.PI;
+			// var skewYRads = skewY / 180 * Math.PI;
+			// var skewXSin = Math.sin(skewXRads);
+			// var skewYSin = Math.sin(skewYRads);
+			// var skewXCos = Math.cos(skewXRads);
+			// var skewYCos = Math.cos(skewYRads);
 			// var transX = (transPoint.x * skewYCos * element.scaleX + transPoint.y * skewXSin * element.scaleY);
 			// var transY = (transPoint.y * skewXCos * element.scaleY + transPoint.x * skewYSin * element.scaleX);
 			// xList.push(this.precision(matrix.tx + transX));
@@ -2523,7 +2527,7 @@
 			skyList.push(this.precision(sky));*/
 
 			//if(matrix.d < 0)sky = -sky;
-			 skxList.push(this.precision(-skewX));
+			 skxList.push(this.precision(skewX));
 			 skyList.push(this.precision(skewY));
 			//skxList.push(0);
 			//if(skewY)skyList.push(this.precision(matrix.c));
@@ -2537,7 +2541,7 @@
 			var time = this.precision(time);
 			timeList.push(time);
 
-			if(addTweenKiller){
+			/*if(addTweenKiller){
 				xList.push(xList[xList.length-1]);
 				yList.push(yList[yList.length-1]);
 				scxList.push(scxList[scxList.length-1]);
@@ -2551,7 +2555,7 @@
 				transYList.push(transYList[transYList.length-1]);
 				alphaList.push(alphaList[alphaList.length-1]);
 				splineList.push(splineList[splineList.length-1]);
-			}
+			}*/
 		},
 		rotateMatrix:function(matrix, angle, rotSin, rotCos, transPoint){
 			var radians = angle / 180 * Math.PI;
@@ -2565,11 +2569,11 @@
 			ret.ty = matrix.ty + (transPoint.y * rotCos + transPoint.x * rotSin) - transPoint.y;
 			return ret;
 		},
-		checkSkewQuadrant:function(skew, time, oldSkew, oldTime, scaleList, othScaleList, scaleTimeList, scaleSplineList, transPointDim1, transPointDim2){
+		checkSkewQuadrant:function(skew, time, oldSkew, oldTime, scaleList, othScaleList, scaleTimeList, scaleSplineList, transPointDim1, transPointDim2, doEase){
 			var quad = Math.floor((skew) / 90);
 			var oldQuad = Math.floor((oldSkew) / 90);
 
-			if(oldSkew!=null){
+			if(oldSkew!=null && doEase){
 				//skew = this._getClosestRot(skew, oldSkew);
 				var diff = quad - oldQuad;
 				if(diff){
@@ -2654,7 +2658,7 @@
 						scaleList.push(sc);
 						othScaleList.push(1);
 						scaleTimeList.push(t);
-						scaleSplineList.push(this._getFractSpline(ease));
+						if(scaleList.length>1)scaleSplineList.push(this._getFractSpline(ease));
 					}
 				}
 			}
@@ -2662,7 +2666,7 @@
 			scaleList.push(this.precision(Math.cos(rads)));
 			othScaleList.push(1);
 			scaleTimeList.push(this.precision(time));
-			scaleSplineList.push(this._getFractSpline(0));
+			if(scaleList.length>1)scaleSplineList.push(doEase ? this._getFractSpline(0) : this.NO_TWEEN_SPLINE_TOKEN);
 
 			return diff>0;
 		},
@@ -2748,6 +2752,7 @@
 			masked.clear();
 		},
 		_addAnimationNode:function(toNode, type, valueLists, times, totalTime, splineList, tweensFound, defaultValue, beginAnimation, repeatCount, forceDiscrete, validateAllLists){
+			fl.trace("\n_addAnimationNode: "+type);
 			if(validateAllLists==null)validateAllLists = true;
 			if(defaultValue==null)defaultValue = 0;
 			var getValue = function(valueLists, i){
@@ -2781,7 +2786,7 @@
 			var n = splineList.length;
 			var hasEasing = false;
 			for(var i=0; i<n; ++i){
-				if(splineList[i]!=this.NO_TWEEN_SPLINE){
+				if(splineList[i]!=this.NO_TWEEN_SPLINE_TOKEN){
 					hasEasing = true;
 					break;
 				}
@@ -2793,34 +2798,65 @@
 
 			var lastVal = getValue(valueLists, 0);
 			var lastTime = times[0];
+			var lastSpline = splineList[0];
+			var secVal = getValue(valueLists, 1);
 
-			if(lastTime>0){
+			if(lastTime<=0 || (secVal==lastVal && lastSpline==this.NO_TWEEN_SPLINE_TOKEN)){
+				var validV = [lastVal];
+				var validT = [0];
+				var validS = [lastSpline==this.NO_TWEEN_SPLINE_TOKEN ? this.NO_TWEEN_SPLINE : lastSpline];
+			}else{
 				var validV = [lastVal,lastVal];
 				var validT = [0,lastTime];
-				var validS = ["0 0 1 1", splineList[0]];
-			}else{
-				var validV = [lastVal];
-				var validT = [lastTime];
-				var validS = [splineList[0]];
+				var validS = ["0 0 1 1", lastSpline==this.NO_TWEEN_SPLINE_TOKEN ? this.NO_TWEEN_SPLINE : lastSpline];
 			}
 
 			var endPointMode = false;
 			for(var i=1; i<times.length; ++i){
-				var newVal = getValue(valueLists, i);
 				lastTime = times[i];
 				if(lastTime>1)lastTime = 1;
+				var newVal = getValue(valueLists, i);
+				var newSpline = splineList[i];
 
-				//var noneTween = (splineList[i]==this.NO_TWEEN_SPLINE);
-				if(newVal==lastVal && (endPointMode/* || noneTween*/)){
-					if(endPointMode)validT[validT.length-1] = lastTime;
-					//if(noneTween)validS[validT.length-1] = this.NO_TWEEN_SPLINE; 
+				fl.trace("frame: "+lastVal+" > "+newVal);
+
+				if(lastSpline==this.NO_TWEEN_SPLINE_TOKEN){
+					
+					fl.trace("\tno tween: "+lastVal+" "+validV[validV.length-2]+" "+validV.join(";"));
+					validV.push(lastVal);
+					validT.push(lastTime - 1/Math.pow(10, this.decimalPointPrecision));
+					validS.push(this.NO_TWEEN_SPLINE);
+					
+				}
+
+				if(newVal==lastVal && (endPointMode || (validV.length>1 && lastVal==validV[validV.length-2]))){
+					fl.trace("\textend last: "+validT[validT.length-1]+" > "+lastTime);
+					validT[validT.length-1] = lastTime;
+					validS[validS.length-1] = (newSpline==this.NO_TWEEN_SPLINE_TOKEN ? this.NO_TWEEN_SPLINE : newSpline);
+
 				}else{
+					/*if(lastSpline==this.NO_TWEEN_SPLINE_TOKEN){
+						if(newVal==lastVal || lastVal==validV[validV.length-2]){
+							validT[validT.length-1] = lastTime - 1/Math.pow(10, this.decimalPointPrecision);
+							validS[validS.length-1] = this.NO_TWEEN_SPLINE;
+							fl.trace("\tWHOA");
+						}else{
+							fl.trace("\tno tween: "+lastVal+" "+validV[validV.length-2]+" "+validV.join(";"));
+							validV.push(lastVal);
+							validT.push(lastTime - 1/Math.pow(10, this.decimalPointPrecision));
+							validS.push(this.NO_TWEEN_SPLINE);
+						}
+					}*/
+
 					endPointMode = (newVal==lastVal);
 					lastVal = newVal;
 					validV.push(newVal);
 					validT.push(lastTime);
-					validS.push(splineList[i]);
+					validS.push(newSpline==this.NO_TWEEN_SPLINE_TOKEN ? this.NO_TWEEN_SPLINE : newSpline);
 				}
+
+				fl.trace("-- "+validV.length+" "+validT.length+" "+validS.length);
+				lastSpline = newSpline;
 			}
 			if(validT[validT.length-1]<1){
 				if(validV.length==2 && validV[0]==validV[1]){
@@ -2872,14 +2908,13 @@
 			if(frame.hasCustomEase)ext.warn('Custom easing is not yet supported (at frame '+frame.startFrame+")");
 			if(!frame.useSingleEaseCurve) ext.warn('Per property custom easing is not supported (at frame '+frame.startFrame+")");
 			//if(frame.motionTweenRotateTimes!=0) ext.warn('Auto-rotate tweens are not yet supported (at frame '+frame.startFrame+")");
-
 			if(frame.tweenType=="none"){
-				return this.NO_TWEEN_SPLINE;
+				return this.NO_TWEEN_SPLINE_TOKEN;
 			}
 			return this._getFractSpline(frame.tweenEasing/100);
 		},
 		_getFractSpline:function(fract){
-			if(fract==0)return this.NO_TWEEN_SPLINE;
+			if(fract==0)return "0 0 1 1";
 
 			fract = fract * 0.5; // this number determines the severeness of easing (should match flash IDE, between 0-1)
 			var halfFract = fract/2;
