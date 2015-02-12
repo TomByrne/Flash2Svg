@@ -1647,7 +1647,7 @@
 				if(!settings.isRoot){
 					this._symbolList.push(xml);
 					this._symbols[symbolIDString] = xml;
-					this._useNodeMap[symbolIDString] = [instanceXML];
+					this._useNodeMap[id] = [instanceXML];
 				}
 
 				var forceDiscrete = settings.flattenMotion && settings.discreteEasing;
@@ -1978,10 +1978,10 @@
 								var firstSkX;
 								var firstSkY;*/
 								var allowRotateList = [];
-								var lastElement;
+								var lastElement = null;
 								for(var nextInd = n; nextInd<frameEnd; ++nextInd){
 									var nextFrame = layer.frames[nextInd];
-									if(nextFrame.startFrame!=nextInd)continue;
+									if(nextFrame.startFrame!=nextInd && n!=nextInd)continue;
 									var nextElement = nextFrame.elements[0];
 									if(lastElement){
 										allowRotateList.push(/*!isNaN(nextElement.rotation) || */(nextElement.skewX > nextElement.skewY) == (lastElement.skewX > lastElement.skewY));
@@ -2059,8 +2059,13 @@
 
 									var nextElement = nextFrame.elements[0];
 									var rot = this._getRotation(nextElement, allowSkewRot) - firstRot;
-									var skewX = nextElement.skewX - firstSkX;
-									var skewY = nextElement.skewY - firstSkY;
+									if(nextElement.skewX == nextElement.skewY){
+										var skewX = - firstSkX;
+										var skewY = - firstSkY;
+									}else{
+										var skewX = nextElement.skewX - firstSkX;
+										var skewY = nextElement.skewY - firstSkY;
+									}
 
 									while(attemptForeRot && Math.abs(rot-lastRot)>Math.abs(rot+360-lastRot)){
 										rot += 360;
@@ -2072,6 +2077,7 @@
 										skewX -= 360;
 										skewY -= 360;
 									}
+
 									// if there is a rotation tween of up to 45 degrees, we add extra bounds to accomodate it.
 									var rotDif = Math.abs(lastRot - rot)/180*Math.PI;
 									if(rotDif>Math.PI/4)rotDif = Math.PI/4;
@@ -2089,8 +2095,10 @@
 									if(isNaN(rot)){
 										rot = rotList.length ? rotList[rotList.length-1] : 0;
 									}
-									skewX -= rot;
-									skewY -= rot;
+									if(nextElement.skewX != nextElement.skewY){
+										skewX -= rot;
+										skewY -= rot;
+									}
 
 									skewX = this._getClosestRotList(-skewX, skxList);
 									skewY = this._getClosestRotList(skewY, skyList);
@@ -2266,7 +2274,7 @@
 				instanceXML['@x']=vb[0];
 				instanceXML['@y']=vb[1];*/
 				//instanceXML['@overflow']="visible";
-				this._useNodeMap[symbolIDString].push(instanceXML);
+				this._useNodeMap[id].push(instanceXML);
 			}
 			/*
 			 *  If this is a temporary scene, delete it and return to the original.
@@ -2410,8 +2418,10 @@
 			if((isNaN(element.rotation) || element.rotation==0) && allowSkewRotate){
 				//fl.trace("--------------- TAKE SKEW");
 				return element.skewX;
-			}else{
+			}else if(!isNaN(element.rotation)){
 				return element.rotation;
+			}else{
+				return 0;
 			}
 		},
 		_addAnimFrame:function(frame, element, invMatrix, time, rot, skewX, skewY, autoRotate,
@@ -2752,7 +2762,6 @@
 			masked.clear();
 		},
 		_addAnimationNode:function(toNode, type, valueLists, times, totalTime, splineList, tweensFound, defaultValue, beginAnimation, repeatCount, forceDiscrete, validateAllLists){
-			fl.trace("\n_addAnimationNode: "+type);
 			if(validateAllLists==null)validateAllLists = true;
 			if(defaultValue==null)defaultValue = 0;
 			var getValue = function(valueLists, i){
@@ -2818,19 +2827,18 @@
 				var newVal = getValue(valueLists, i);
 				var newSpline = splineList[i];
 
-				fl.trace("frame: "+lastVal+" > "+newVal);
-
 				if(lastSpline==this.NO_TWEEN_SPLINE_TOKEN){
-					
-					fl.trace("\tno tween: "+lastVal+" "+validV[validV.length-2]+" "+validV.join(";"));
-					validV.push(lastVal);
-					validT.push(lastTime - 1/Math.pow(10, this.decimalPointPrecision));
-					validS.push(this.NO_TWEEN_SPLINE);
-					
+					if(lastVal==validV[validV.length-2]){
+						validT[validT.length-1] = lastTime - 1/Math.pow(10, this.decimalPointPrecision);
+						validS[validS.length-1] = this.NO_TWEEN_SPLINE;
+					}else{
+						validV.push(lastVal);
+						validT.push(lastTime - 1/Math.pow(10, this.decimalPointPrecision));
+						validS.push(this.NO_TWEEN_SPLINE);
+					}
 				}
 
 				if(newVal==lastVal && (endPointMode || (validV.length>1 && lastVal==validV[validV.length-2]))){
-					fl.trace("\textend last: "+validT[validT.length-1]+" > "+lastTime);
 					validT[validT.length-1] = lastTime;
 					validS[validS.length-1] = (newSpline==this.NO_TWEEN_SPLINE_TOKEN ? this.NO_TWEEN_SPLINE : newSpline);
 
@@ -2855,7 +2863,6 @@
 					validS.push(newSpline==this.NO_TWEEN_SPLINE_TOKEN ? this.NO_TWEEN_SPLINE : newSpline);
 				}
 
-				fl.trace("-- "+validV.length+" "+validT.length+" "+validS.length);
 				lastSpline = newSpline;
 			}
 			if(validT[validT.length-1]<1){
@@ -4614,8 +4621,6 @@
 					if(existing){
 						var useNodes = this._useNodeMaps[timelineIndex][symbol.@id.toString()];
 						if(useNodes){
-							fl.trace("\tCOMBINE: "+existing.@id+" "+symbol.@id+" "+(useNodes!=null));
-
 							delete symbol.parent().children()[symbol.childIndex()];
 							for(var i=0; i<useNodes.length; i++){
 								var useNode = useNodes[i];
