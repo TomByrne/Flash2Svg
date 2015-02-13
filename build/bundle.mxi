@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<macromedia-extension 
+	id="org.tbyrne.SvgAnimationForFlash"
+	icon="icon.png"
+	name="SVG Animation Exporter" 
+	requires-restart="true"
+	version="{version}">
+ 
+	<author name="Thomas Byrne"/>
+ 
+	<description href="http://github.com/TomByrne/Flash2Svg">
+		<![CDATA[A tool for exporting Animated SVG files from Flash]]>
+	</description>
+ 
+	 <ui-access>
+		<![CDATA[For CC users, go to Window > Extensions > SVG Animation.
+For CS5 and CS6 users, go to Window > Other Panels > SVG.
+
+If the option does not appear in this location, it could be related to language settings in Adobe Extension Manager.]]>
+	</ui-access>
+ 
+  	<license-agreement>GNU Public License: http://www.gnu.org/licenses/gpl.html</license-agreement> 
+ 
+	<products>
+		<product name="Flash" version="11"/>
+	</products>
+ 
+	<files>
+		<!-- The HTML panel -->
+		<file source="HTML/org.tbyrne.SvgAnimationForFlash.zxp"
+			  destination=""
+			  file-type="CSXS"
+			  products="Flash"
+			  minVersion="13.0" />
+		
+		<!-- The FLASH panel -->
+	    <file source="FLASH/Extensible" destination="$flash/Javascript" minVersion="11.0" maxVersion="12.0"/>
+	    <file source="FLASH/SVG.swf" destination="$flash/WindowSWF" minVersion="11.0" maxVersion="12.0"/>
+	    <file source="FLASH/svg-help.xml" destination="$flash/WindowSWF" minVersion="11.0" maxVersion="12.0"/>
+ 
+		<!-- Extension Manager icon -->
+		<file source="icon.png" destination="$ExtensionSpecificEMStore" />
+	</files>
+</macromedia-extension>

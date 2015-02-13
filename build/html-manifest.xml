@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<ExtensionManifest Version="4.0" ExtensionBundleId="org.tbyrne.SvgAnimationForFlash" ExtensionBundleVersion="3.3.0"
+		ExtensionBundleName="SvgAnimationForFlash" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<Author>
+		<![CDATA[tbyrne.org]]>
+	</Author>	<ExtensionList>
+		<Extension Id="org.tbyrne.SvgAnimationForFlash.ExportPanel" Version="1.0" />
+	</ExtensionList>
+	<ExecutionEnvironment>
+		<HostList>
+			<Host Name="FLPR" Version="13.1|14.1" />
+		</HostList>
+		<LocaleList>
+			<Locale Code="All" />
+		</LocaleList>
+		<RequiredRuntimeList>
+			<RequiredRuntime Name="CSXS" Version="4.0" />
+
+		</RequiredRuntimeList>
+	</ExecutionEnvironment>
+	<DispatchInfoList>
+		<Extension Id="org.tbyrne.SvgAnimationForFlash.ExportPanel">
+			<DispatchInfo >
+				<Resources>
+				<MainPath>./index.html</MainPath>
+				</Resources>
+				<Lifecycle>
+					<AutoVisible>true</AutoVisible>
+				</Lifecycle>
+				<UI>
+					<Type>Panel</Type>
+					<Menu>SVG Animation</Menu>
+					<Geometry>
+						<Size>
+							<Height>200</Height>
+							<Width>200</Width>
+						</Size>
+						<MaxSize>
+							<Height>3000</Height>
+							<Width>300</Width>
+						</MaxSize>
+						<MinSize>
+							<Height>200</Height>
+							<Width>200</Width>
+						</MinSize>
+					</Geometry>
+					<Icons>
+						<Icon Type="Normal">./icons/light-normal.png</Icon>
+						<Icon Type="RollOver">./icons/light-normal.png</Icon>
+						<Icon Type="Disabled">./icons/dark-normal.png</Icon>
+						<Icon Type="DarkNormal">./icons/dark-normal.png</Icon>
+						<Icon Type="DarkRollOver">./icons/dark-normal.png</Icon>
+					</Icons>
+				</UI>
+			</DispatchInfo>
+		</Extension>
+	</DispatchInfoList>
+</ExtensionManifest>
