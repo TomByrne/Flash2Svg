@@ -1,6 +1,5 @@
 /bin
-/html/Assets
 /html/org.tbyrne.SvgAnimationForFlash.bundle.mxi
-/html/cert/cert.p12
 /build/tools
 /build/cert.p12
+/build/password.txt
