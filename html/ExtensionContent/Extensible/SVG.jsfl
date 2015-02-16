@@ -1484,6 +1484,9 @@
 				}else if(settings.timeOffset!=null && settings.timeOffset>0){
 					symbolIDString += '_t'+Math.round(settings.timeOffset * Math.pow(10, this.decimalPointPrecision));
 				}
+				if(settings.totalDuration > settings.frameCount / ext.doc.frameRate){
+					symbolIDString += '_d'+settings.totalDuration;
+				}
 			}
 			var isNew,boundingBox;
 			if(this._symbols[symbolIDString]){
@@ -1888,7 +1891,7 @@
 								elemSettings.startFrame = this._getPriorFrame(element.timeline, childFrame);
 
 							}else if(element.symbolType=="movie clip"){
-								if(elemSettings.timeOffset==0 || element.libraryItem.timeline.frameCount<(frameEnd-n) && frameEnd>n+1){
+								if((/*elemSettings.timeOffset==0 || */element.libraryItem.timeline.frameCount<(frameEnd-n)) && frameEnd>n+1){
 									elemSettings.beginAnimation = this.precision(elemSettings.timeOffset)+"s";
 									elemSettings.timeOffset = 0;
 									elemSettings.frameCount = element.libraryItem.timeline.frameCount;
@@ -2108,7 +2111,7 @@
 									var transPoint = nextElement.getTransformationPoint();
 									this.checkSkewQuadrant(skewX, time, lastSkX, lastTime, skxScaleYList, skxScaleXList, skxTimeList, skxSplineList, transPoint.x, transPoint.y, lastFrame.tweenType!="none")
 									this.checkSkewQuadrant(skewY, time, lastSkY, lastTime, skyScaleXList, skyScaleYList, skyTimeList, skySplineList, transPoint.y, transPoint.x, lastFrame.tweenType!="none")
-									this._addAnimFrame(nextFrame, nextElement, invMatrix, time, rot, skewX, skewY, autoRotate, xList, yList, transXList, transYList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, alphaList, timeList, splineList, addTweenKiller, i, nextInd);
+									this._addAnimFrame(nextFrame, nextElement, invMatrix, time, rot, skewX, skewY, autoRotate, xList, yList, transXList, transYList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, alphaList, timeList, splineList, addTweenKiller, timeline, i);
 									
 									lastFrame = nextFrame;
 									lastRot = rot;
@@ -2427,7 +2430,7 @@
 		_addAnimFrame:function(frame, element, invMatrix, time, rot, skewX, skewY, autoRotate,
 								xList, yList, transXList, transYList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, alphaList,
 								timeList, splineList,
-								addTweenKiller, layerI, frameI){
+								addTweenKiller, timeline, layerI){
 
 			if(!isNaN(element.rotation)){
 				element.rotation += 0; // sometimes fixes invalid matrices
@@ -2545,7 +2548,7 @@
 
 			alphaList.push(element.colorAlphaPercent / 100);
 
-			var spline = this._getFrameSpline(frame);
+			var spline = this._getFrameSpline(frame, timeline, layerI);
 			splineList.push(spline);
 
 			var time = this.precision(time);
@@ -2909,12 +2912,22 @@
 		 * Gets the spline points for a motion tweened frame.
 		 * Spline data is in the format 'x1 y1 x2 y2;' (per frame)
 		 */
-		_getFrameSpline:function(frame){
+		_getFrameSpline:function(frame, timeline, layerI){
 
 			// Tween support warnings, remove these as different tween settings gain support
-			if(frame.hasCustomEase)ext.warn('Custom easing is not yet supported (at frame '+frame.startFrame+")");
-			if(!frame.useSingleEaseCurve) ext.warn('Per property custom easing is not supported (at frame '+frame.startFrame+")");
-			//if(frame.motionTweenRotateTimes!=0) ext.warn('Auto-rotate tweens are not yet supported (at frame '+frame.startFrame+")");
+			if(frame.hasCustomEase){
+				var ease = frame.getCustomEase();
+
+				if(ease.length==4){
+					var p1 = ease[1];
+					var p2 = ease[2];
+					return this.precision(p1.x)+" "+this.precision(p1.y)+" "+this.precision(p2.x)+" "+this.precision(p2.y);
+				}else{
+					ext.warn('Custom easing is only supported with two control points (in timeline "'+timeline.name+'", layer '+(layerI+1)+' at frame '+(frame.startFrame+1)+")");
+				}
+			}
+			if(!frame.useSingleEaseCurve) ext.warn('Per property custom easing is not supported (in timeline "'+timeline.name+'", layer '+(layerI+1)+' at frame '+(frame.startFrame+1)+")");
+			
 			if(frame.tweenType=="none"){
 				return this.NO_TWEEN_SPLINE_TOKEN;
 			}
