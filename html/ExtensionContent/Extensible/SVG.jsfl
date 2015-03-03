@@ -1487,6 +1487,9 @@
 				if(settings.totalDuration > settings.frameCount / ext.doc.frameRate){
 					symbolIDString += '_d'+settings.totalDuration;
 				}
+				if(settings.repeatCount!="indefinite"){
+					symbolIDString += '_l'+settings.repeatCount;
+				}
 			}
 			var isNew,boundingBox;
 			if(this._symbols[symbolIDString]){
@@ -1662,7 +1665,11 @@
 								      attributeName="display"/>;
 
 					if(settings.beginAnimation!="0s")animNode.@begin = settings.beginAnimation;
-					animNode.@repeatCount = settings.repeatCount;
+					if(settings.repeatCount.charAt(settings.repeatCount.length-1)=="s"){
+						animNode.@repeatDur = settings.repeatCount;
+					}else{
+						animNode.@repeatCount = settings.repeatCount;
+					}
 
 
 					/*var animDur = totFrames*(1/ext.doc.frameRate);
@@ -1896,8 +1903,10 @@
 									elemSettings.timeOffset = 0;
 									elemSettings.frameCount = element.libraryItem.timeline.frameCount;
 									elemSettings.totalDuration = elemSettings.frameCount / ext.doc.frameRate;
+									if(settings.repeatCount!="indefinite"){
+										elemSettings.repeatCount = animDur+"s";
+									}
 								}
-								elemSettings.repeatCount = settings.repeatCount;
 							}
 
 							if(!elemSettings.lookupName || !this._symbols[elemSettings.lookupName]){
@@ -2187,7 +2196,9 @@
 								
 								if(this.hasDifferent(alphaList)){
 									frameHasAnimated = true;
-									this._addAnimationNode(elementXML, "opacity", [alphaList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+									if(this._addAnimationNode(elementXML, "opacity", [alphaList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete)){
+										elementXML.@opacity = lastElement.colorAlphaPercent / 100;
+									}
 								}
 
 								elementXML.@transform = this._getMatrix(matrix);
@@ -2347,7 +2358,7 @@
 				// }
 
 				if(ext.log) ext.log.pauseTimer(timer);
-				return instanceXML;
+				return { inst : instanceXML, sym : xml };
 			}
 		},
 		hasDifferent:function(){
@@ -2890,7 +2901,13 @@
 
 
 			if(beginAnimation!="0s")animNode.@begin = beginAnimation;
-			if(repeatCount!=1)animNode.@repeatCount = repeatCount;
+			if(repeatCount!=1){
+				if(repeatCount.charAt(repeatCount.length-1)=="s"){
+					animNode.@repeatDur = repeatCount;
+				}else{
+					animNode.@repeatCount = repeatCount;
+				}
+			}
 
 			animNode.@dur = this.precision(totalTime)+"s";
 			animNode.@keyTimes = validT.join(";");
@@ -2993,7 +3010,9 @@
 			//settings.matrix = instance.matrix.concat(settings.matrix);
 			settings.matrix = fl.Math.concatMatrix(instance.matrix, settings.matrix);
 
-			var xml = this._getTimeline(instance.timeline, settings);
+			var pack = this._getTimeline(instance.timeline, settings);
+			var xml = pack.inst;
+			var sym = pack.sym;
 			var filterID=this._getFilters(instance, xml, options, dom.defs);
 			if(filterID && dom.defs.filter.(@id.toString()==filterID).length()){
 				xml['@filter']='url(#'+filterID+')';
@@ -3491,7 +3510,7 @@
 						oppFills.push(othContour.fill);
 					}
 				}
-				for(var i=0; i<pathList.length; i++){
+				for(var i=0; i<holeObj.maxPath; i++){
 					var otherG = pathList[i].node;
 					var othEdges = edgeIdLists[i];
 					var othContour = validContours[i];
@@ -3698,7 +3717,7 @@
 				// Fills with an alpha channel should cut holes in fills so that the other fill doesn't show through
 				cutHole = true;
 			}
-			if(cutHole)reverse = !reverse;
+			if(cutHole && pathList.length)reverse = !reverse;
 
 			var degPrefix=['M','L','Q','C'];
 			var pathNodes = [];
@@ -3744,7 +3763,7 @@
 					lastPoint = point;
 				}
 				if(cutHole && i==0){
-					holes.push({contour:contour, edgeIDs:edgeIDs, pathStr:pathStr, polygon:polygon});
+					holes.push({contour:contour, edgeIDs:edgeIDs, pathStr:pathStr, polygon:polygon, maxPath:pathList.length});
 					if(fill || currPath.stroke){
 						polygons.push(polygon);
 						pathNodes.push('<path ' + currPath.fillString + opacityString + currPath.stroke + ' d="' + pathStr + '"/>\n');

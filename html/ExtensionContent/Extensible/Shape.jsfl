@@ -52,7 +52,7 @@
 			var contours=new ext.Array();
 			for(var i=0;i<this.$.contours.length;i++){
 				var c=new ext.Contour(this.$.contours[i],{shape:this});
-				var matched=false;
+				/*var matched=false;
 				for(var n=0;n<contours.length;n++){
 					if(c.edgeIDs.is(contours[n].edgeIDs)){
 						matched=true;
@@ -64,9 +64,9 @@
 						break;
 					}
 				}
-				if(!matched){
+				if(!matched){*/
 					contours.push(c);
-				}
+				//}
 			}
 			this.cache.contours=contours;
 			return contours;
