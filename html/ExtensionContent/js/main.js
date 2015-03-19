@@ -46,6 +46,7 @@ function onLoaded() {
     csInterface.addEventListener("com.adobe.events.flash.timelineChanged", onTimelineChanged);
     csInterface.addEventListener("com.adobe.events.flash.documentChanged", onDocumentChanged);
     csInterface.addEventListener("com.adobe.events.flash.documentClosed", onDocumentChanged);
+    csInterface.addEventListener("com.adobe.events.flash.documentSaved", onTimelineChanged);
     onDocumentChanged();
 	
 

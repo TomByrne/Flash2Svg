@@ -35,7 +35,7 @@
 			tweenType:null, // 'highKeyframe', 'highAllFrames', 'low'
 			convertPatternsToSymbols:true,
 			applyTransformations:true,
-			applyColorEffects:false,
+			applyColorEffects:true,
 			flattenMotion:true,
 			curveDegree:3,
 			maskingType:'clipping', // 'clipping', 'alpha', 'luminance'
@@ -823,7 +823,9 @@
 				if(this.applyTransformations){
 					this.applyMatrices(document);
 				}
-				this._applyColorEffects(document,document.defs);
+				if(this.applyColorEffects){
+					this._applyColorEffects(document, document.defs);
+				}
 				this._deleteUnusedFilters(document);
 				document['@xmlns']="http://www.w3.org/2000/svg";
 
@@ -1739,6 +1741,7 @@
 					if(layer.layerType=='mask'){
 						isMask = true;
 						if(this.maskingType=='alpha'){
+							// This makes semi-transparent parts of masks fully opaque
 							colorX=new ext.Color('#FFFFFF00');
 						}else if(this.maskingType=='clipping'){
 							colorX=new ext.Color('#FFFFFF00');
@@ -1912,6 +1915,9 @@
 									}
 								}
 							}
+							if(element.instanceType=="symbol" && element.blendMode!="normal"){
+								ext.warn('Blend modes are not yet supported (in timeline "'+timeline.name+'", layer '+(i+1)+' at frame '+(j+1)+")");
+							}
 
 							if(!elemSettings.lookupName || !this._symbols[elemSettings.lookupName]){
 								if(this._delayedProcessing){
@@ -1947,6 +1953,28 @@
 							
 						}
 
+						var filterElement = element;
+						if(doCollateFrames){
+							var transAnimObj = {xList:[], yList:[], scxList:[], scyList:[], skxList:[], skyList:[], rotList:[], trxList:[], tryList:[],
+												redOList:[], redMList:[], greenOList:[], greenMList:[], blueOList:[], blueMList:[], alphaOList:[], alphaMList:[],
+												timeList:[], splineList:[],
+												skxScaleXList:[], skxScaleYList:[], skxTimeList:[], skxSplineList:[],
+												skyScaleXList:[], skyScaleYList:[], skyTimeList:[], skySplineList:[],
+												transXList:[], transYList:[]};
+
+							if(this.showEndFrame){
+								filterElement = lastFrame.elements[0];
+							}
+						}
+
+						if(doCollateFrames || (element.elementType=="instance" && element.colorMode!='none')){
+							//var colTransNode = this._addColorTrans(elementXML, element, !doCollateFrames);
+							var filterID=this._getFilters(filterElement, elementXML, elemSettings, dom.defs, transAnimObj);
+							if(filterID && dom.defs.filter.(@id.toString()==filterID).length()){
+								elementXML['@filter']='url(#'+filterID+')';
+							}
+						}
+
 						if(doAnim){
 							
 							if(doCollateFrames){
@@ -1954,45 +1982,9 @@
 									var timer2=ext.log.startTimer('extensible.SVG._getTimeline() >> Get keyframes');	
 								}
 
-
-								var xList = [];
-								var yList = [];
-								var scxList = [];
-								var scyList = [];
-								var skxList = [];
-								var skyList = [];
-								var rotList = [];
-								var trxList = [];
-								var tryList = [];
-								var alphaList = [];
-
-								var timeList = [];
-								var splineList = [];
-
-								// skewX scale lists
-								var skxScaleXList = [];
-								var skxScaleYList = [];
-								var skxTimeList = [];
-								var skxSplineList = [];
-
-								// skewY scale lists
-								var skyScaleXList = [];
-								var skyScaleYList = [];
-								var skyTimeList = [];
-								var skySplineList = [];
-
-								var transXList = [];
-								var transYList = [];
-
 								var tweensFound = (frame.tweenType!="none" && frame.duration>1);
 
 								var matrix;
-								/*var invMatrix;
-								var firstRot;
-								var firstScX;
-								var firstScY;
-								var firstSkX;
-								var firstSkY;*/
 								var allowRotateList = [];
 								var lastElement = null;
 								for(var nextInd = n; nextInd<frameEnd; ++nextInd){
@@ -2000,8 +1992,7 @@
 									if(nextFrame.startFrame!=nextInd && n!=nextInd)continue;
 									var nextElement = nextFrame.elements[0];
 									if(lastElement){
-										allowRotateList.push(/*!isNaN(nextElement.rotation) || */(nextElement.skewX > nextElement.skewY) == (lastElement.skewX > lastElement.skewY));
-										//fl.trace(">>>>\n"+lastElement.rotation+" "+lastElement.skewX+" "+lastElement.skewY+" "+(lastElement.skewX - lastElement.skewY)+"\n"+nextElement.rotation+" "+nextElement.skewX+" "+nextElement.skewY+" "+(nextElement.skewX - nextElement.skewY));
+										allowRotateList.push((nextElement.skewX > nextElement.skewY) == (lastElement.skewX > lastElement.skewY));
 									}
 									lastElement = nextElement;
 								}
@@ -2012,18 +2003,6 @@
 									nextElement = element;
 									matrix = element.matrix.clone();
 								}
-								/*firstSkX = nextElement.skewX;
-								firstSkY = nextElement.skewY;
-								firstScX = nextElement.scaleX;
-								firstScY = nextElement.scaleY;
-								firstRot = this._getRotation(nextElement);
-								if(isNaN(firstRot))firstRot = 0;
-
-								var transPoint = nextElement.getTransformationPoint();
-								//if(firstRot)matrix = this.rotateMatrix(matrix, firstRot, Math.sin(firstRot), Math.cos(firstRot), transPoint);
-								var invMatrix = matrix.invert();
-								//invMatrix.tx -= transPoint.x;
-								//invMatrix.ty -= transPoint.y;*/
 								var invMatrix = new ext.Matrix();
 								var firstRot = 0;
 								var firstScX = 0;
@@ -2058,7 +2037,7 @@
 									var isLast = (nextFrame.duration + nextInd >= frameEnd);
 									if(addTweenKiller){
 										var smallT = this.precision(time-1/Math.pow(10, this.decimalPointPrecision));
-										timeList.push(smallT);
+										transAnimObj.timeList.push(smallT);
 									}else if(lastFrame.tweenType=="motion"){
 										tweensFound = true;
 										switch(lastFrame.motionTweenRotate){
@@ -2115,16 +2094,15 @@
 										skewX -= rot;
 										skewY -= rot;
 									}
-
-									skewX = this._getClosestRotList(-skewX, skxList);
-									skewY = this._getClosestRotList(skewY, skyList);
+									skewX = this._getClosestRotList(-skewX, transAnimObj.skxList);
+									skewY = this._getClosestRotList(skewY, transAnimObj.skyList);
 
 			 						//fl.trace("\nframe: "+nextFrame.startFrame);
 									//addTweenKiller = (nextFrame.tweenType=="none" && (!loopAnim || !isLast));
 									var transPoint = nextElement.getTransformationPoint();
-									this.checkSkewQuadrant(skewX, time, lastSkX, lastTime, skxScaleYList, skxScaleXList, skxTimeList, skxSplineList, transPoint.x, transPoint.y, lastFrame.tweenType!="none")
-									this.checkSkewQuadrant(skewY, time, lastSkY, lastTime, skyScaleXList, skyScaleYList, skyTimeList, skySplineList, transPoint.y, transPoint.x, lastFrame.tweenType!="none")
-									this._addAnimFrame(nextFrame, nextElement, invMatrix, time, forceDiscrete, rot, skewX, skewY, autoRotate, xList, yList, transXList, transYList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, alphaList, timeList, splineList, addTweenKiller, timeline, i);
+									this.checkSkewQuadrant(skewX, time, lastSkX, lastTime, transAnimObj.skxScaleYList, transAnimObj.skxScaleXList, transAnimObj.skxTimeList, transAnimObj.skxSplineList, transPoint.x, transPoint.y, lastFrame.tweenType!="none")
+									this.checkSkewQuadrant(skewY, time, lastSkY, lastTime, transAnimObj.skyScaleXList, transAnimObj.skyScaleYList, transAnimObj.skyTimeList, transAnimObj.skySplineList, transPoint.y, transPoint.x, lastFrame.tweenType!="none")
+									this._addAnimFrame(nextFrame, nextElement, invMatrix, time, forceDiscrete, rot, skewX, skewY, autoRotate, transAnimObj, addTweenKiller, timeline, i);
 									
 									lastFrame = nextFrame;
 									lastRot = rot;
@@ -2137,75 +2115,107 @@
 								}
 								if(addTweenKiller || loopAnim){
 									var t = (settings.timeOffset+nextInd/ext.doc.frameRate)/animDur;
-									timeList.push(t);
+									transAnimObj.timeList.push(t);
 									if(loopAnim){
-										skxTimeList.push(t);
-										skyTimeList.push(t);
+										transAnimObj.skxTimeList.push(t);
+										transAnimObj.skyTimeList.push(t);
 
 										if(settings.loopTweens){
-											if(splineList[splineList.length-1]==this.NO_TWEEN_SPLINE_TOKEN) splineList[splineList.length-1] = splineList[0];
-											if(skxTimeList[skxTimeList.length-1]==this.NO_TWEEN_SPLINE_TOKEN) skxTimeList[skxTimeList.length-1] = skxTimeList[0];
-											if(skySplineList[skySplineList.length-1]==this.NO_TWEEN_SPLINE_TOKEN) skySplineList[skySplineList.length-1] = skySplineList[0];
+											if(transAnimObj.splineList[transAnimObj.splineList.length-1]==this.NO_TWEEN_SPLINE_TOKEN) transAnimObj.splineList[transAnimObj.splineList.length-1] = transAnimObj.splineList[0];
+											if(transAnimObj.skxTimeList[transAnimObj.skxTimeList.length-1]==this.NO_TWEEN_SPLINE_TOKEN) transAnimObj.skxTimeList[transAnimObj.skxTimeList.length-1] = transAnimObj.skxTimeList[0];
+											if(transAnimObj.skySplineList[transAnimObj.skySplineList.length-1]==this.NO_TWEEN_SPLINE_TOKEN) transAnimObj.skySplineList[transAnimObj.skySplineList.length-1] = transAnimObj.skySplineList[0];
 										}
 										// this code joins the end of the animation up with the start for seemless looping
-										xList.push(xList[0]);
-										yList.push(yList[0]);
-										scxList.push(scxList[0]);
-										scyList.push(scyList[0]);
-										skxList.push(skxList[0]);
-										skyList.push(skyList[0]);
-										rotList.push(rotList[0]);
-										trxList.push(trxList[0]);
-										tryList.push(tryList[0]);
-										alphaList.push(alphaList[0]);
-										splineList.push(splineList[0]);
-										transXList.push(transXList[0]);
-										transYList.push(transYList[0]);
+										transAnimObj.xList.push(transAnimObj.xList[0]);
+										transAnimObj.yList.push(transAnimObj.yList[0]);
+										transAnimObj.scxList.push(transAnimObj.scxList[0]);
+										transAnimObj.scyList.push(transAnimObj.scyList[0]);
+										transAnimObj.skxList.push(transAnimObj.skxList[0]);
+										transAnimObj.skyList.push(transAnimObj.skyList[0]);
+										transAnimObj.rotList.push(transAnimObj.rotList[0]);
+										transAnimObj.trxList.push(transAnimObj.trxList[0]);
+										transAnimObj.tryList.push(transAnimObj.tryList[0]);
+										transAnimObj.splineList.push(transAnimObj.splineList[0]);
+										transAnimObj.transXList.push(transAnimObj.transXList[0]);
+										transAnimObj.transYList.push(transAnimObj.transYList[0]);
 
-										skxScaleXList.push(skxScaleXList[0]);
-										skxScaleYList.push(skxScaleYList[0]);
-										skyScaleXList.push(skyScaleXList[0]);
-										skyScaleYList.push(skyScaleYList[0]);
+										transAnimObj.redOList.push(transAnimObj.redOList[0]);
+										transAnimObj.redMList.push(transAnimObj.redMList[0]);
+										transAnimObj.greenOList.push(transAnimObj.greenOList[0]);
+										transAnimObj.greenMList.push(transAnimObj.greenMList[0]);
+										transAnimObj.blueOList.push(transAnimObj.blueOList[0]);
+										transAnimObj.blueMList.push(transAnimObj.blueMList[0]);
+										transAnimObj.alphaOList.push(transAnimObj.alphaOList[0]);
+										transAnimObj.alphaMList.push(transAnimObj.alphaMList[0]);
 
-										skxSplineList.push(skxSplineList[0]);
-										skySplineList.push(skySplineList[0]);
+										transAnimObj.skxScaleXList.push(transAnimObj.skxScaleXList[0]);
+										transAnimObj.skxScaleYList.push(transAnimObj.skxScaleYList[0]);
+										transAnimObj.skyScaleXList.push(transAnimObj.skyScaleXList[0]);
+										transAnimObj.skyScaleYList.push(transAnimObj.skyScaleYList[0]);
+
+										transAnimObj.skxSplineList.push(transAnimObj.skxSplineList[0]);
+										transAnimObj.skySplineList.push(transAnimObj.skySplineList[0]);
 									}
 								}
 								var combineSkewScales = false;
-								if(skxTimeList.length == skyTimeList.length){
+								if(transAnimObj.skxTimeList.length == transAnimObj.skyTimeList.length){
 									combineSkewScales = true;
-									for(var p=0; p<skxTimeList.length; p++){
-										if(skxTimeList[p]!=skyTimeList[p]){
+									for(var p=0; p<transAnimObj.skxTimeList.length; p++){
+										if(transAnimObj.skxTimeList[p]!=transAnimObj.skyTimeList[p]){
 											combineSkewScales = false;
 											break;
 										}
 									}
 								}
-								if(this.hasDifferent(xList, yList, rotList, skyList, skxList, scxList, scyList)){
+								var hasTransformAnim = this.hasDifferent(transAnimObj.rotList, transAnimObj.skyList, transAnimObj.skxList, transAnimObj.scxList, transAnimObj.scyList);
+								var hasTranslateAnim = this.hasDifferent(transAnimObj.xList, transAnimObj.yList);
+								if(!hasTransformAnim && hasTranslateAnim){
+									for(var m=0; m<transAnimObj.xList.length; m++){
+										transAnimObj.xList[m] += transAnimObj.transXList[m];
+										transAnimObj.yList[m] += transAnimObj.transYList[m];
+										transAnimObj.transXList[m] = 0;
+										transAnimObj.transYList[m] = 0;
+									}
+								}
+								if(hasTransformAnim || hasTranslateAnim){
 									frameHasAnimated = true;
 									// the ordering of these animation nodes is important
-									this._addAnimationNode(elementXML, "translate", [xList, yList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete)
-									this._addAnimationNode(elementXML, "rotate", [rotList, trxList, tryList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete, false)
-									this._addAnimationNode(elementXML, "skewX", [skxList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete)
-									this._addAnimationNode(elementXML, "skewY", [skyList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete)
-									this._addAnimationNode(elementXML, "scale", [scxList, scyList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true)
+									this._addAnimationNode(elementXML, "translate", [transAnimObj.xList, transAnimObj.yList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+									this._addAnimationNode(elementXML, "rotate", [transAnimObj.rotList, transAnimObj.trxList, transAnimObj.tryList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete, false);
+									this._addAnimationNode(elementXML, "skewX", [transAnimObj.skxList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+									this._addAnimationNode(elementXML, "skewY", [transAnimObj.skyList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+									this._addAnimationNode(elementXML, "scale", [transAnimObj.scxList, transAnimObj.scyList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true);
 									if(!forceDiscrete){
 										if(combineSkewScales){
-											this._addAnimationNode(elementXML, "scale", [skyScaleXList, skxScaleYList], skxTimeList, animDur, skxSplineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true)
+											this._addAnimationNode(elementXML, "scale", [transAnimObj.skyScaleXList, transAnimObj.skxScaleYList], transAnimObj.skxTimeList, animDur, transAnimObj.skxSplineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true);
 										}else{
-											this._addAnimationNode(elementXML, "scale", [skxScaleXList, skxScaleYList], skxTimeList, animDur, skxSplineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true)
-											this._addAnimationNode(elementXML, "scale", [skyScaleXList, skyScaleYList], skyTimeList, animDur, skySplineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true)
+											this._addAnimationNode(elementXML, "scale", [transAnimObj.skxScaleXList, transAnimObj.skxScaleYList], transAnimObj.skxTimeList, animDur, transAnimObj.skxSplineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true);
+											this._addAnimationNode(elementXML, "scale", [transAnimObj.skyScaleXList, transAnimObj.skyScaleYList], transAnimObj.skyTimeList, animDur, transAnimObj.skySplineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true);
 										}
 									}
-									this._addAnimationNode(elementXML, "translate", [transXList, transYList], timeList, animDur, splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete)
+									this._addAnimationNode(elementXML, "translate", [transAnimObj.transXList, transAnimObj.transYList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete);
 								}
 								
-								if(this.hasDifferent(alphaList)){
+								var hasOpacityAnim = this.hasDifferent(transAnimObj.alphaMList);
+								var hasColorAnim = this.hasDifferent(transAnimObj.redOList, transAnimObj.redMList, transAnimObj.greenOList, transAnimObj.greenMList, transAnimObj.blueOList, transAnimObj.blueMList, transAnimObj.alphaOList);
+								if((hasOpacityAnim || hasColorAnim) && !isMask){
 									frameHasAnimated = true;
-									if(this._addAnimationNode(elementXML, "opacity", [alphaList], timeList, animDur, splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete)){
-										elementXML.@opacity = lastElement.colorAlphaPercent / 100;
+									if(hasColorAnim){
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncR, "intercept", [transAnimObj.redOList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, 0, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncR, "slope", [transAnimObj.redMList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncG, "intercept", [transAnimObj.greenOList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, 0, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncG, "slope", [transAnimObj.greenMList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncB, "intercept", [transAnimObj.blueOList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, 0, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncB, "slope", [transAnimObj.blueMList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncA, "intercept", [transAnimObj.alphaOList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, 0, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncA, "slope", [transAnimObj.alphaMList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+
+									}else if(hasOpacityAnim && this._addAnimationNode(elementXML, "opacity", [transAnimObj.alphaMList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete)){
+										if(this.showEndFrame)elementXML.@opacity = lastElement.colorAlphaPercent / 100;
+										transAnimObj.colorTransNode.feFuncA.@slope = 1;
 									}
 								}
+								this._simplifyColorTrans(transAnimObj.colorTransNode, elementXML);
 
 								elementXML.@transform = this._getMatrix(matrix);
 
@@ -2213,12 +2223,7 @@
 									ext.log.pauseTimer(timer2);
 								}
 
-							}/*else if(tweenType=='none'){
-								while(frameEnd<layer.frames.length && layer.frames[frameEnd].startFrame==n){
-									frameEnd++;
-									// this will add in extra time for frames with non changing content (which won't be included as a real frame)
-								}
-							}*/
+							}
 
 							var lastFrameInd = (transToDiff?frameEnd-1:frameEnd)
 							//lastFrameInd    += (lastFrameInd==layerEnd?1:0);
@@ -2446,9 +2451,7 @@
 		},
 		_addAnimFrame:function(frame, element, invMatrix, time, forceDiscrete,
 								rot, skewX, skewY, autoRotate,
-								xList, yList, transXList, transYList, scxList, scyList, skxList, skyList, rotList, trxList, tryList, alphaList,
-								timeList, splineList,
-								addTweenKiller, timeline, layerI){
+								transAnimObj, addTweenKiller, timeline, layerI){
 
 			if(!isNaN(element.rotation)){
 				element.rotation += 0; // sometimes fixes invalid matrices
@@ -2456,13 +2459,13 @@
 			var matrix = new ext.Matrix(element.matrix);
 			var transPoint = element.getTransformationPoint();
 
-			transXList.push(-transPoint.x);
-			transYList.push(-transPoint.y);
+			transAnimObj.transXList.push(-transPoint.x);
+			transAnimObj.transYList.push(-transPoint.y);
 
 			//transPoint = matrix.transformPoint(transPoint.x, transPoint.y, false);
 			var outerTransPoint = matrix.transformPoint(transPoint.x, transPoint.y, true);
-			xList.push(this.precision(outerTransPoint.x));
-			yList.push(this.precision(outerTransPoint.y));
+			transAnimObj.xList.push(this.precision(outerTransPoint.x));
+			transAnimObj.yList.push(this.precision(outerTransPoint.y));
 
 			if(!isNaN(rot) && rot!=0){
 				var rotRad = rot / 180 * Math.PI;
@@ -2483,42 +2486,49 @@
 				matrix = new ext.Matrix(fl.Math.concatMatrix(matrix, invMatrix));
 
 				if((matrix.a<0) == (matrix.d<0)){
-					rotList.push(this.precision(rot + autoRotate));
+					transAnimObj.rotList.push(this.precision(rot + autoRotate));
 				}else{
-					rotList.push(this.precision(-rot + autoRotate));
+					transAnimObj.rotList.push(this.precision(-rot + autoRotate));
 					matrix.a = -matrix.a;
 					matrix.d = -matrix.d;
 				}
 			}else{
-				rotList.push(0);
+				transAnimObj.rotList.push(0);
 				var rotCos = Math.cos(0);
 				var rotSin = Math.sin(0);
 				matrix = new ext.Matrix(fl.Math.concatMatrix(matrix, invMatrix));
 			}
 
-			trxList.push(0);
-			tryList.push(0);
+			transAnimObj.trxList.push(0);
+			transAnimObj.tryList.push(0);
 
 			if(forceDiscrete){
 				var radX = skewX / 180 * Math.PI;
 				var radY = skewY / 180 * Math.PI;
-				scxList.push(this.precision(element.scaleX * Math.cos(radY)));
-				scyList.push(this.precision(element.scaleY * Math.cos(radX)));
+				transAnimObj.scxList.push(this.precision(element.scaleX * Math.cos(radY)));
+				transAnimObj.scyList.push(this.precision(element.scaleY * Math.cos(radX)));
 
 			}else{
-				scxList.push(this.precision(element.scaleX));
-				scyList.push(this.precision(element.scaleY));
+				transAnimObj.scxList.push(this.precision(element.scaleX));
+				transAnimObj.scyList.push(this.precision(element.scaleY));
 			}
-			skxList.push(this.precision(skewX));
-			skyList.push(this.precision(skewY));
+			transAnimObj.skxList.push(this.precision(skewX));
+			transAnimObj.skyList.push(this.precision(skewY));
 
-			alphaList.push(element.colorAlphaPercent / 100);
+			transAnimObj.redOList.push(element.colorRedAmount / 0xff);
+			transAnimObj.redMList.push(element.colorRedPercent / 100);
+			transAnimObj.greenOList.push(element.colorGreenAmount / 0xff);
+			transAnimObj.greenMList.push(element.colorGreenPercent / 100);
+			transAnimObj.blueOList.push(element.colorBlueAmount / 0xff);
+			transAnimObj.blueMList.push(element.colorBluePercent / 100);
+			transAnimObj.alphaOList.push(element.colorAlphaAmount / 0xff);
+			transAnimObj.alphaMList.push(element.colorAlphaPercent / 100);
 
 			var spline = this._getFrameSpline(frame, timeline, layerI);
-			splineList.push(spline);
+			transAnimObj.splineList.push(spline);
 
 			var time = this.precision(time);
-			timeList.push(time);
+			transAnimObj.timeList.push(time);
 		},
 		rotateMatrix:function(matrix, angle, rotSin, rotCos, transPoint){
 			var radians = angle / 180 * Math.PI;
@@ -2828,7 +2838,8 @@
 				validS.pop(); // spline list should be one element shorter than other lists
 			}
 
-			if(type=="opacity"){
+			var isTrans = (type=="scale" || type=="translate" || type=="rotate" || type=="skewX" || type=="skewY");
+			if(!isTrans){
 				var animNode = <animate />;
 				animNode.@attributeName = type;
 			}else{
@@ -2952,17 +2963,17 @@
 			var pack = this._getTimeline(instance.timeline, settings);
 			var xml = pack.inst;
 			var sym = pack.sym;
-			var filterID=this._getFilters(instance, xml, options, dom.defs);
+			/*var filterID=this._getFilters(instance, xml, options, dom.defs);
 			if(filterID && dom.defs.filter.(@id.toString()==filterID).length()){
 				xml['@filter']='url(#'+filterID+')';
-			}
+			}*/
 
 			if(ext.log){
 				ext.log.pauseTimer(timer);
 			}
 			return xml;
 		},
-		_getFilters:function(element, xml ,options,defs){
+		_getFilters:function(element, xml, options, defs, transAnimObj){
 			var settings=new ext.Object({
 				frame:0,
 				color:undefined,
@@ -2990,7 +3001,7 @@
 				(
 					color &&
 					( !color.amount.is([0,0,0,0]) || !color.percent.is([100,100,100,100]) )
-				) || filters.length
+				) || filters.length || transAnimObj
 			){
 				var src="SourceGraphic";
 				filterID=this._uniqueID('filter');
@@ -3200,77 +3211,95 @@
 					filter.@x='-10%';
 					filter.@y='-10%';
 				}
-				if( ( element?element.colorMode!='none':false ) || settings.color ){
-					if( // colorMode "tint"
-						color.percent[0]==color.percent[1]==color.percent[2] && 
-						color.percent[3]==100 &&
+				if( ( element?element.colorMode!='none':false ) || settings.color || transAnimObj ){
+
+					if(transAnimObj){
+						var ro = this.precision(color.amount[0] / 0xff);
+						var rm = this.precision(color.percent[0] / 100);
+						var go = this.precision(color.amount[1] / 0xff);
+						var gm = this.precision(color.percent[1] / 100);
+						var bo = this.precision(color.amount[2] / 0xff);
+						var bm = this.precision(color.percent[2] / 100);
+						var ao = this.precision(color.amount[3] / 0xff);
+						var am = this.precision(color.percent[3] / 100);
+
+						var feComponentTransfer = new XML(	  '<feComponentTransfer in="'+src+'" result="colorTrans">'+
+																'<feFuncR type="linear" slope="'+rm+'" intercept="'+ro+'"/>'+
+																'<feFuncG type="linear" slope="'+gm+'" intercept="'+go+'"/>'+
+														        '<feFuncB type="linear" slope="'+bm+'" intercept="'+bo+'"/>'+
+														        '<feFuncA type="linear" slope="'+am+'" intercept="'+ao+'"/>'+
+														      '</feComponentTransfer>');
+						src = "colorTrans";
+						transAnimObj.colorTransNode = feComponentTransfer;
+						filter.appendChild(feComponentTransfer);
+
+					}else if(color.percent[0]==100 &&
+						color.percent[1]==100 &&
+						color.percent[2]==100 &&
+						color.amount[0]==0 &&
+						color.amount[2]==0 &&
 						color.amount[3]==0 &&
-						false
-					){
-						/*
-						var tintSrc=src;
-						var tintOpacity=1-(color.percent[0]/100);
-						var tintColor=new ext.Color(color);
-						var tintColor.percent=[100,100,100,100];
-						var feFlood=<feFlood id={this._uniqueID('feFlood')} />;
-						feFlood['@flood-color']=tintColor.hex;
-						feFlood['@flood-opacity']=tintOpacity;
-						feColorMatrix['@result']=src="tint_feFlood";
-						filter.appendChild(feFlood);
-						var feComposite=<feComposite id={this._uniqueID('feComposite')} />;
-						feComposite.@operator=atop;
-						feComposite.@in=tintSrc;
-						feComposite.@in2=src;
-						feComposite.@result='tint_feComposite';
-						*/
+						color.amount[4]==0){
+
+						if(color.percent[3]!=100){
+							xml.@opacity = color.percent[3]/100;
+						}
+
 					}else{
-						if(	color.percent[0]==100 &&
-							color.percent[1]==100 &&
-							color.percent[2]==100){
-
-							if(color.percent[3]!=100){
-								xml.@opacity = color.percent[3]/100;
-							}
-
-						}else{
-							feColorMatrix=<feColorMatrix />;
-							feColorMatrix.@type="matrix";
-							feColorMatrix['@in']=src;
-							feColorMatrix.@values=[
-								color.percent[0]/100,0,0,0,0,
-								0,color.percent[1]/100,0,0,0,
-								0,0,color.percent[2]/100,0,0,
-								0,0,0,color.percent[3]/100,0
-							].join(' ');
-							feColorMatrix['@result']=src="colorEffect_percent";
-							filter.appendChild(feColorMatrix);
-						}
-						if(!color.amount.is([0,0,0,0])){
-							var feComponentTransfer=<feComponentTransfer />;
-							feComponentTransfer['@in']=src;
-							feComponentTransfer.@result=src='colorEffect_amount';
-							var feFuncR=<feFuncR/>;
-							var feFuncG=<feFuncG/>;
-							var feFuncB=<feFuncB/>;
-							var feFuncA=<feFuncA/>;
-							feFuncR.@type=feFuncG.@type=feFuncB.@type=feFuncA.@type="linear";
-							feFuncR.@slope=feFuncG.@slope=feFuncB.@slope=feFuncA.@slope=1;
-							feFuncR.@intercept=color.amount[0]/255;
-							feFuncG.@intercept=color.amount[1]/255;
-							feFuncB.@intercept=color.amount[2]/255;
-							feFuncA.@intercept=color.amount[3]/255;
-							feComponentTransfer.appendChild(feFuncR);
-							feComponentTransfer.appendChild(feFuncG);
-							feComponentTransfer.appendChild(feFuncB);
-							feComponentTransfer.appendChild(feFuncA);
-							filter.appendChild(feComponentTransfer);
-						}
+						feColorMatrix=<feColorMatrix type="matrix" />;
+						feColorMatrix['@in']=src;
+						feColorMatrix.@values=[
+							this.precision(color.percent[0]/100),0,0,0,this.precision(color.amount[0]/0xFF),
+							0,this.precision(color.percent[1]/100),0,0,this.precision(color.amount[1]/0xFF),
+							0,0,this.precision(color.percent[2]/100),0,this.precision(color.amount[2]/0xFF),
+							0,0,0,this.precision(color.percent[3]/100),this.precision(color.amount[3]/0xFF)
+						].join(' ');
+						feColorMatrix['@result']=src="colorTrans";
+						filter.appendChild(feColorMatrix);
 					}
 				}
 			}
 			if(filter && filterID && filter.*.length()){
 				defs.appendChild(filter);
 				return filterID;
+			}
+		},
+		_simplifyColorTrans:function(colorTransXML, elementXML){
+			if(colorTransXML..animate.length()==0){
+				var matStr = [
+							colorTransXML.feFuncR.@slope,0,0,0,colorTransXML.feFuncR.@intercept,
+							0,colorTransXML.feFuncG.@slope,0,0,colorTransXML.feFuncG.@intercept,
+							0,0,colorTransXML.feFuncB.@slope,0,colorTransXML.feFuncB.@intercept,
+							0,0,0,colorTransXML.feFuncA.@slope,colorTransXML.feFuncA.@intercept
+						].join(' ');
+				var par = colorTransXML.parent();
+				if(matStr != "1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 1 0"){
+					var colorTrans = new XML('<feColorMatrix type="matrix" in="'+colorTransXML['@in']+'" result="'+colorTransXML['@result']+'" values="'+matStr+'"/>');
+					par.appendChild(colorTrans);
+					delete par.children()[colorTransXML.childIndex()];
+
+				}else{
+					if(par.children().length()==1){
+						// remove whole filter stack
+						delete elementXML.@filter;
+						delete par.parent().children()[par.childIndex()];
+					}else{
+						// plug filters back together
+						delete par.children()[colorTransXML.childIndex()];
+					}
+				}
+			}else{
+				this._simplifyColorNode(colorTransXML, 'feFuncR');
+				this._simplifyColorNode(colorTransXML, 'feFuncG');
+				this._simplifyColorNode(colorTransXML, 'feFuncB');
+				this._simplifyColorNode(colorTransXML, 'feFuncA');
+			}
+			return colorTransXML;
+		},
+		_simplifyColorNode:function(colorTransXML, nodeName){
+			var node = colorTransXML.elements(nodeName)[0];
+			if( node.@slope=="1" && node.@intercept=="0" && node.animate.length()==0){
+				delete colorTransXML.children()[node.childIndex()];
 			}
 		},
 		_getBitmapInstance:function(bitmapInstance,options){
@@ -4397,6 +4426,7 @@
 					if(filter){
 						if(filter.length()){
 							filter=filter[0];
+
 							color=this._colorFromEffect(filter);
 							if(color){
 								var n=0;
@@ -4472,57 +4502,52 @@
 					}
 				}
 			}
-			for each(var element in xml.*){
-				this._applyColorEffects(element,defs,color);
+			if(this.applyColorEffects){
+				for each(var element in xml.*){
+					this._applyColorEffects(element,defs,color);
+				}
 			}
 			if(ext.log){
 				ext.log.pauseTimer(timer);
 			}
 		},
 		_colorFromEffect:function(filter){
-			var feAmount=filter.feComponentTransfer.(@result.toString()=='colorEffect_amount');
-			var fePercent=filter.feColorMatrix.(@result.toString()=='colorEffect_percent');
-			if(!(feAmount.length() || fePercent.length())){
-				return;
+			var matrixFilter = filter.feColorMatrix[0];
+			if(matrixFilter && matrixFilter..animate.length()==0){
+				var mat = matrixFilter.@values.toString().split(" ");
+				var color = new ext.Color();
+				color.amount[0] = parseFloat(mat[4]) * 0xff;
+				color.amount[1] = parseFloat(mat[9]) * 0xff;
+				color.amount[2] = parseFloat(mat[14]) * 0xff;
+				color.amount[3] = parseFloat(mat[19]) * 0xff;
+				color.percent[0] = parseFloat(mat[0]) * 100;
+				color.percent[1] = parseFloat(mat[6]) * 100;
+				color.percent[2] = parseFloat(mat[12]) * 100;
+				color.percent[3] = parseFloat(mat[18]) * 100;
+				return color;
 			}
-			var color=new ext.Color([0,0,0,0]);
-			var n=0;
-			if(feAmount.length()){
-				n+=1;
-				feAmount=feAmount[feAmount.length()-1];
-				if(feAmount.feFuncR.length()){
-					if(feAmount.feFuncR.@intercept.length()){
-						color.amount[0]=Number(feAmount.feFuncR.@intercept)*255;
-					}
+
+			var compFilter = filter.feComponentTransfer[0];
+			if(compFilter && compFilter..animate.length()==0){
+				var color = new ext.Color();
+				if(compFilter.feFuncR.length()){
+					color.amount[0] = parseFloat(compFilter.feFuncR.@intercept) * 0xff;
+					color.percent[0] = parseFloat(compFilter.feFuncR.@slope) * 100;
 				}
-				if(feAmount.feFuncG.length()){
-					if(feAmount.feFuncG.@intercept.length()){
-						color.amount[1]=Number(feAmount.feFuncG.@intercept)*255;
-					}
+				if(compFilter.feFuncR.length()){
+					color.amount[1] = parseFloat(compFilter.feFuncG.@intercept) * 0xff;
+					color.percent[1] = parseFloat(compFilter.feFuncG.@slope) * 100;
 				}
-				if(feAmount.feFuncB.length()){
-					if(feAmount.feFuncB.@intercept.length()){
-						color.amount[2]=Number(feAmount.feFuncB.@intercept)*255;
-					}
+				if(compFilter.feFuncR.length()){
+					color.amount[2] = parseFloat(compFilter.feFuncB.@intercept) * 0xff;
+					color.percent[2] = parseFloat(compFilter.feFuncB.@slope) * 100;
 				}
-				if(feAmount.feFuncA.length()){
-					if(feAmount.feFuncA.@intercept.length()){
-						color.amount[3]=Number(feAmount.feFuncA.@intercept)*255;
-					}
+				if(compFilter.feFuncR.length()){
+					color.amount[3] = parseFloat(compFilter.feFuncA.@intercept) * 0xff;
+					color.percent[3] = parseFloat(compFilter.feFuncA.@slope) * 100;
 				}
+				return color;
 			}
-			if(fePercent.length()){
-				n+=1;
-				fePercent=fePercent[fePercent.length()-1];
-				var values=String(fePercent.@values).match(/[\d\.\-]*\d/g);
-				if(values.length>16){
-					color.percent[0]=values[0]*100;
-					color.percent[1]=values[6]*100;
-					color.percent[2]=values[12]*100;
-					color.percent[3]=values[18]*100;
-				}
-			}
-			return color;
 		},
 		_transformFilter:function(matrix,element,defs){
 			defs=defs||element.defs;

@@ -27,6 +27,7 @@ tools\ZXPSignCmd -sign HTML "MXI\HTML\org.tbyrne.SvgAnimationForFlash.zxp" cert.
 
 echo f | xcopy "..\bundle\icon.png" "MXI\icon.png" /Y
 
+xcopy "..\metainfo" MXI
 call repl.bat "{version}" "%version%" L < "bundle.mxi" >"MXI\org.tbyrne.SvgAnimationForFlash.mxi"
 java -jar tools\ucf.jar -package -storetype PKCS12 -keystore cert.p12 -storepass %password% -tsa https://timestamp.geotrust.com/tsa "../bin/Flash2Svg v%version%.zxp" -C MXI .
 
