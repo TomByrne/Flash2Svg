@@ -1523,23 +1523,6 @@
 
 
 
-				// deselect all
-				if(ext.log){
-					var timer2=ext.log.startTimer('extensible.SVG._getTimeline() >> Deselect all');	
-				}
-				if(settings.libraryItem){
-					ext.doc.library.editItem(settings.libraryItem.name);
-				}
-				timeline.setSelectedFrames(0, timeline.frameCount-1, true);
-				timeline.setSelectedFrames(0,0);
-				ext.doc.selectNone();
-				if(settings.libraryItem){
-					ext.doc.exitEditMode();
-				}
-				if(ext.log){
-					ext.log.pauseTimer(timer2);
-				}
-
 				/*
 				 * Create temporary timelines where tweens exist & convert to
 				 * keyframes.
@@ -1871,6 +1854,7 @@
 						}
 
 						var frameHasAnimated = false;
+						var frameDeselected = false;
 
 						for(var j=0; j<items.length; ++j){
 							var element = items[j];
@@ -1891,7 +1875,29 @@
 										flattenMotion:settings.flattenMotion
 									};
 
-							if(element.elementType=="shape" && settings.referenceShapes){
+							var isShape = (element.elementType=="shape");
+
+							if(isShape && !frameDeselected){
+								if(ext.log){
+									var timer2=ext.log.startTimer('extensible.SVG._getTimeline() >> Deselect all');	
+								}
+								if(settings.libraryItem){
+									ext.doc.library.editItem(settings.libraryItem.name);
+								}
+								timeline.setSelectedFrames(n, n, true);
+								ext.doc.selectNone();
+
+								timeline.setSelectedFrames(0,0);
+								if(settings.libraryItem){
+									ext.doc.exitEditMode();
+								}
+								if(ext.log){
+									ext.log.pauseTimer(timer2);
+								}
+								frameDeselected = true;
+							}
+
+							if(isShape && settings.referenceShapes){
 								elemSettings.lookupName = timelineName+"_"+i+"."+frame.startFrame+(items.length>1?"."+j:"");
 
 							}else if(element.symbolType=="graphic"){
@@ -1911,7 +1917,7 @@
 									elemSettings.frameCount = element.libraryItem.timeline.frameCount;
 									elemSettings.totalDuration = elemSettings.frameCount / ext.doc.frameRate;
 									if(settings.repeatCount!="indefinite"){
-										elemSettings.repeatCount = animDur+"s";
+										elemSettings.repeatCount = ((frameEnd - n) / ext.doc.frameRate)+"s";
 									}
 								}
 							}
