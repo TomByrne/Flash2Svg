@@ -1446,7 +1446,7 @@
 				libraryItem:undefined,
 				color:undefined,
 				isRoot:false,
-				timeOffset:0,
+				animOffset:0,
 				referenceShapes:false
 			});
 			settings.extend(options);
@@ -1483,14 +1483,13 @@
 				symbolIDString += '_'+settings.color.idString; //should factor this out and use a transform
 			}
 			if(frameCount>1){
-				var dur = settings.totalDuration * ext.doc.frameRate;
-				var offset = settings.timeOffset * ext.doc.frameRate;
+				var offset = settings.animOffset;
 				if(settings.frameCount==1){
 					symbolIDString += '_f'+settings.startFrame;
-				}else if(settings.timeOffset!=null && settings.timeOffset>0){
-					symbolIDString += '_t'+Math.round(settings.timeOffset * Math.pow(10, this.decimalPointPrecision));
+				}else if(settings.animOffset!=null && settings.animOffset>0){
+					symbolIDString += '_t'+settings.animOffset;
 				}
-				if(settings.totalDuration > settings.frameCount / ext.doc.frameRate){
+				if(settings.totalDuration > settings.frameCount){
 					symbolIDString += '_d'+settings.totalDuration;
 				}
 				if(settings.repeatCount!="indefinite"){
@@ -1661,30 +1660,21 @@
 					}
 
 
-					/*var animDur = totFrames*(1/ext.doc.frameRate);
-					if(settings.totalDuration<animDur){
-						animDur = settings.totalDuration;
-					}
-					animDur = Math.roundTo(animDur,this.decimalPointPrecision);*/
-
 					if(settings.totalDuration!=null){
 						animDur = settings.totalDuration;
 					}else{
-						/*if(this.repeatCount=="indefinite"){
-							// when looping, we behave as if the timeline is 1 frame shorter so the last KF acts as an end-point (making for seemless loops)
-							animDur = this.precision((totFrames-1)*(1/ext.doc.frameRate));
-						}else{*/
-							animDur = this.precision(totFrames / ext.doc.frameRate);
-						//}
+						animDur = totFrames;
+					}
+					if(settings.loopTweens){
+						animDur -= 1;
 					}
 
-					animNode.@dur = this.precision(animDur)+"s";
+					animNode.@dur = this.precision( animDur / ext.doc.frameRate )+"s";
 				}else{
 					animDur = 0;
 				}
 				var animatedFrames = {};
 
-				var lastFrameTime = this.precision((settings.timeOffset + (settings.endFrame - settings.startFrame)*(1/ext.doc.frameRate))/animDur);
 				/*
 				 * Loop through the visible frames by layer &
 				 * either take note of the elements for linear
@@ -1738,6 +1728,7 @@
 					}
 					var frames = layer.frames;
 					var n=settings.startFrame;
+					layerSelected = false;
 					while( n<layerEnd ){
 						if(ext.log){
 							var timer2=ext.log.startTimer('extensible.SVG._getTimeline() >> Get frame items');	
@@ -1815,7 +1806,7 @@
 								var singleFrameStart = this._getPriorFrame(mainElem.libraryItem.timeline, mainElem.firstFrame);
 							}
 							var lastFrame = frame;
-							while(frameEnd<layerEnd){
+							while(frameEnd < layerEnd){
 								var nextFrame = layer.frames[frameEnd];
 								if(nextFrame){
 									if(nextFrame.startFrame==frameEnd){
@@ -1843,6 +1834,13 @@
 								}
 								lastFrame = nextFrame;
 							}
+							if(lastFrame && lastFrame.startFrame!=frameEnd-1){
+								if(!layerSelected){
+									layerSelected = true;
+									timeline.$.setSelectedLayers(i);
+								}
+								timeline.$.convertToKeyframes(frameEnd-1, frameEnd-1);
+							}
 							if(ext.log){
 								ext.log.pauseTimer(timer2);
 							}
@@ -1860,17 +1858,15 @@
 							var element = items[j];
 							element.timeline = timeline;
 							//var elementID=this._uniqueID('element');
-
-							var time = settings.timeOffset + (n - settings.startFrame) / ext.doc.frameRate;
 							var elemSettings = {
 										frame:n,
 										dom:dom,
-										timeOffset:time,
+										animOffset:(settings.animOffset + n - settings.startFrame),
 										frameCount:(frameEnd - n),
 										totalDuration:animDur,
 										beginAnimation:"0s",
 										repeatCount:settings.repeatCount,
-										loopTweens:this.loopTweens,
+										loopTweens:false,
 										discreteEasing:this.discreteEasing,
 										flattenMotion:settings.flattenMotion
 									};
@@ -1904,20 +1900,16 @@
 								elemSettings.frameCount = 1;
 								var childFrame = element.firstFrame;
 								if(element.loop!="single frame")childFrame += (n - frame.startFrame);
-								/*if(element.loop=="loop"){
-									elemSettings.timeOffset = 0;
-									elemSettings.totalDuration = element.timeline.frameCount / ext.doc.frameRate;
-								}*/
 								elemSettings.startFrame = this._getPriorFrame(element.timeline, childFrame);
 
 							}else if(element.symbolType=="movie clip"){
-								if((/*elemSettings.timeOffset==0 || */element.libraryItem.timeline.frameCount<(frameEnd-n)) && frameEnd>n+1){
-									elemSettings.beginAnimation = this.precision(elemSettings.timeOffset)+"s";
-									elemSettings.timeOffset = 0;
+								if((element.libraryItem.timeline.frameCount<(frameEnd-n)) && frameEnd>n+1){
+									elemSettings.beginAnimation = this.precision(elemSettings.animOffset / ext.doc.frameRate)+"s";
+									elemSettings.animOffset = 0;
 									elemSettings.frameCount = element.libraryItem.timeline.frameCount;
-									elemSettings.totalDuration = elemSettings.frameCount / ext.doc.frameRate;
+									elemSettings.totalDuration = elemSettings.frameCount;
 									if(settings.repeatCount!="indefinite"){
-										elemSettings.repeatCount = ((frameEnd - n) / ext.doc.frameRate)+"s";
+										elemSettings.repeatCount = this.precision((frameEnd - n) / ext.doc.frameRate)+"s";
 									}
 								}
 							}
@@ -2015,9 +2007,6 @@
 								var firstScY = 0;
 								var firstSkX = 0;
 								var firstSkY = 0;
-
-
-								var time = settings.timeOffset+(n/ext.doc.frameRate)/animDur;
 								
 								var lastRot = 0;
 								var lastFrame = frame;
@@ -2027,8 +2016,9 @@
 								var lastTime;
 
 								var mainElem = frame.elements[0];
-								var loopAnim = (settings.loopTweens && n==settings.startFrame && frameEnd==settings.endFrame && settings.repeatCount=="indefinite" && layer.frames[frameEnd-1].startFrame==frameEnd-1);
-								var addTweenKiller = false;
+								//var loopAnim = (settings.loopTweens && n==settings.startFrame && frameEnd==settings.endFrame && settings.repeatCount=="indefinite" && layer.frames[frameEnd-1].startFrame==frameEnd-1);
+								//loopAnim = false;
+								//var addTweenKiller = false;
 								var keyframeI = 0;
 								for(var nextInd = n/*+1*/; nextInd<frameEnd; ++nextInd){
 									var nextFrame = layer.frames[nextInd];
@@ -2039,12 +2029,13 @@
 
 									var attemptForeRot = true;
 									var attemptBackRot = true;
-									var time = (settings.timeOffset+nextInd/ext.doc.frameRate)/animDur;
+									//var time = (settings.animOffset+nextInd/ext.doc.frameRate)/animDur;
+									var time = (settings.animOffset + nextInd) / animDur;
 									var isLast = (nextFrame.duration + nextInd >= frameEnd);
-									if(addTweenKiller){
+									/*if(addTweenKiller){
 										var smallT = this.precision(time-1/Math.pow(10, this.decimalPointPrecision));
 										transAnimObj.timeList.push(smallT);
-									}else if(lastFrame.tweenType=="motion"){
+									}else */if(lastFrame.tweenType=="motion"){
 										tweensFound = true;
 										switch(lastFrame.motionTweenRotate){
 											case "clockwise":
@@ -2108,7 +2099,7 @@
 									var transPoint = nextElement.getTransformationPoint();
 									this.checkSkewQuadrant(skewX, time, lastSkX, lastTime, transAnimObj.skxScaleYList, transAnimObj.skxScaleXList, transAnimObj.skxTimeList, transAnimObj.skxSplineList, transPoint.x, transPoint.y, lastFrame.tweenType!="none")
 									this.checkSkewQuadrant(skewY, time, lastSkY, lastTime, transAnimObj.skyScaleXList, transAnimObj.skyScaleYList, transAnimObj.skyTimeList, transAnimObj.skySplineList, transPoint.y, transPoint.x, lastFrame.tweenType!="none")
-									this._addAnimFrame(nextFrame, nextElement, invMatrix, time, forceDiscrete, rot, skewX, skewY, autoRotate, transAnimObj, addTweenKiller, timeline, i);
+									this._addAnimFrame(nextFrame, nextElement, invMatrix, time, forceDiscrete, rot, skewX, skewY, autoRotate, transAnimObj, timeline, i);
 									
 									lastFrame = nextFrame;
 									lastRot = rot;
@@ -2116,11 +2107,13 @@
 									lastSkY = skewY;
 									lastTime = time;
 
-									if(!transToDiff || nextInd<frameEnd-1)animatedFrames[i+"-"+nextInd] = true;
+									if(!transToDiff || nextInd<frameEnd-1){
+										animatedFrames[i+"-"+nextInd] = true;
+									}
 									if(nextFrame.elements.length>1 || nextElement.libraryItem!=element.libraryItem)break;
 								}
-								if(addTweenKiller || loopAnim){
-									var t = (settings.timeOffset+nextInd/ext.doc.frameRate)/animDur;
+								/*if(addTweenKiller || loopAnim){
+									var t = (settings.animOffset + nextInd) / animDur;
 									transAnimObj.timeList.push(t);
 									if(loopAnim){
 										transAnimObj.skxTimeList.push(t);
@@ -2162,7 +2155,7 @@
 										transAnimObj.skxSplineList.push(transAnimObj.skxSplineList[0]);
 										transAnimObj.skySplineList.push(transAnimObj.skySplineList[0]);
 									}
-								}
+								}*/
 								var combineSkewScales = false;
 								if(transAnimObj.skxTimeList.length == transAnimObj.skyTimeList.length){
 									combineSkewScales = true;
@@ -2183,23 +2176,24 @@
 										transAnimObj.transYList[m] = 0;
 									}
 								}
+								var timeDur = this.precision(animDur / ext.doc.frameRate);
 								if(hasTransformAnim || hasTranslateAnim){
 									frameHasAnimated = true;
 									// the ordering of these animation nodes is important
-									this._addAnimationNode(elementXML, "translate", [transAnimObj.xList, transAnimObj.yList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-									this._addAnimationNode(elementXML, "rotate", [transAnimObj.rotList, transAnimObj.trxList, transAnimObj.tryList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete, false);
-									this._addAnimationNode(elementXML, "skewX", [transAnimObj.skxList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-									this._addAnimationNode(elementXML, "skewY", [transAnimObj.skyList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-									this._addAnimationNode(elementXML, "scale", [transAnimObj.scxList, transAnimObj.scyList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true);
+									this._addAnimationNode(elementXML, "translate", [transAnimObj.xList, transAnimObj.yList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+									this._addAnimationNode(elementXML, "rotate", [transAnimObj.rotList, transAnimObj.trxList, transAnimObj.tryList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete, false);
+									this._addAnimationNode(elementXML, "skewX", [transAnimObj.skxList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+									this._addAnimationNode(elementXML, "skewY", [transAnimObj.skyList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+									this._addAnimationNode(elementXML, "scale", [transAnimObj.scxList, transAnimObj.scyList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true);
 									if(!forceDiscrete){
 										if(combineSkewScales){
-											this._addAnimationNode(elementXML, "scale", [transAnimObj.skyScaleXList, transAnimObj.skxScaleYList], transAnimObj.skxTimeList, animDur, transAnimObj.skxSplineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true);
+											this._addAnimationNode(elementXML, "scale", [transAnimObj.skyScaleXList, transAnimObj.skxScaleYList], transAnimObj.skxTimeList, timeDur, transAnimObj.skxSplineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true);
 										}else{
-											this._addAnimationNode(elementXML, "scale", [transAnimObj.skxScaleXList, transAnimObj.skxScaleYList], transAnimObj.skxTimeList, animDur, transAnimObj.skxSplineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true);
-											this._addAnimationNode(elementXML, "scale", [transAnimObj.skyScaleXList, transAnimObj.skyScaleYList], transAnimObj.skyTimeList, animDur, transAnimObj.skySplineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true);
+											this._addAnimationNode(elementXML, "scale", [transAnimObj.skxScaleXList, transAnimObj.skxScaleYList], transAnimObj.skxTimeList, timeDur, transAnimObj.skxSplineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true);
+											this._addAnimationNode(elementXML, "scale", [transAnimObj.skyScaleXList, transAnimObj.skyScaleYList], transAnimObj.skyTimeList, timeDur, transAnimObj.skySplineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true);
 										}
 									}
-									this._addAnimationNode(elementXML, "translate", [transAnimObj.transXList, transAnimObj.transYList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+									this._addAnimationNode(elementXML, "translate", [transAnimObj.transXList, transAnimObj.transYList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete);
 								}
 								
 								var hasOpacityAnim = this.hasDifferent(transAnimObj.alphaMList);
@@ -2207,16 +2201,16 @@
 								if((hasOpacityAnim || hasColorAnim) && !isMask){
 									frameHasAnimated = true;
 									if(hasColorAnim){
-										this._addAnimationNode(transAnimObj.colorTransNode.feFuncR, "intercept", [transAnimObj.redOList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, 0, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-										this._addAnimationNode(transAnimObj.colorTransNode.feFuncR, "slope", [transAnimObj.redMList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-										this._addAnimationNode(transAnimObj.colorTransNode.feFuncG, "intercept", [transAnimObj.greenOList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, 0, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-										this._addAnimationNode(transAnimObj.colorTransNode.feFuncG, "slope", [transAnimObj.greenMList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-										this._addAnimationNode(transAnimObj.colorTransNode.feFuncB, "intercept", [transAnimObj.blueOList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, 0, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-										this._addAnimationNode(transAnimObj.colorTransNode.feFuncB, "slope", [transAnimObj.blueMList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-										this._addAnimationNode(transAnimObj.colorTransNode.feFuncA, "intercept", [transAnimObj.alphaOList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, 0, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-										this._addAnimationNode(transAnimObj.colorTransNode.feFuncA, "slope", [transAnimObj.alphaMList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncR, "intercept", [transAnimObj.redOList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, 0, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncR, "slope", [transAnimObj.redMList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncG, "intercept", [transAnimObj.greenOList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, 0, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncG, "slope", [transAnimObj.greenMList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncB, "intercept", [transAnimObj.blueOList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, 0, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncB, "slope", [transAnimObj.blueMList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncA, "intercept", [transAnimObj.alphaOList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, 0, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncA, "slope", [transAnimObj.alphaMList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete);
 
-									}else if(hasOpacityAnim && this._addAnimationNode(elementXML, "opacity", [transAnimObj.alphaMList], transAnimObj.timeList, animDur, transAnimObj.splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete)){
+									}else if(hasOpacityAnim && this._addAnimationNode(elementXML, "opacity", [transAnimObj.alphaMList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete)){
 										if(this.showEndFrame)elementXML.@opacity = lastElement.colorAlphaPercent / 100;
 										transAnimObj.colorTransNode.feFuncA.@slope = 1;
 									}
@@ -2228,18 +2222,16 @@
 								if(ext.log){
 									ext.log.pauseTimer(timer2);
 								}
-
 							}
 
-							var lastFrameInd = (transToDiff?frameEnd-1:frameEnd)
-							//lastFrameInd    += (lastFrameInd==layerEnd?1:0);
+							var lastFrameInd = (transToDiff ? frameEnd-1 : frameEnd);
+							if(settings.loopTweens && lastFrameInd > (animDur - settings.animOffset + settings.startFrame))lastFrameInd = (animDur - settings.animOffset + settings.startFrame); // really just to suppress the warning
 
-							// use precision before devision because animDur has already been rounded and fractions that should be 1 can end up being 0.999 otherwise
-							var frameTimeStart = this.precision(this.precision(settings.timeOffset + (n - settings.startFrame)/ext.doc.frameRate)/animDur);
-							var frameTimeEnd = this.precision(this.precision(settings.timeOffset + (lastFrameInd - settings.startFrame)/ext.doc.frameRate)/animDur);
+							var frameTimeStart = this.precision((settings.animOffset + n - settings.startFrame)/animDur);
+							var frameTimeEnd = this.precision((settings.animOffset + lastFrameInd - settings.startFrame)/animDur);
 
-							if(frameTimeStart>1)fl.trace("START TIME WARNING: "+frameTimeStart+" "+settings.timeOffset+" "+animDur+" "+n+" "+settings.startFrame+" "+((n - settings.startFrame)*(1/ext.doc.frameRate)));
-							if(frameTimeEnd>1)fl.trace("END TIME WARNING: "+timeline.name+" "+((settings.timeOffset + (lastFrameInd - settings.startFrame)/ext.doc.frameRate) * ext.doc.frameRate)+" / "+(animDur * ext.doc.frameRate)+" = "+frameTimeEnd);
+							if(frameTimeStart>1)fl.trace("START TIME WARNING: "+frameTimeStart+" "+settings.animOffset+" "+animDur+" "+n+" "+settings.startFrame+" "+((n - settings.startFrame)*(1/ext.doc.frameRate)));
+							if(frameTimeEnd>1)fl.trace("END TIME WARNING: "+timeline.name+" "+(settings.animOffset + lastFrameInd - settings.startFrame)+" / "+animDur+" = "+frameTimeEnd+" "+frameTimeStart);
 
 
 							if(frameTimeEnd>1)frameTimeEnd = 1;
@@ -2420,8 +2412,6 @@
 			if(libraryItem==undefined){
 				ext.doc.editScene(ext.doc.timelines.indexOf(timeline.$));
 				ext.doc.duplicateScene();
-				//ext.doc.editScene(ext.doc.timelines.indexOf(timeline.$)+1); // edit new scene (after duplication current scene changes to last scene)
-
 				timelines=ext.doc.timelines;
 				timeline = new ext.Timeline(timelines[ext.doc.timelines.indexOf(timeline.$)+1]);
 			}else{
@@ -2457,7 +2447,7 @@
 		},
 		_addAnimFrame:function(frame, element, invMatrix, time, forceDiscrete,
 								rot, skewX, skewY, autoRotate,
-								transAnimObj, addTweenKiller, timeline, layerI){
+								transAnimObj, timeline, layerI){
 
 			if(!isNaN(element.rotation)){
 				element.rotation += 0; // sometimes fixes invalid matrices
@@ -3537,7 +3527,7 @@
 							matrix:descendantMatrix,
 							frame:settings.frame,
 							dom:dom,
-							timeOffset:settings.timeOffset,
+							animOffset:settings.animOffset,
 							frameCount:settings.frameCount,
 							//totalDuration:settings.totalDuration,
 							beginAnimation:settings.beginAnimation,
