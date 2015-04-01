@@ -558,7 +558,7 @@ function onPresetSelected(){
 }
 
 function onTimelineChanged(event){
-	if(isProcessing)return;
+	if(isProcessing || !this.settings)return;
 	doLoadSettings();
 	evalScript("extensible.getDefaultTimelineFileName()",
 			function(res) {

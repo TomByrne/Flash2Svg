@@ -12,6 +12,7 @@
 		this.IDENTITY_MATRIX='matrix(1 0 0 1 0 0)';
 		this.NO_TWEEN_SPLINE_TOKEN='DISC';
 		this.NO_TWEEN_SPLINE='.1 .1 .9 .9';
+		this.LINEAR_SPLINE='0 0 1 1';
 		this.DOCUMENT_DATA='SVGExportOptions';
 		this.MODULO_STAND_IN='.__';
 
@@ -1520,7 +1521,7 @@
 						includeGraphicChanges:true
 					});
 
-
+				 var origTimeline = settings.libraryItem;
 
 				/*
 				 * Create temporary timelines where tweens exist & convert to
@@ -1834,7 +1835,7 @@
 								}
 								lastFrame = nextFrame;
 							}
-							if(lastFrame && lastFrame.startFrame!=frameEnd-1){
+							if(lastFrame && lastFrame.startFrame!=frameEnd-1 && lastFrame.tweenType!="none"){
 								if(!layerSelected){
 									layerSelected = true;
 									timeline.$.setSelectedLayers(i);
@@ -1878,10 +1879,18 @@
 									var timer2=ext.log.startTimer('extensible.SVG._getTimeline() >> Deselect all');	
 								}
 								if(settings.libraryItem){
-									ext.doc.library.editItem(settings.libraryItem.name);
+									ext.doc.library.editItem(timeline.libraryItem.name);
 								}
-								timeline.setSelectedFrames(n, n, true);
-								ext.doc.selectNone();
+								if(timeline.frameCount > 1){
+									timeline.$.currentFrame = n;
+								}
+								if(ext.doc.selection.length){
+									//ext.doc.selectNone(); // crashes flash sometimes
+									fl.getDocumentDOM().selection = [];
+									if(fl.getDocumentDOM().selection.length){
+										fl.trace("WARNING: Failed to deselect objects in timeline "+origTimeline.name+" on layer "+layer.name+" at frame "+(n+1)+". This can cause vector data to be offset, manually deselect to fix.");
+									}
+								}
 
 								timeline.setSelectedFrames(0,0);
 								if(settings.libraryItem){
@@ -1980,8 +1989,6 @@
 									var timer2=ext.log.startTimer('extensible.SVG._getTimeline() >> Get keyframes');	
 								}
 
-								var tweensFound = (frame.tweenType!="none" && frame.duration>1);
-
 								var matrix;
 								var allowRotateList = [];
 								var lastElement = null;
@@ -2036,7 +2043,6 @@
 										var smallT = this.precision(time-1/Math.pow(10, this.decimalPointPrecision));
 										transAnimObj.timeList.push(smallT);
 									}else */if(lastFrame.tweenType=="motion"){
-										tweensFound = true;
 										switch(lastFrame.motionTweenRotate){
 											case "clockwise":
 												if(lastFrame.duration>1)autoRotate += lastFrame.motionTweenRotateTimes*360;
@@ -2093,6 +2099,9 @@
 									}
 									skewX = this._getClosestRotList(-skewX, transAnimObj.skxList);
 									skewY = this._getClosestRotList(skewY, transAnimObj.skyList);
+
+									fl.trace("\nx: "+skewX+" "+nextElement.skewX);
+									fl.trace("y: "+skewY+" "+nextElement.skewY);
 
 			 						//fl.trace("\nframe: "+nextFrame.startFrame);
 									//addTweenKiller = (nextFrame.tweenType=="none" && (!loopAnim || !isLast));
@@ -2180,20 +2189,20 @@
 								if(hasTransformAnim || hasTranslateAnim){
 									frameHasAnimated = true;
 									// the ordering of these animation nodes is important
-									this._addAnimationNode(elementXML, "translate", [transAnimObj.xList, transAnimObj.yList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-									this._addAnimationNode(elementXML, "rotate", [transAnimObj.rotList, transAnimObj.trxList, transAnimObj.tryList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete, false);
-									this._addAnimationNode(elementXML, "skewX", [transAnimObj.skxList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-									this._addAnimationNode(elementXML, "skewY", [transAnimObj.skyList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-									this._addAnimationNode(elementXML, "scale", [transAnimObj.scxList, transAnimObj.scyList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true);
+									this._addAnimationNode(elementXML, "translate", [transAnimObj.xList, transAnimObj.yList], transAnimObj.timeList, timeDur, transAnimObj.splineList, null, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+									this._addAnimationNode(elementXML, "rotate", [transAnimObj.rotList, transAnimObj.trxList, transAnimObj.tryList], transAnimObj.timeList, timeDur, transAnimObj.splineList, null, settings.beginAnimation, settings.repeatCount, forceDiscrete, false);
+									this._addAnimationNode(elementXML, "skewX", [transAnimObj.skxList], transAnimObj.timeList, timeDur, transAnimObj.splineList, null, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+									this._addAnimationNode(elementXML, "skewY", [transAnimObj.skyList], transAnimObj.timeList, timeDur, transAnimObj.splineList, null, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+									this._addAnimationNode(elementXML, "scale", [transAnimObj.scxList, transAnimObj.scyList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true);
 									if(!forceDiscrete){
 										if(combineSkewScales){
-											this._addAnimationNode(elementXML, "scale", [transAnimObj.skyScaleXList, transAnimObj.skxScaleYList], transAnimObj.skxTimeList, timeDur, transAnimObj.skxSplineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true);
+											this._addAnimationNode(elementXML, "scale", [transAnimObj.skyScaleXList, transAnimObj.skxScaleYList], transAnimObj.skxTimeList, timeDur, transAnimObj.skxSplineList, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true);
 										}else{
-											this._addAnimationNode(elementXML, "scale", [transAnimObj.skxScaleXList, transAnimObj.skxScaleYList], transAnimObj.skxTimeList, timeDur, transAnimObj.skxSplineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true);
-											this._addAnimationNode(elementXML, "scale", [transAnimObj.skyScaleXList, transAnimObj.skyScaleYList], transAnimObj.skyTimeList, timeDur, transAnimObj.skySplineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true);
+											this._addAnimationNode(elementXML, "scale", [transAnimObj.skxScaleXList, transAnimObj.skxScaleYList], transAnimObj.skxTimeList, timeDur, transAnimObj.skxSplineList, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true);
+											this._addAnimationNode(elementXML, "scale", [transAnimObj.skyScaleXList, transAnimObj.skyScaleYList], transAnimObj.skyTimeList, timeDur, transAnimObj.skySplineList, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true);
 										}
 									}
-									this._addAnimationNode(elementXML, "translate", [transAnimObj.transXList, transAnimObj.transYList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, null, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+									this._addAnimationNode(elementXML, "translate", [transAnimObj.transXList, transAnimObj.transYList], transAnimObj.timeList, timeDur, transAnimObj.splineList, null, settings.beginAnimation, settings.repeatCount, forceDiscrete);
 								}
 								
 								var hasOpacityAnim = this.hasDifferent(transAnimObj.alphaMList);
@@ -2201,16 +2210,16 @@
 								if((hasOpacityAnim || hasColorAnim) && !isMask){
 									frameHasAnimated = true;
 									if(hasColorAnim){
-										this._addAnimationNode(transAnimObj.colorTransNode.feFuncR, "intercept", [transAnimObj.redOList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, 0, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-										this._addAnimationNode(transAnimObj.colorTransNode.feFuncR, "slope", [transAnimObj.redMList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-										this._addAnimationNode(transAnimObj.colorTransNode.feFuncG, "intercept", [transAnimObj.greenOList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, 0, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-										this._addAnimationNode(transAnimObj.colorTransNode.feFuncG, "slope", [transAnimObj.greenMList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-										this._addAnimationNode(transAnimObj.colorTransNode.feFuncB, "intercept", [transAnimObj.blueOList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, 0, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-										this._addAnimationNode(transAnimObj.colorTransNode.feFuncB, "slope", [transAnimObj.blueMList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-										this._addAnimationNode(transAnimObj.colorTransNode.feFuncA, "intercept", [transAnimObj.alphaOList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, 0, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-										this._addAnimationNode(transAnimObj.colorTransNode.feFuncA, "slope", [transAnimObj.alphaMList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncR, "intercept", [transAnimObj.redOList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 0, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncR, "slope", [transAnimObj.redMList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncG, "intercept", [transAnimObj.greenOList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 0, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncG, "slope", [transAnimObj.greenMList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncB, "intercept", [transAnimObj.blueOList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 0, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncB, "slope", [transAnimObj.blueMList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncA, "intercept", [transAnimObj.alphaOList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 0, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncA, "slope", [transAnimObj.alphaMList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete);
 
-									}else if(hasOpacityAnim && this._addAnimationNode(elementXML, "opacity", [transAnimObj.alphaMList], transAnimObj.timeList, timeDur, transAnimObj.splineList, tweensFound, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete)){
+									}else if(hasOpacityAnim && this._addAnimationNode(elementXML, "opacity", [transAnimObj.alphaMList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete)){
 										if(this.showEndFrame)elementXML.@opacity = lastElement.colorAlphaPercent / 100;
 										transAnimObj.colorTransNode.feFuncA.@slope = 1;
 									}
@@ -2317,6 +2326,7 @@
 					ext.lib.deleteItem(tempName);	
 				}
 			}*/
+						
 			if(isNew){ // set the viewBox
 				if(settings.isRoot && this.clipToScalingGrid && settings.libraryItem){
 					boundingBox=settings.libraryItem.scalingGridRect;
@@ -2720,7 +2730,7 @@
 			xml.prependChild(mg);
 			masked.clear();
 		},
-		_addAnimationNode:function(toNode, type, valueLists, times, totalTime, splineList, tweensFound, defaultValue, beginAnimation, repeatCount, forceDiscrete, validateAllLists){
+		_addAnimationNode:function(toNode, type, valueLists, times, totalTime, splineList, defaultValue, beginAnimation, repeatCount, forceDiscrete, validateAllLists){
 			if(validateAllLists==null)validateAllLists = true;
 			if(defaultValue==null)defaultValue = 0;
 			var getValue = function(valueLists, i){
@@ -2752,11 +2762,15 @@
 				return false;
 			}
 			var n = splineList.length;
+			var hasTweens = false;
 			var hasEasing = false;
 			for(var i=0; i<n; ++i){
 				if(splineList[i]!=this.NO_TWEEN_SPLINE_TOKEN){
-					hasEasing = true;
-					break;
+					hasTweens = true;
+					if(splineList[i]!=this.LINEAR_SPLINE){
+						hasEasing = true;
+						break;
+					}
 				}
 			}
 			while(times.length>splineList.length){
@@ -2776,7 +2790,7 @@
 			}else{
 				var validV = [lastVal,lastVal];
 				var validT = [0,lastTime];
-				var validS = ["0 0 1 1", lastSpline==this.NO_TWEEN_SPLINE_TOKEN ? this.NO_TWEEN_SPLINE : lastSpline];
+				var validS = [this.LINEAR_SPLINE, lastSpline==this.NO_TWEEN_SPLINE_TOKEN ? this.NO_TWEEN_SPLINE : lastSpline];
 			}
 
 			var endPointMode = false;
@@ -2859,7 +2873,7 @@
 			animNode.@keyTimes = validT.join(";");
 			animNode.@values = validV.join(";");
 
-			if(tweensFound && !forceDiscrete){
+			if(hasTweens && !forceDiscrete){
 				if(hasEasing){
 					animNode.@keySplines = validS.join(";");
 					animNode.@calcMode="spline";
@@ -2897,7 +2911,7 @@
 			return this._getFractSpline(frame.tweenEasing/100);
 		},
 		_getFractSpline:function(fract){
-			if(fract==0)return "0 0 1 1";
+			if(fract==0)return this.LINEAR_SPLINE;
 
 			fract = fract * 0.5; // this number determines the severeness of easing (should match flash IDE, between 0-1)
 			var halfFract = fract/2;
@@ -3312,25 +3326,15 @@
 		_getBitmapItem:function(item){
 			var bitmapURI=this._bitmaps[item.name];
 			if(!bitmapURI){
-				/*if(this.timelines.length==1 && (this.timelines[0].frames.length==1 || this.animated)){
-					bitmapURI=this.file.dir+'/'+item.name.basename;
-				}else{
-					bitmapURI=this.file+'/'+item.name;
-					if(
-						FLfile.exists(this.file) &&
-						FLfile.getAttributes(this.file).indexOf("D")<0
-					){
-						FLfile.remove(this.file);
-					}
-					if(!FLfile.exists(this.file)){
-						FLfile.createFolder(this.file);
-					}
-				}*/
 				bitmapURI=this.file+'/'+item.name;
-				var ext=item.sourceFilePath.extension;
-				var re=new RegExp('\.'+ext+'$');
-				if(!re.test(bitmapURI)){
-					bitmapURI+='.'+ext;
+				if(!bitmapURI.extension){
+					var ext = item.sourceFilePath.extension;
+					if(ext){
+						var re=new RegExp('\.'+ext+'$');
+						bitmapURI+='.'+ext;
+					}else{
+						bitmapURI += ".png";
+					}
 				}
 				var success,xml;
 				if(item.sourceFileExists && item.sourceFileIsCurrent){
@@ -3345,15 +3349,20 @@
 					}
 				}else if(FLfile.exists(bitmapURI)){
 					var uniqueFileName=bitmapURI.uniqueFileName;
-					item.exportToFile(uniqueFileName);
-					var compareStr=FLfile.read(bitmapURI);
-					if(FLfile.read(uniqueFileName)==FLfile.read(bitmapURI)){
-						FLfile.remove(uniqueFileName);
+					if(!item.exportToFile(uniqueFileName)){
+						fl.trace("WARNING: Failed to export image to url "+uniqueFileName);
 					}else{
-						bitmapURI=uniqueFileName;
+						var compareStr=FLfile.read(bitmapURI);
+						if(FLfile.read(uniqueFileName)==FLfile.read(bitmapURI)){
+							FLfile.remove(uniqueFileName);
+						}else{
+							bitmapURI=uniqueFileName;
+						}
 					}
 				}else{
-					item.exportToFile(bitmapURI);	
+					if(!item.exportToFile(bitmapURI)){
+						fl.trace("WARNING: Failed to export image to url "+bitmapURI);
+					}
 				}
 				bitmapURI=bitmapURI.relativeTo(this.file.dir);
 				this._bitmaps[item.name]=bitmapURI;
