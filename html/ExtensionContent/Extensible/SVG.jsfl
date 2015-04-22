@@ -2176,8 +2176,9 @@
 								var hasTranslateAnim = this.hasDifferent(transAnimObj.xList, transAnimObj.yList);
 								if(!hasTransformAnim && hasTranslateAnim){
 									for(var m=0; m<transAnimObj.xList.length; m++){
-										transAnimObj.xList[m] += transAnimObj.transXList[m];
-										transAnimObj.yList[m] += transAnimObj.transYList[m];
+										var point = matrix.transformPoint(transAnimObj.transXList[m], transAnimObj.transYList[m], false);
+										transAnimObj.xList[m] = this.precision(transAnimObj.xList[m] + point.x);
+										transAnimObj.yList[m] = this.precision(transAnimObj.yList[m] + point.y);
 										transAnimObj.transXList[m] = 0;
 										transAnimObj.transYList[m] = 0;
 									}
