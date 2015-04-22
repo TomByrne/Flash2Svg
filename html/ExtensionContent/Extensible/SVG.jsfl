@@ -2100,9 +2100,6 @@
 									skewX = this._getClosestRotList(-skewX, transAnimObj.skxList);
 									skewY = this._getClosestRotList(skewY, transAnimObj.skyList);
 
-									fl.trace("\nx: "+skewX+" "+nextElement.skewX);
-									fl.trace("y: "+skewY+" "+nextElement.skewY);
-
 			 						//fl.trace("\nframe: "+nextFrame.startFrame);
 									//addTweenKiller = (nextFrame.tweenType=="none" && (!loopAnim || !isLast));
 									var transPoint = nextElement.getTransformationPoint();

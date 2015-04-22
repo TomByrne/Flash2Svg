@@ -132,6 +132,20 @@
 			return this.currentID+this.length;
 		},
 		/**
+		 * Call process until either there isn't anything left to process or 
+		 * it has taken the amount of time specified
+		 */
+		processFor:function(ms){
+			if(!this.currentTask) return false;
+
+			var endTime = (new Date().getTime()) + ms;
+			do{
+				this.process();
+			} while(this.currentTask && endTime > (new Date().getTime()) )
+
+			return (this.currentTask!=null);
+		},
+		/**
 		 * 
 		 */
 		process:function(){

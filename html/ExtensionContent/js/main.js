@@ -384,7 +384,7 @@ var pendingProcess;
 function processQue(){
 	if(pendingProcess)return;
 	pendingProcess = true;
-	evalScript('extensible.que.process()',
+	evalScript('extensible.que.processFor(80)',
 			function(res) {
 				pendingProcess = false;
 				if(res=="false"){
