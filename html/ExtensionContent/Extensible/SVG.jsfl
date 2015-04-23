@@ -392,7 +392,7 @@
 			return this.doState();
 		},
 		end:function(){
-			this.currentState = STATE_DONE;
+			this.currentState = this.STATE_DONE;
 			this.qData = [];
 		},
 		doState:function(){
@@ -503,6 +503,7 @@
 					isRoot:true,
 					flattenMotion:this.flattenMotion,
 					beginAnimation:this.beginAnimation,
+					beginOffset:0,
 					repeatCount:this.repeatCount,
 					loopTweens:this.loopTweens,
 					discreteEasing:this.discreteEasing
@@ -1383,13 +1384,33 @@
 				includeHiddenLayers:ext.includeHiddenLayers,
 				includeGuides:false,
 				includeGuidedTweens:false,
-				includeGraphicChanges:false
+				includeGraphicChanges:false,
+				deselectItems:false
 			});
 			settings.extend(options);
+			var deselect = settings.deselectItems;
+			if(deselect){
+				// deselection must occur on the original timeline, not a copy or flash crashes
+				var layersVis = [];
+				var layersLocked = [];
+				if(settings.timeline.libraryItem){
+					ext.doc.library.editItem(settings.timeline.libraryItem.name);
+				}else{
+					ext.doc.editScene(ext.doc.timelines.indexOf(settings.timeline.$));
+				}
+			}
+			var ret = false;
 			var f=new ext.Array();
 			var layers=settings.timeline.$.layers;
 			for(var l=0;l<layers.length;l++){
 				var layer = layers[l];
+				if(deselect){
+					layersVis[l] = layer.visible;
+					layersLocked[l] = layer.locked;
+
+					layer.locked = false;
+					layer.visible = true;
+				}
 				if(
 					( layer.visible || settings.includeHiddenLayers ) && 
 					( layer.layerType!='guide' || settings.includeGuides) &&
@@ -1407,21 +1428,39 @@
 								(settings.includeGuidedTweens && frame.tweenType=='motion' && layer.layerType=="guided")
 							) && settings.frame!=frame.startFrame
 						){
-							return true;
+							ret = true;
+							break;
 						}
 						if(settings.includeGraphicChanges && frame.duration>1){
 							var elems = frame.elements;
 							for(var j=0; j<elems.length; ++j){
 								var elem = elems[j];
 								if(elem.symbolType=="graphic" && elem.loop!="single frame"){
-									return true;
+									ret = true;
+									break;
 								}
 							}
 						}
 					}
+					if(ret && !deselect)break;
 				}
 			}
-			return false;	
+			if(deselect){
+				var end = (settings.endFrame+1 < settings.timeline.frameCount ? settings.endFrame+1 : settings.timeline.frameCount)
+				for(var i=settings.startFrame;i<end;i++){
+					settings.timeline.currentFrame = i;
+					if(ext.doc.selection.length){
+						ext.doc.selectNone();
+					}
+				}
+				for(var l=0;l<layers.length;l++){
+					var layer = layers[l];
+					layer.locked = layersLocked[l];
+					layer.visible = layersVis[l];
+				}
+			}
+			if(settings.timeline.libraryItem)ext.doc.exitEditMode();
+			return ret;	
 		},
 		/**
 		 * Retrieves the SVG data corresponding to a timeline.
@@ -1518,7 +1557,8 @@
 						includeGuides:this.includeGuides,
 						includeMotionTweens:true,
 						includeGuidedTweens:true,
-						includeGraphicChanges:true
+						includeGraphicChanges:true,
+						deselectItems:true
 					});
 
 				 var origTimeline = settings.libraryItem;
@@ -1643,6 +1683,8 @@
 					this._symbolList.push(xml);
 					this._symbols[symbolIDString] = xml;
 					this._useNodeMap[id] = [instanceXML];
+				}else{
+					settings.beginAnimation = settings.beginAnimation.split("${root}").join(id);
 				}
 
 				var forceDiscrete = settings.flattenMotion && settings.discreteEasing;
@@ -1653,7 +1695,14 @@
 					var animNode = <animate
 								      attributeName="display"/>;
 
-					if(settings.beginAnimation!="0s")animNode.@begin = settings.beginAnimation;
+					var beginAnim;
+					if(settings.beginAnimation=="0s"){
+						beginAnim = (settings.beginOffset ? settings.beginOffset + "s": "0s");
+					}else{
+						beginAnim = settings.beginAnimation + (settings.beginOffset ? "+" + settings.beginOffset + "s" : "");
+					}
+					if(beginAnim!="0s")animNode.@begin = beginAnim;
+
 					if(settings.repeatCount.charAt(settings.repeatCount.length-1)=="s"){
 						animNode.@repeatDur = settings.repeatCount;
 					}else{
@@ -1853,7 +1902,6 @@
 						}
 
 						var frameHasAnimated = false;
-						var frameDeselected = false;
 
 						for(var j=0; j<items.length; ++j){
 							var element = items[j];
@@ -1865,44 +1913,15 @@
 										animOffset:(settings.animOffset + n - settings.startFrame),
 										frameCount:(frameEnd - n),
 										totalDuration:animDur,
-										beginAnimation:"0s",
+										beginAnimation:settings.beginAnimation,
+										beginOffset:0,
 										repeatCount:settings.repeatCount,
 										loopTweens:false,
 										discreteEasing:this.discreteEasing,
 										flattenMotion:settings.flattenMotion
 									};
 
-							var isShape = (element.elementType=="shape");
-
-							if(isShape && !frameDeselected){
-								if(ext.log){
-									var timer2=ext.log.startTimer('extensible.SVG._getTimeline() >> Deselect all');	
-								}
-								if(settings.libraryItem){
-									ext.doc.library.editItem(timeline.libraryItem.name);
-								}
-								if(timeline.frameCount > 1){
-									timeline.$.currentFrame = n;
-								}
-								if(ext.doc.selection.length){
-									//ext.doc.selectNone(); // crashes flash sometimes
-									fl.getDocumentDOM().selection = [];
-									if(fl.getDocumentDOM().selection.length){
-										fl.trace("WARNING: Failed to deselect objects in timeline "+origTimeline.name+" on layer "+layer.name+" at frame "+(n+1)+". This can cause vector data to be offset, manually deselect to fix.");
-									}
-								}
-
-								timeline.setSelectedFrames(0,0);
-								if(settings.libraryItem){
-									ext.doc.exitEditMode();
-								}
-								if(ext.log){
-									ext.log.pauseTimer(timer2);
-								}
-								frameDeselected = true;
-							}
-
-							if(isShape && settings.referenceShapes){
+							if(element.elementType=="shape" && settings.referenceShapes){
 								elemSettings.lookupName = timelineName+"_"+i+"."+frame.startFrame+(items.length>1?"."+j:"");
 
 							}else if(element.symbolType=="graphic"){
@@ -1913,7 +1932,7 @@
 
 							}else if(element.symbolType=="movie clip"){
 								if((element.libraryItem.timeline.frameCount<(frameEnd-n)) && frameEnd>n+1){
-									elemSettings.beginAnimation = this.precision(elemSettings.animOffset / ext.doc.frameRate)+"s";
+									elemSettings.beginOffset = this.precision(elemSettings.animOffset / ext.doc.frameRate);
 									elemSettings.animOffset = 0;
 									elemSettings.frameCount = element.libraryItem.timeline.frameCount;
 									elemSettings.totalDuration = elemSettings.frameCount;
@@ -2187,20 +2206,20 @@
 								if(hasTransformAnim || hasTranslateAnim){
 									frameHasAnimated = true;
 									// the ordering of these animation nodes is important
-									this._addAnimationNode(elementXML, "translate", [transAnimObj.xList, transAnimObj.yList], transAnimObj.timeList, timeDur, transAnimObj.splineList, null, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-									this._addAnimationNode(elementXML, "rotate", [transAnimObj.rotList, transAnimObj.trxList, transAnimObj.tryList], transAnimObj.timeList, timeDur, transAnimObj.splineList, null, settings.beginAnimation, settings.repeatCount, forceDiscrete, false);
-									this._addAnimationNode(elementXML, "skewX", [transAnimObj.skxList], transAnimObj.timeList, timeDur, transAnimObj.splineList, null, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-									this._addAnimationNode(elementXML, "skewY", [transAnimObj.skyList], transAnimObj.timeList, timeDur, transAnimObj.splineList, null, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-									this._addAnimationNode(elementXML, "scale", [transAnimObj.scxList, transAnimObj.scyList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true);
+									this._addAnimationNode(elementXML, "translate", [transAnimObj.xList, transAnimObj.yList], transAnimObj.timeList, timeDur, transAnimObj.splineList, null, beginAnim, settings.repeatCount, forceDiscrete);
+									this._addAnimationNode(elementXML, "rotate", [transAnimObj.rotList, transAnimObj.trxList, transAnimObj.tryList], transAnimObj.timeList, timeDur, transAnimObj.splineList, null, beginAnim, settings.repeatCount, forceDiscrete, false);
+									this._addAnimationNode(elementXML, "skewX", [transAnimObj.skxList], transAnimObj.timeList, timeDur, transAnimObj.splineList, null, beginAnim, settings.repeatCount, forceDiscrete);
+									this._addAnimationNode(elementXML, "skewY", [transAnimObj.skyList], transAnimObj.timeList, timeDur, transAnimObj.splineList, null, beginAnim, settings.repeatCount, forceDiscrete);
+									this._addAnimationNode(elementXML, "scale", [transAnimObj.scxList, transAnimObj.scyList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 1, beginAnim, settings.repeatCount, forceDiscrete, true);
 									if(!forceDiscrete){
 										if(combineSkewScales){
-											this._addAnimationNode(elementXML, "scale", [transAnimObj.skyScaleXList, transAnimObj.skxScaleYList], transAnimObj.skxTimeList, timeDur, transAnimObj.skxSplineList, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true);
+											this._addAnimationNode(elementXML, "scale", [transAnimObj.skyScaleXList, transAnimObj.skxScaleYList], transAnimObj.skxTimeList, timeDur, transAnimObj.skxSplineList, 1, beginAnim, settings.repeatCount, forceDiscrete, true);
 										}else{
-											this._addAnimationNode(elementXML, "scale", [transAnimObj.skxScaleXList, transAnimObj.skxScaleYList], transAnimObj.skxTimeList, timeDur, transAnimObj.skxSplineList, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true);
-											this._addAnimationNode(elementXML, "scale", [transAnimObj.skyScaleXList, transAnimObj.skyScaleYList], transAnimObj.skyTimeList, timeDur, transAnimObj.skySplineList, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete, true);
+											this._addAnimationNode(elementXML, "scale", [transAnimObj.skxScaleXList, transAnimObj.skxScaleYList], transAnimObj.skxTimeList, timeDur, transAnimObj.skxSplineList, 1, beginAnim, settings.repeatCount, forceDiscrete, true);
+											this._addAnimationNode(elementXML, "scale", [transAnimObj.skyScaleXList, transAnimObj.skyScaleYList], transAnimObj.skyTimeList, timeDur, transAnimObj.skySplineList, 1, beginAnim, settings.repeatCount, forceDiscrete, true);
 										}
 									}
-									this._addAnimationNode(elementXML, "translate", [transAnimObj.transXList, transAnimObj.transYList], transAnimObj.timeList, timeDur, transAnimObj.splineList, null, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+									this._addAnimationNode(elementXML, "translate", [transAnimObj.transXList, transAnimObj.transYList], transAnimObj.timeList, timeDur, transAnimObj.splineList, null, beginAnim, settings.repeatCount, forceDiscrete);
 								}
 								
 								var hasOpacityAnim = this.hasDifferent(transAnimObj.alphaMList);
@@ -2208,16 +2227,16 @@
 								if((hasOpacityAnim || hasColorAnim) && !isMask){
 									frameHasAnimated = true;
 									if(hasColorAnim){
-										this._addAnimationNode(transAnimObj.colorTransNode.feFuncR, "intercept", [transAnimObj.redOList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 0, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-										this._addAnimationNode(transAnimObj.colorTransNode.feFuncR, "slope", [transAnimObj.redMList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-										this._addAnimationNode(transAnimObj.colorTransNode.feFuncG, "intercept", [transAnimObj.greenOList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 0, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-										this._addAnimationNode(transAnimObj.colorTransNode.feFuncG, "slope", [transAnimObj.greenMList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-										this._addAnimationNode(transAnimObj.colorTransNode.feFuncB, "intercept", [transAnimObj.blueOList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 0, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-										this._addAnimationNode(transAnimObj.colorTransNode.feFuncB, "slope", [transAnimObj.blueMList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-										this._addAnimationNode(transAnimObj.colorTransNode.feFuncA, "intercept", [transAnimObj.alphaOList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 0, settings.beginAnimation, settings.repeatCount, forceDiscrete);
-										this._addAnimationNode(transAnimObj.colorTransNode.feFuncA, "slope", [transAnimObj.alphaMList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncR, "intercept", [transAnimObj.redOList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 0, beginAnim, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncR, "slope", [transAnimObj.redMList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 1, beginAnim, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncG, "intercept", [transAnimObj.greenOList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 0, beginAnim, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncG, "slope", [transAnimObj.greenMList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 1, beginAnim, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncB, "intercept", [transAnimObj.blueOList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 0, beginAnim, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncB, "slope", [transAnimObj.blueMList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 1, beginAnim, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncA, "intercept", [transAnimObj.alphaOList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 0, beginAnim, settings.repeatCount, forceDiscrete);
+										this._addAnimationNode(transAnimObj.colorTransNode.feFuncA, "slope", [transAnimObj.alphaMList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 1, beginAnim, settings.repeatCount, forceDiscrete);
 
-									}else if(hasOpacityAnim && this._addAnimationNode(elementXML, "opacity", [transAnimObj.alphaMList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 1, settings.beginAnimation, settings.repeatCount, forceDiscrete)){
+									}else if(hasOpacityAnim && this._addAnimationNode(elementXML, "opacity", [transAnimObj.alphaMList], transAnimObj.timeList, timeDur, transAnimObj.splineList, 1, beginAnim, settings.repeatCount, forceDiscrete)){
 										if(this.showEndFrame)elementXML.@opacity = lastElement.colorAlphaPercent / 100;
 										transAnimObj.colorTransNode.feFuncA.@slope = 1;
 									}
@@ -3538,6 +3557,7 @@
 							frameCount:settings.frameCount,
 							//totalDuration:settings.totalDuration,
 							beginAnimation:settings.beginAnimation,
+							beginOffset:settings.beginOffset,
 							repeatCount:settings.repeatCount,
 							loopTweens:this.loopTweens,
 							discreteEasing:this.discreteEasing,
