@@ -47,6 +47,11 @@
 		  </label>
 		  
 		  <label>
+			  <input id="settings-save-root" type="checkbox"/>
+			  <label for="settings-save-root">SVG Root settings</label>
+		  </label>
+		  
+		  <label>
 			  <input id="settings-save-graphics" type="checkbox"/>
 			  <label for="settings-save-graphics">Graphics settings</label>
 		  </label>
@@ -155,17 +160,6 @@
 		        <span id="output-decimal-hint" class="option-hint"></span>
 		    </label>
 		    <label>
-		        <span>Rendering:</span>
-		        <div class="select-wrapper">
-			        <select id="output-rendering" disabled="disabled">
-		                <option value="auto">Auto</option>
-		                <option value="optimizeSpeed">For Speed</option>
-		                <option value="optimizeQuality">For Quality</option>
-		                <option value="inherit">Inherit</option>
-		            </select>
-		        </div>
-		    </label>
-		    <label>
 		        <span>Expand Symbols:</span>
 		        <div class="select-wrapper">
 			        <select id="output-expand" disabled="disabled">
@@ -192,6 +186,35 @@
 		  		<label for="output-remove-miter">Remove Miter Joins</label>
 		        <span class="option-hint">Fixes Firefox rendering issues</span>
 		    </label>
+		</div>
+		<h3><a href="#">SVG Root</a></h3>
+		<div>
+			<span class="section-help ui-icon ui-icon-help"></span>
+		    <label>
+		        <span>Rendering:</span>
+		        <div class="select-wrapper">
+			        <select id="root-rendering" disabled="disabled">
+		                <option value="auto">Auto</option>
+		                <option value="optimizeSpeed">For Speed</option>
+		                <option value="optimizeQuality">For Quality</option>
+		                <option value="inherit">Inherit</option>
+		            </select>
+		        </div>
+		    </label>
+		    <label>
+		        <span>Scaling:</span>
+		        <div class="select-wrapper">
+			        <select id="root-scaling" disabled="disabled">
+		                <option value="none">None</option>
+		                <option value="contain">Contain within bounds</option>
+		                <option value="crop">Crop to bounds</option>
+		            </select>
+		        </div>
+		    </label>
+		    <!-- <label>
+		        <span>Alignment:</span>
+		        <div id="root-alignment"/>
+		    </label> -->
 		</div>
 		<h3><a href="#">Graphics</a></h3>
 		<div>
@@ -268,21 +291,33 @@
 		        </div>
 		    </label>-->
 		</div>
-		<!-- <h3><a href="#">Preview</a></h3>
+		<h3><a href="#">Preview</a></h3>
 		<div>
-			<div id="preview-frame-bar">
+			<!-- <div id="preview-frame-bar">
 		    	<span>Frame:</span>
 				<span id="preview-prev-button" class="ui-icon ui-icon-carat-1-w"></span>
 				<input id="preview-frame" type="number" value="0" />
 				<span id="preview-next-button" class="ui-icon ui-icon-carat-1-e"></span>
 				<input id="preview-issue" type="button" value="Submit Issue" />
+			</div> -->
+			<div id="preview-action-bar">
+				<span id="preview-reload-button" class="ui-button" onclick="doReloadPreview()" disabled="disabled">
+			 		<span class="ui-icon ui-icon-arrowrefresh-1-w" title="Reload Preview" onclick="doReloadPreview()"></span>
+			 	</span>
+				<a id="preview-filename" onclick="doOpenExport()"></a>
 			</div>
 			<div id="preview-area">
+				<iframe id="preview-img" type="image/svg+xml" src=""></iframe>
+				<span id="preview-browser"></span>
 			</div>
-			<div id="preview-expander">
+			<!-- <div id="preview-progress">
+				<div class="ui-progressbar-value"></div>
+				<div id="preview-progress-label" class="preview-label"></div>
+			</div> -->
+			<!-- <div id="preview-expander">
 				<span class="ui-icon ui-icon-grip-dotted-horizontal"></span>
-			</div>
-		</div> -->
+			</div> -->
+		</div>
 	</div>
 </div>
 	

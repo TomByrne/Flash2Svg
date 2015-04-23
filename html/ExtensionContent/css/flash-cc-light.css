@@ -7,7 +7,7 @@
 body{
 	color: #484848;
 }
-.ui-state-default, input[type="submit"], input[type="button"], input[type="checkbox"],
+.ui-state-default, .ui-button, input[type="submit"], input[type="button"], input[type="checkbox"],
 .ui-widget-content .ui-state-default,
 .ui-widget-header .ui-state-default,
 .ui-widget-content .ui-state-active,

@@ -73,6 +73,7 @@ Settings.FILE = "file";
 Settings.PRECISION = "decimalPointPrecision";
 Settings.EXPAND_SYMBOLS = "expandSymbols";
 Settings.RENDERING = "rendering";
+Settings.ROOT_SCALING = "rootScaling";
 Settings.CONVERT_PATTERNS = "convertPatternsToSymbols";
 Settings.APPLY_TRANSFORMS = "applyTransformations";
 Settings.APPLY_EFFECTS = "applyColorEffects";

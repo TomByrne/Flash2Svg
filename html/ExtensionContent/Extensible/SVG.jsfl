@@ -33,6 +33,7 @@
 			decimalPointPrecision:3,
 			expandSymbols:'usedOnce', // 'nested', 'all', 'none', 'usedOnce'
 			rendering:'auto', // 'auto', 'optimizeSpeed', 'optimizeQuality', 'inherit'
+			rootScaling:"none", // 'none', 'contain', 'crop'
 			tweenType:null, // 'highKeyframe', 'highAllFrames', 'low'
 			convertPatternsToSymbols:true,
 			applyTransformations:true,
@@ -483,6 +484,11 @@
 			if(this.includeBackground){
 				xml['@style']="background-color:"+this.backgroundColor;
 			}
+			if(this.rootScaling=="contain"){
+				xml['@preserveAspectRatio'] = "xMidYMid meet";
+			}else if(this.rootScaling=="crop"){
+				xml['@preserveAspectRatio'] = "xMidYMid slice";
+			}
 			xml['@x']=String(this.x)+'px';
 			xml['@y']=String(this.y)+'px';
 			xml['@width']=String(this.width)+'px';
@@ -845,7 +851,9 @@
 					}
 					delete document.@transform;
 				}
-				//document['@viewBox']=String(this.x)+' '+String(this.y)+' '+String(this.width)+' '+String(this.height);
+				if(document.@preserveAspectRatio.length()){
+					document['@viewBox']=String(this.x)+' '+String(this.y)+' '+String(this.width)+' '+String(this.height);
+				}
 				document.@width = this.width;
 				document.@height = this.height;
 
@@ -866,6 +874,7 @@
 					fl.trace("WARNING: Miter joins display incorrectly in current versions of Firefox (Oct 2014)");
 				}
 
+				ext.SVG.lastExportPath = timeline.filePath;
 				fl.trace("finalise: "+timeline.filePath);
 				this.qData.push(closure(this.processFixUseLinks, [outputObject], this));
 				this.qData.push(closure(this.processCompactColours, [outputObject], this));
@@ -1688,6 +1697,7 @@
 				}
 
 				var forceDiscrete = settings.flattenMotion && settings.discreteEasing;
+				var animDur;
 
 				if(this.animated){
 					var totFrames = (settings.endFrame - settings.startFrame);
@@ -1931,14 +1941,13 @@
 								elemSettings.startFrame = this._getPriorFrame(element.timeline, childFrame);
 
 							}else if(element.symbolType=="movie clip"){
-								if((element.libraryItem.timeline.frameCount<(frameEnd-n)) && frameEnd>n+1){
+								if((element.libraryItem.timeline.frameCount<(frameEnd-n)) && frameEnd>n+1 && settings.repeatCount!="indefinite"){
+									// this changes from an animation with the same duration as the parent timeline to one with a shorter duration (and a repearDur)
 									elemSettings.beginOffset = this.precision(elemSettings.animOffset / ext.doc.frameRate);
 									elemSettings.animOffset = 0;
 									elemSettings.frameCount = element.libraryItem.timeline.frameCount;
 									elemSettings.totalDuration = elemSettings.frameCount;
-									if(settings.repeatCount!="indefinite"){
-										elemSettings.repeatCount = this.precision((frameEnd - n) / ext.doc.frameRate)+"s";
-									}
+									elemSettings.repeatCount = this.precision((frameEnd - n) / ext.doc.frameRate)+"s";
 								}
 							}
 							if(element.instanceType=="symbol" && element.blendMode!="normal"){

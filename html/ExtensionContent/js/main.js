@@ -22,8 +22,12 @@ var inputs;
 var savePresetPanel;
 var saveSourceSettings;
 var saveOutputSettings;
+var saveRootSettings;
 var saveGraphicsSettings;
 var saveAnimationSettings;
+var previewReloadButton;
+var previewFilename;
+var previewBrowser;
 
 var timelineSettingsStr;
 var dir;
@@ -55,6 +59,7 @@ function onLoaded() {
 	savePresetName = $("#settings-save-name");
 	saveSourceSettings = $("#settings-save-source");
 	saveOutputSettings = $("#settings-save-output");
+	saveRootSettings = $("#settings-save-root");
 	saveGraphicsSettings = $("#settings-save-graphics");
 	saveAnimationSettings = $("#settings-save-animation");
 	
@@ -80,6 +85,20 @@ function onLoaded() {
 	autoSaveSetting = $("#settings-autosave");
 	saveSettingsButton = $("#settings-save");
 	loadSettingsButton = $("#settings-load");
+
+    previewFilename = $( "#preview-filename" );
+    previewBrowser = $( "#preview-browser" );
+    previewReloadButton = $( "#preview-reload-button" );
+
+    var version = 0;
+   
+    var regexp = /WebKit\/([\d.]+)/;
+    var result = regexp.exec(navigator.userAgent);
+    if(result) {
+    	previewBrowser.text("WebKit: "+parseFloat(result[1]));
+    }else{
+    	previewBrowser.text(navigator.userAgent);
+    }
 	
 	progBar.progressbar({value:0});
     accordion.multiAccordion({active:[],
@@ -227,7 +246,8 @@ function bindSettings(){
 	ControlBinder.bind(this.settings, Settings.END_FRAME, frameRangeEnd);
 	ControlBinder.bind(this.settings, Settings.OUTPUT, outputType);
 	ControlBinder.bind(this.settings, Settings.PRECISION, decimalInput);
-	ControlBinder.bind(this.settings, Settings.RENDERING, $("#output-rendering"));
+	ControlBinder.bind(this.settings, Settings.RENDERING, $("#root-rendering"));
+	ControlBinder.bind(this.settings, Settings.ROOT_SCALING, $("#root-scaling"));
 	ControlBinder.bind(this.settings, Settings.EXPAND_SYMBOLS, $("#output-expand"));
 	ControlBinder.bind(this.settings, Settings.REMOVE_GROUPS, $("#output-ungroup"));
 	ControlBinder.bind(this.settings, Settings.COMPACT_OUTPUT, $("#output-compact"));
@@ -300,9 +320,8 @@ function createLoader(uri, onComplete, index){
 var isExportReady = false;
 function setProgressState(ready, stateLabel, value, max){
 	isExportReady = ready;
-	if(hasDocument){
-		exportButton.prop('disabled', !isExportReady);
-	}
+	if(hasDocument)exportButton.prop('disabled', !isExportReady);
+	if(hasPreview)previewReloadButton.prop('disabled', !isExportReady);
 	progLabel.text(stateLabel);
 	progBar.progressbar( "option", "value", value );
 	progBar.progressbar( "option", "max", max );
@@ -390,11 +409,49 @@ function processQue(){
 				if(res=="false"){
 					setProgressState(true, "", 0, 0);
 					setProcessing(false);
+					loadLastExport();
 				}else{
 					intervalID = setTimeout(processQue, 20);
 				}
 			}
 	);
+}
+
+/** Loads the last export into the preview panel **/
+var hasPreview;
+var lastExportPath;
+function setPreviewData(url){
+	lastExportPath = url;
+
+	$("#preview-img").attr("src", url);
+
+	hasPreview = (url && url!="");
+	previewReloadButton.prop('disabled', !isExportReady && hasPreview);
+
+	if(hasPreview){
+		previewFilename.text(url.substring(url.lastIndexOf('/')+1));
+	}else{
+		previewFilename.text("");
+	}
+}
+
+var platform = navigator.platform.toLowerCase();
+var openCommand = (platform.indexOf("mac")!=-1 ? "open" : (platform.indexOf("win")!=-1 ? "explorer" : "gnome-open"));
+
+/*function doOpenExport(){
+	if(!hasPreview)return;
+	var ret = window.cep.process.createProcess(openCommand, lastExportPath); 
+}*/
+function loadLastExport(){
+	evalScript('extensible.SVG.lastExportPath',
+			function(res) {
+				res = decodeURI(res).replace("file:///", "file://").replace("|", ":");
+				setPreviewData(res);
+			}
+	);
+}
+function doReloadPreview(){
+	setPreviewData(lastExportPath);
 }
 
 
@@ -477,7 +534,11 @@ function doLoadSettings(onComplete){
 }
 
 
-function doShowSavePanel(){
+function doShowSavePanel(e){
+	if(e && e.ctrlKey){
+		window.location.reload();
+		return;
+	}
 	if(savePresetPanel.is(":visible") ){
 		doCancelPreset();
 		return;
@@ -485,6 +546,7 @@ function doShowSavePanel(){
 	savePresetName.val("");
 	saveSourceSettings.prop("checked", true);
 	saveOutputSettings.prop("checked", true);
+	saveRootSettings.prop("checked", true);
 	saveGraphicsSettings.prop("checked", true);
 	saveAnimationSettings.prop("checked", true);
 	
@@ -506,6 +568,7 @@ function doSavePreset(){
 
 	var source = saveSourceSettings.prop("checked");
 	var output = saveOutputSettings.prop("checked");
+	var root = saveRootSettings.prop("checked");
 	var graphics = saveGraphicsSettings.prop("checked");
 	var animation = saveAnimationSettings.prop("checked");
 	
@@ -518,11 +581,14 @@ function doSavePreset(){
 		props.push(Settings.OUTPUT);
 		props.push(Settings.FILE);
 		props.push(Settings.PRECISION);
-		props.push(Settings.RENDERING);
 		props.push(Settings.EXPAND_SYMBOLS);
 		props.push(Settings.REMOVE_GROUPS);
 		props.push(Settings.COMPACT_OUTPUT);
 		props.push(Settings.AVOID_MITER);
+	}
+	if(root){
+		props.push(Settings.RENDERING);
+		props.push(Settings.ROOT_SCALING);
 	}
 	if(graphics){
 		props.push(Settings.MASKING_TYPE);

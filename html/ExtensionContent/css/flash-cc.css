@@ -777,7 +777,7 @@ body .ui-tooltip {
 	font-size:1em;
 }
 
-.ui-widget-content a {
+.ui-widget-content>a {
 color:#333;
 }
 
@@ -918,6 +918,7 @@ body{
     font-size: 0.6em;
     margin: 0px;
 }
+.ui-button:disabled,
 input:disabled,
 select:disabled{
 	opacity: 0.4;
@@ -1196,6 +1197,7 @@ h3 {
 /* Interaction states
 ----------------------------------*/
 .ui-state-default,
+.ui-button,
 .ui-widget-content .ui-state-default,
 .ui-widget-header .ui-state-default,
 .ui-widget-content .ui-state-active,
