@@ -3,6 +3,9 @@
 	background: #424242;
 	border-bottom: 1px solid #111;
 }
+#preview-area{
+	background-image: url(img/preview-grid-dark.png);
+}
 
 body{
 	color: #d5d5d5;
@@ -90,9 +93,9 @@ input:focus{
 }
 
 ::-webkit-scrollbar {
-	border-color: #020202;
+	border: 2px solid #333333;
 	background: #383838;
-	outline-color: #333333;
+	outline-color: #020202;
 }
 ::-webkit-scrollbar-thumb{
 	background: #424242;
