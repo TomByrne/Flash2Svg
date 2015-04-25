@@ -255,6 +255,8 @@ function bindSettings(){
 	ControlBinder.bind(this.settings, Settings.MASKING_TYPE, $("#graphics-masks"));
 	ControlBinder.bind(this.settings, Settings.CURVE_DEGREE, $("#graphics-curves"));
 	ControlBinder.bind(this.settings, Settings.CONVERT_PATTERNS, $("#graphics-patterns"));
+	//ControlBinder.bind(this.settings, Settings.CONVERT_TEXT_TO_OUTLINES, $("#text-outlines"));
+	ControlBinder.bind(this.settings, Settings.EMBED_IMAGES, $("#images-embed"));
 	ControlBinder.bind(this.settings, Settings.INCLUDE_BG, $("#graphics-background"));
 	ControlBinder.bind(this.settings, Settings.LOOP, loopCheckbox);
 	ControlBinder.bind(this.settings, Settings.LOOP_TWEENS, loopTweensCheckbox);
@@ -383,7 +385,7 @@ function doExport(){
 		doSaveSettings();
 	}
 	var settings = this.settings.stringify({file:fileNameInput.attr("placeholder")});
-	evalScript('extensible.que.push( new extensible.SVG('+settings+'))');
+	evalScript('extensible.que.push( extensible.SVG.inst = new extensible.SVG('+settings+'))');
 	setProgressState(false, "Exporting", false, 0);
 	setProcessing(true);
 }
@@ -407,8 +409,6 @@ function processQue(){
 			function(res) {
 				pendingProcess = false;
 				if(res=="false"){
-					setProgressState(true, "", 0, 0);
-					setProcessing(false);
 					loadLastExport();
 				}else{
 					intervalID = setTimeout(processQue, 20);
@@ -417,41 +417,106 @@ function processQue(){
 	);
 }
 
+function loadLastExport(){
+	evalScript('extensible.SVG.inst.getExportedPaths()',
+			function(res) {
+				exportedPaths = JSON.parse(res.split("\\").join("\\\\"));
+				hasPreview = (exportedPaths && exportedPaths.length);
+				firstExportUri = hasPreview ? exportedPaths[0].uri : null;
+
+				if(this.settings.getProp("embedImages")){
+					embedImagery();
+				}else{
+					finishExport();
+				}
+			}
+	);
+}
+
+function embedImagery(){
+	for(var x=0; x<exportedPaths.length; x++){
+		var path = exportedPaths[x].path;
+		var dir;
+		if(unixFS){
+			dir = path.substring(0, path.lastIndexOf("/")+1);
+		}else{
+			dir = path.substring(0, path.lastIndexOf("\\")+1);
+		}
+		var result = window.cep.fs.readFile(path);
+		if (result.err == 0) {
+			var data = result.data;
+			var xml = $($.parseXML( data ));
+			var imageNodes = xml.find("image");
+			var changed = false;
+			var done = {};
+			for(var i=0; i<imageNodes.length; i++){
+				var node = $(imageNodes[i]);
+				var relative = node.attr("xlink:href");
+				if(done[relative])continue;
+				done[relative] = true;
+
+				var correctedRel = relative;
+				if(!unixFS)correctedRel = correctedRel.split("/").join("\\");
+
+				var imgPath = dir + correctedRel;
+
+				var b64 = window.cep.fs.readFile(imgPath, window.cep.encoding.Base64);
+				if (0 == b64.err) {
+					var b64Data = b64.data.split("\n").join("");
+					data = data.split(relative).join("data:image/png;base64,"+b64Data);
+					changed = true;
+				}else {
+					evalScript('fl.trace( "Failed to load image for embedding: '+imgPath+'")');
+				}
+			}
+			if(changed){
+				var writeRes = window.cep.fs.writeFile(path, data);
+				if (writeRes.err == 0) {
+					// yay
+				}
+				else {
+					evalScript('fl.trace( "Failed to write SVG for embedding: '+path+'")');
+				}
+			}
+		}else {
+			evalScript('fl.trace( "Failed to load SVG for embedding")');
+		}
+	}
+	finishExport();
+}
+
+function finishExport(){
+	loadPreviewData();
+	setProgressState(true, "", 0, 0);
+	setProcessing(false);
+}
+
 /** Loads the last export into the preview panel **/
 var hasPreview;
-var lastExportPath;
-function setPreviewData(url){
-	lastExportPath = url;
+var exportedPaths;
+var firstExportUri;
+function loadPreviewData(){
 
-	$("#preview-img").attr("src", url);
-
-	hasPreview = (url && url!="");
+	$("#preview-img").attr("src", firstExportUri);
 	previewReloadButton.prop('disabled', !isExportReady && hasPreview);
 
 	if(hasPreview){
-		previewFilename.text(url.substring(url.lastIndexOf('/')+1));
+		previewFilename.text(firstExportUri.substring(firstExportUri.lastIndexOf('/')+1));
 	}else{
 		previewFilename.text("");
 	}
 }
 
 var platform = navigator.platform.toLowerCase();
-var openCommand = (platform.indexOf("mac")!=-1 ? "open" : (platform.indexOf("win")!=-1 ? "explorer" : "gnome-open"));
+var unixFS = (platform.indexOf("win")==-1);
+//var openCommand = (platform.indexOf("mac")!=-1 ? "open" : (platform.indexOf("win")!=-1 ? "explorer" : "gnome-open"));
 
-/*function doOpenExport(){
+function doOpenExport(){
 	if(!hasPreview)return;
-	var ret = window.cep.process.createProcess(openCommand, lastExportPath); 
-}*/
-function loadLastExport(){
-	evalScript('extensible.SVG.lastExportPath',
-			function(res) {
-				res = decodeURI(res).replace("file:///", "file://").replace("|", ":");
-				setPreviewData(res);
-			}
-	);
+	window.cep.util.openURLInDefaultBrowser(firstExportUri);
 }
 function doReloadPreview(){
-	setPreviewData(lastExportPath);
+	loadPreviewData();
 }
 
 
@@ -595,6 +660,8 @@ function doSavePreset(){
 		props.push(Settings.CURVE_DEGREE);
 		props.push(Settings.CONVERT_PATTERNS);
 		props.push(Settings.INCLUDE_BG);
+		//props.push(Settings.CONVERT_TEXT_TO_OUTLINES);
+		props.push(Settings.EMBED_IMAGES);
 	}
 	if(animation){
 		props.push(Settings.TWEEN_TYPE);

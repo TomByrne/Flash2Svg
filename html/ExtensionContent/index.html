@@ -27,7 +27,7 @@
 	 <div class="select-wrapper">
 	    <select id="settings-select" name="source" title="Load settings" onchange="onPresetSelected()"></select>
 	 </div>
-	 <span id="settings-save-button" class="ui-icon ui-icon-plus" title="Save settings" onclick="doShowSavePanel()"></span>
+	 <span id="settings-save-button" class="ui-icon ui-icon-plus" title="Save settings" onclick="doShowSavePanel(event)"></span>
 	 <div id="settings-add-panel" style="display:none;">
 		  
 		  <h3>Preset name:</h3>
@@ -241,6 +241,14 @@
 		    <label>
 		  		<input id="graphics-patterns" type="checkbox" disabled="disabled"/>
 		  		<label for="graphics-patterns">Convert patterns to Symbols</label>
+		    </label>
+		    <!--<label>
+		  		<input id="text-outlines" type="checkbox" disabled="disabled"/>
+		  		<label for="text-outlines">Convert text to outlines</label>
+		    </label>-->
+		    <label>
+		  		<input id="images-embed" type="checkbox" disabled="disabled"/>
+		  		<label for="images-embed">Embed images</label>
 		    </label>
 		    <label>
 		  		<input id="graphics-background" type="checkbox" disabled="disabled"/>

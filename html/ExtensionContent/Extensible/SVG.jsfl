@@ -874,7 +874,6 @@
 					fl.trace("WARNING: Miter joins display incorrectly in current versions of Firefox (Oct 2014)");
 				}
 
-				ext.SVG.lastExportPath = timeline.filePath;
 				fl.trace("finalise: "+timeline.filePath);
 				this.qData.push(closure(this.processFixUseLinks, [outputObject], this));
 				this.qData.push(closure(this.processCompactColours, [outputObject], this));
@@ -887,6 +886,18 @@
 			if(ext.log){
 				ext.log.pauseTimer(timer);
 			}
+		},
+		getExportedPaths:function(){
+			var ret = "[";
+			for(var k=0; k<this.timelines.length;k++){
+				var timeline = this.timelines[k];
+				var uri = timeline.filePath.replace("file:///", "file://").replace("|", ":");
+				var path = FLfile.uriToPlatformPath(timeline.filePath);
+
+				ret += '{"uri":"'+uri+'","path":"'+path+'"}';
+			}
+			ret += "]";
+			return ret;
 		},
 		processFixUseLinks:function(outputObj){
 			if(ext.log){
@@ -4128,8 +4139,11 @@
 					}catch(e){}
 				}
 				ext.doc.union();
-				//options.matrix=matrix.concat(tempMatrix.invert()).concat(options.matrix);
-				options.matrix = fl.Math.concatMatrix(fl.Math.concatMatrix(matrix, tempMatrix.invert()), options.matrix);
+				var mat = fl.Math.concatMatrix(matrix, tempMatrix.invert());
+				if(options.matrix){
+					mat = fl.Math.concatMatrix(mat, options.matrix);
+				}
+				options.matrix = mat;
 				var xml=this._getShape(currentTimeline.layers[tempLayerIndex].elements[0],options);
 				currentTimeline.deleteLayer(tempLayerIndex);
 				element.removePersistentData(id);
@@ -4137,6 +4151,8 @@
 					ext.log.pauseTimer(timer);	
 				}
 				return xml;
+			}else{
+				xml = new XML("<text x='"+element.x+"' y='"+element.y+"' width='"+element.width+"' height='"+element.height+"' fill='"+element.$.getTextAttr("fillColor")+"'>"+element.$.getTextString()+"</text>");
 			}
 			return xml;
 		},

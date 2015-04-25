@@ -91,6 +91,7 @@ Settings.INCLUDE_BG = "includeBackground";
 Settings.INCLUDE_HIDDEN_LAYERS = "includeHiddenLayers";
 Settings.INCLUDE_GUIDES = "includeGuides";
 Settings.CONVERT_TEXT_TO_OUTLINES = "convertTextToOutlines";
+Settings.EMBED_IMAGES = "embedImages";
 Settings.SELECTION = "selection";
 Settings.TRACE_LOG = "traceLog";
 Settings.BEGIN_ANIMATION = "beginAnimation";
