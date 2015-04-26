@@ -4,7 +4,8 @@
 - Bevel filter
 - Gradient bevel filter
 - Gradient Glow filter
-- Text (not as shapes)
+- Primative Shape support (rect, circle, etc)
+- Detect rectangle paths and use primative shape
 
 ##Enhancements
 - Add option to embed imagery (base64)

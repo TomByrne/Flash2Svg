@@ -255,7 +255,7 @@ function bindSettings(){
 	ControlBinder.bind(this.settings, Settings.MASKING_TYPE, $("#graphics-masks"));
 	ControlBinder.bind(this.settings, Settings.CURVE_DEGREE, $("#graphics-curves"));
 	ControlBinder.bind(this.settings, Settings.CONVERT_PATTERNS, $("#graphics-patterns"));
-	//ControlBinder.bind(this.settings, Settings.CONVERT_TEXT_TO_OUTLINES, $("#text-outlines"));
+	ControlBinder.bind(this.settings, Settings.CONVERT_TEXT_TO_OUTLINES, $("#text-outlines"));
 	ControlBinder.bind(this.settings, Settings.EMBED_IMAGES, $("#images-embed"));
 	ControlBinder.bind(this.settings, Settings.INCLUDE_BG, $("#graphics-background"));
 	ControlBinder.bind(this.settings, Settings.LOOP, loopCheckbox);
@@ -660,7 +660,7 @@ function doSavePreset(){
 		props.push(Settings.CURVE_DEGREE);
 		props.push(Settings.CONVERT_PATTERNS);
 		props.push(Settings.INCLUDE_BG);
-		//props.push(Settings.CONVERT_TEXT_TO_OUTLINES);
+		props.push(Settings.CONVERT_TEXT_TO_OUTLINES);
 		props.push(Settings.EMBED_IMAGES);
 	}
 	if(animation){

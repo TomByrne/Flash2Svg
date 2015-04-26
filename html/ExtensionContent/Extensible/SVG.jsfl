@@ -4152,9 +4152,208 @@
 				}
 				return xml;
 			}else{
-				xml = new XML("<text x='"+element.x+"' y='"+element.y+"' width='"+element.width+"' height='"+element.height+"' fill='"+element.$.getTextAttr("fillColor")+"'>"+element.$.getTextString()+"</text>");
+				var text = element.$;
+				var textRuns = text.textRuns;
+				var mat = element.matrix.clone();
+				var skX = text.skewX;
+				var skY = text.skewY;
+				var rot = text.rotation;
+				var scX = text.scaleX;
+				var scY = text.scaleY;
+				text.skewX = 0;
+				text.skewY = 0;
+				text.rotation = 0;
+				text.scaleX = 1;
+				text.scaleY = 1;
+				var width = text.width;
+				var height = text.height;
+				element.matrix = mat;
+
+				var lineSpacing = textRuns[0].textAttrs.lineSpacing * 8.5/10;
+
+				height += lineSpacing;
+
+				var xml = new XML("<foreignObject width='"+(width+1)+"' height='"+(height+1)+"'></foreignObject>");
+
+
+				/*if(textRuns.length==1){
+					xml.appendChild(new XML("<span xmlns='http://www.w3.org/1999/xhtml'"+this._getTextRunAttrs(textRuns[0].textAttrs)+">"+textRuns[0].characters+"</span>"));*/
+
+				if(text.textType=="input"){
+					xml.appendChild(new XML("<input xmlns='http://www.w3.org/1999/xhtml'"+this._getTextFieldAttrs(text, width, height, textRuns[0].textAttrs, true, true)+" value='"+textRuns[0].characters+"'></input>"));
+				}else if(textRuns.length==1 && !textRuns[0].textAttrs.url){
+					var textRun = textRuns[0];
+					var textAttrs = textRun.textAttrs;
+					var openTags = "";
+					var closeTags = "";
+					if(textRun.textAttrs.characterPosition=="subscript"){
+						openTags = "<sub>"+openTags;
+						closeTags = closeTags+"</sub>";
+					}else if(textRun.textAttrs.characterPosition=="superscript"){
+						openTags = "<sup>"+openTags;
+						closeTags = closeTags+"</sup>";
+					}
+					xml.appendChild(new XML("<div xmlns='http://www.w3.org/1999/xhtml'"+this._getTextFieldAttrs(text, width, height, textAttrs, true, false)+">"+openTags+textRun.characters+closeTags+"</div>"));
+				}else{
+					var cont = new XML("<div xmlns='http://www.w3.org/1999/xhtml'"+this._getTextFieldAttrs(text, width, height, textRuns[0].textAttrs)+"></div>");
+					for(var i=0; i<textRuns.length; i++){
+						var textRun = textRuns[i];
+						var tag;
+						if(textRun.textAttrs.url!=null){
+							tag = "a";
+						}else{
+							tag = "span";
+						}
+						var openTag = "<"+tag;
+						var closeTag = "</"+tag+">";
+						if(textRun.textAttrs.characterPosition=="subscript"){
+							openTag = "<sub>"+openTag;
+							closeTag = closeTag+"</sub>";
+						}else if(textRun.textAttrs.characterPosition=="superscript"){
+							openTag = "<sup>"+openTag;
+							closeTag = closeTag+"</sup>";
+						}
+						var span = new XML(openTag+this._getTextRunAttrs(textRun.textAttrs)+">"+textRun.characters+closeTag);
+						cont.appendChild(span)
+					}
+					xml.appendChild(cont);
+				}
+				/*var mat = fl.Math.concatMatrix(matrix, tempMatrix.invert());
+				if(options.matrix){
+					mat = fl.Math.concatMatrix(mat, options.matrix);
+				}*/
+				var offset = mat.transformPoint(0, -lineSpacing * 1/2, false);
+				mat.tx += offset.x;
+				mat.ty += offset.y;
+				if(mat.a==1 && mat.b==0 && mat.c==0 && mat.d==1){
+					if(mat.tx!=0)xml['@x'] = mat.tx;
+					if(mat.ty!=0)xml['@y'] = mat.ty;
+				}else{
+					xml['@transform'] = this._getMatrix(mat);
+				}
 			}
 			return xml;
+		},
+		_getTextFieldAttrs:function(textElem, width, height, textAttrs, getAttrs, isInput){
+			var ret;
+			var style;
+			if(getAttrs){
+				var obj = this._getTextRunAttrs(textAttrs, true);
+				ret = obj.attrs;
+				style = obj.styles;
+			}else{
+				ret = "";
+				style = "";
+			}
+			if(textElem.textType!="static" && textElem.border){
+				style += "box-sizing:border-box;";
+				style += "border:1px solid #000;";
+				style += "background:#FFF;";
+			}else if(isInput){
+				style += "box-sizing:border-box;";
+				style += "border:none;";
+				style += "background:none;";
+			}
+			if(isInput && textElem.lineType=="password"){
+				ret += " type='password'";
+			}else if(textElem.textType!="static"){
+				if(textElem.lineType=="multiline no wrap")style += "white-space: pre;"
+				else if(textElem.lineType=="single line")style += "white-space: nowrap;"
+			}
+			if(isInput && textElem.maxCharacters > 0){
+				ret += " maxlength='"+textElem.maxCharacters+"'";
+			}
+			if(!textElem.selectable){
+				style += "cursor:default;";
+				style += "-webkit-touch-callout:none;"
+			    style += "-webkit-user-select:none;"
+			    style += "-moz-user-select:none;"
+			    style += "-ms-user-select:none;"
+			    style += "user-select:none;"
+			}
+			style += "width:"+width+"px;";
+			style += "height:"+height+"px;";
+
+			if(textElem.orientation != "horizontal"){
+				var hor = (textElem.orientation=="vertical left to right" ? "lr" : "rl");
+
+				style += "-ms-writing-mode: tb-"+hor+";";
+				style += "-webkit-writing-mode: vertical-"+hor+";";
+				style += "-moz-writing-mode: vertical-"+hor+";";
+				style += "-ms-writing-mode: vertical-"+hor+";";
+				style += "writing-mode: vertical-"+hor+";";
+
+				if(!textAttrs.rotation){
+					style += "-webkit-text-orientation: upright;";
+					style += "-moz-text-orientation: upright;";
+					style += "-ms-text-orientation: upright;";
+					style += "text-orientation: upright;";
+				}
+			}
+
+			if(textAttrs.indent){
+				style += "text-indent:"+textAttrs.indent+"px;";
+			}
+			if(style.length){
+				ret += " style='"+style+"'";
+			}
+			return ret;
+		},
+		_getTextRunAttrs:function(textAttrs, returnObj){
+			var ret = "";
+			var style = "";
+			var size = textAttrs.size * 3/4;
+			if(textAttrs.characterPosition=="subscript" || textAttrs.characterPosition=="superscript"){
+				size *= 3/5;
+			}
+			if(textAttrs.fillColor!="#000"){
+				style += "color:"+textAttrs.fillColor+";";
+			}
+			if(textAttrs.alignment!="left"){
+				style += "text-align:"+textAttrs.alignment+";";
+			}
+			if(textAttrs.lineSpacing!=0){
+				style += "line-height:"+(size + (textAttrs.lineSpacing * 8.5/10))+"pt;";
+			}
+			if(textAttrs.leftMargin!=0){
+				style += "padding-left:"+textAttrs.leftMargin+"px;";
+			}
+			if(textAttrs.rightMargin!=0){
+				style += "padding-right:"+textAttrs.rightMargin+"px;";
+			}
+			if(textAttrs.letterSpacing!=0){
+				style += "letter-spacing:"+textAttrs.letterSpacing+"pt;";
+			}
+			if(textAttrs.bold){
+				style += "font-weight:bold;";
+			}
+			if(textAttrs.italic){
+				style += "font-style:italic;";
+			}
+			if(textAttrs.url){
+				ret += " href='"+textAttrs.url+"'";
+				if(textAttrs.target){
+					ret += " target='"+textAttrs.target+"'";
+				}
+			}
+			if(textAttrs.face){
+				var face = textAttrs.face;
+				if(face=="_typewriter")face = "Courier New, Courier, monospace";
+				else if(face=="_serif")face = "Times New Roman, Times, serif";
+				else if(face=="_sans")face = "Arial, Helvetica, sans-serif";
+				style += "font-family:"+face+";";
+			}
+			//if(textAttrs.bold){
+				style += "font-size:"+size+"pt;";
+			//}
+
+			if(returnObj){
+				return {attrs:ret, styles:style};
+			}
+			if(style.length){
+				ret += " style='"+style+"'";
+			}
+			return ret;
 		},
 		_applyMatrix:function(toNode, transStr, transMat, upwards){
 			if(!toNode.@transform.length()){
