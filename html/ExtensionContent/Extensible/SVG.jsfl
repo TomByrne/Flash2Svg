@@ -1883,8 +1883,8 @@
 									if(nextFrame.startFrame==frameEnd){
 										// keyframe
 										var nextElem = nextFrame.elements[0];
-										if(nextFrame.elements.length!=1 ||
-											(nextElem.libraryItem!=mainElem.libraryItem && (lastFrame.startFrame==frameEnd-1 || lastFrame.tweenType=='none'))){ // tweening to a different symbol with no frames between, do not tween
+										if(!nextElem || nextFrame.elements.length!=1 ||
+											(nextElem.libraryItem!=mainElem.libraryItem && lastFrame.tweenType=='none')){ // tweening to a different symbol with no tween between, do not tween
 											break; // tweening to incompatible frame
 
 										}else if(nextElem.libraryItem!=mainElem.libraryItem || mainElem.symbolType!=nextElem.symbolType || 
