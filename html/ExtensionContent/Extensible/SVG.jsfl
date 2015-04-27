@@ -1954,11 +1954,20 @@
 							}else if(element.symbolType=="movie clip"){
 								if((element.libraryItem.timeline.frameCount<(frameEnd-n)) && frameEnd>n+1 && settings.repeatCount!="indefinite"){
 									// this changes from an animation with the same duration as the parent timeline to one with a shorter duration (and a repearDur)
-									elemSettings.beginOffset = this.precision(elemSettings.animOffset / ext.doc.frameRate);
+									elemSettings.beginOffset = settings.beginOffset + this.precision(elemSettings.animOffset / ext.doc.frameRate);
 									elemSettings.animOffset = 0;
 									elemSettings.frameCount = element.libraryItem.timeline.frameCount;
 									elemSettings.totalDuration = elemSettings.frameCount;
 									elemSettings.repeatCount = this.precision((frameEnd - n) / ext.doc.frameRate)+"s";
+								}else{
+									elemSettings.loopTweens = settings.loopTweens;
+									if(settings.startFrame==0 && frameEnd==timeline.frameCount){
+										// When a child timeline spans the entirity of it's parent, it is allowed to maintain it's own loop 
+										elemSettings.beginOffset = settings.beginOffset;
+										elemSettings.animOffset = settings.animOffset;
+										elemSettings.frameCount = element.libraryItem.timeline.frameCount;
+										elemSettings.totalDuration = elemSettings.frameCount;
+									}
 								}
 							}
 							if(element.instanceType=="symbol" && element.blendMode!="normal"){
@@ -1996,6 +2005,14 @@
 							}else if(elementXML){
 								frameXML.appendChild(elementXML);
 							}
+
+							if(!doCollateFrames && element.elementType=="instance"){
+								//var colTransNode = this._addColorTrans(elementXML, element, !doCollateFrames);
+								var filterID=this._getFilters(element, elementXML, elemSettings, dom.defs, null);
+								if(filterID && dom.defs.filter.(@id.toString()==filterID).length()){
+									elementXML['@filter']='url(#'+filterID+')';
+								}
+							}
 							
 						}
 
@@ -2011,10 +2028,6 @@
 							if(this.showEndFrame){
 								filterElement = lastFrame.elements[0];
 							}
-						}
-
-						if(doCollateFrames || (element.elementType=="instance" && element.colorMode!='none')){
-							//var colTransNode = this._addColorTrans(elementXML, element, !doCollateFrames);
 							var filterID=this._getFilters(filterElement, elementXML, elemSettings, dom.defs, transAnimObj);
 							if(filterID && dom.defs.filter.(@id.toString()==filterID).length()){
 								elementXML['@filter']='url(#'+filterID+')';
@@ -2031,6 +2044,8 @@
 								var matrix;
 								var allowRotateList = [];
 								var lastElement = null;
+								var maxRot;
+								var minRot;
 								for(var nextInd = n; nextInd<frameEnd; ++nextInd){
 									var nextFrame = layer.frames[nextInd];
 									if(nextFrame.startFrame!=nextInd && n!=nextInd)continue;
@@ -2038,8 +2053,11 @@
 									if(lastElement){
 										allowRotateList.push((nextElement.skewX > nextElement.skewY) == (lastElement.skewX > lastElement.skewY));
 									}
+									if(minRot==null || nextElement.skewX < minRot)minRot = nextElement.skewX;
+									if(maxRot==null || nextElement.skewX < maxRot)maxRot = nextElement.skewX;
 									lastElement = nextElement;
 								}
+								var withinQuad = (maxRot - minRot) <= 90;
 								allowRotateList.push(allowRotateList[allowRotateList.length-1]);
 								if(this.showEndFrame){
 									matrix = new ext.Matrix(lastElement.matrix);
@@ -2070,7 +2088,7 @@
 									var nextFrame = layer.frames[nextInd];
 									if(nextFrame.startFrame!=nextInd)continue;
 
-									var allowSkewRot = allowRotateList[keyframeI];
+									var allowSkewRot = allowRotateList[keyframeI] || withinQuad;
 									keyframeI++;
 
 									var attemptForeRot = true;
@@ -2513,28 +2531,29 @@
 			if(!isNaN(rot) && rot!=0){
 				var rotRad = rot / 180 * Math.PI;
 
-				if(isNaN(element.rotation)){
+				// Removed the two following conditions for #3924
+				/*if(isNaN(element.rotation)){
 					var spin = Math.abs(element.skewY - element.skewX);
 					if((spin > 90 && spin < 270) || (spin < -90 && spin > -270)){
 					//if(spin > 180){
 						rot = -rot;
+
 						//transPoint.x = -transPoint.x;
 						//transPoint.y = -transPoint.y;
 					}
-				}
+				}*/
 
 				var rotCos = Math.cos(rotRad);
 				var rotSin = Math.sin(rotRad);
 				matrix = this.rotateMatrix(matrix, rot, rotSin, rotCos, transPoint);
 				matrix = new ext.Matrix(fl.Math.concatMatrix(matrix, invMatrix));
-
-				if((matrix.a<0) == (matrix.d<0)){
+				//if((matrix.a<0) == (matrix.d<0)){
 					transAnimObj.rotList.push(this.precision(rot + autoRotate));
-				}else{
+				/*}else{
 					transAnimObj.rotList.push(this.precision(-rot + autoRotate));
 					matrix.a = -matrix.a;
 					matrix.d = -matrix.d;
-				}
+				}*/
 			}else{
 				transAnimObj.rotList.push(0);
 				var rotCos = Math.cos(0);
@@ -3286,7 +3305,7 @@
 						color.amount[0]==0 &&
 						color.amount[2]==0 &&
 						color.amount[3]==0 &&
-						color.amount[4]==0){
+						(color.amount[4]==0 || color.amount[4]==undefined)){
 
 						if(color.percent[3]!=100){
 							xml.@opacity = color.percent[3]/100;
@@ -3579,7 +3598,7 @@
 							beginAnimation:settings.beginAnimation,
 							beginOffset:settings.beginOffset,
 							repeatCount:settings.repeatCount,
-							loopTweens:this.loopTweens,
+							loopTweens:settings.loopTweens,
 							discreteEasing:this.discreteEasing,
 							flattenMotion:this.flattenMotion
 						}
