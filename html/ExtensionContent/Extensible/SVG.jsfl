@@ -3509,6 +3509,7 @@
 			var oppFillsLists=new ext.Array();
 			var polygonsList=new ext.Array();
 			var holes=new ext.Array();
+			var strokesDone={};
 			//var ii;
 			var validContours=new ext.Array([]);
 			for(i=0; i<contours.length; i++){
@@ -3520,6 +3521,7 @@
 					colorTransform:settings.colorTransform,
 					matrix:pathMatrix,
 					holes:holes,
+					strokesDone:strokesDone,
 					dom:dom
 				});
 			}
@@ -3632,6 +3634,7 @@
 			var contoursList = settings.contoursList;
 			var pathList = settings.pathList;
 			var holes = settings.holes;
+			var strokesDone = settings.strokesDone;
 
 			var xform='';
 			if(settings.matrix){
@@ -3703,21 +3706,33 @@
 					cp = cp.reverse();
 				}
 
-				if(!settings.filledOnly && e.stroke && e.stroke.style!='noStroke'){
-					var stroke = " "+this._getStroke(e.stroke, {dom:dom});
-
-					if(!currPath || stroke!=lastStroke){
-						currPath = strokeMap[stroke];
-						if(!currPath){
-							currPath = {stroke:stroke, fillString:" fill='none'", contours:[]};
-							paths.push(currPath);
-							strokeMap[stroke] = currPath;
-						}
-						lastStroke = stroke;
-					}
-					currPath.contours.push(cp);
+				var strokeStyle = (strokesDone[e.id] ? "noStroke" : e.stroke.style );
+				if(e.stroke.style !="noStroke"){
+					strokesDone[e.id] = true;
 				}
-				if(filledPath)filledPath.contours.push(cp);
+
+				if(!settings.filledOnly && strokeStyle){
+					if(strokeStyle!='noStroke'){
+						var stroke = " "+this._getStroke(e.stroke, {dom:dom});
+
+						if(!currPath || stroke!=lastStroke){
+							currPath = strokeMap[stroke];
+							if(!currPath){
+								currPath = {stroke:stroke, fillString:" fill='none'", contours:[]};
+								paths.push(currPath);
+								strokeMap[stroke] = currPath;
+							}
+							lastStroke = stroke;
+						}
+						currPath.contours.push(cp);
+					}else{
+						currPath = null;
+						lastStroke = 'noStroke';
+					}
+				}
+				if(filledPath){
+					filledPath.contours.push(cp);
+				}
 
 				he = he.getNext(); 
 				id = he.id; 
@@ -3761,6 +3776,7 @@
 				var lastDeg = null;
 				var lastPoint = null;
 
+
 				if(reverse){
 					currPath.contours.reverse();
 				}
@@ -3798,7 +3814,7 @@
 						polygons.push(polygon);
 						pathNodes.push('<path ' + currPath.fillString + opacityString + currPath.stroke + ' d="' + pathStr + '"/>\n');
 					}
-				}else{
+				}else if(currPath.fill || currPath.stroke){
 					polygons.push(polygon);
 					pathNodes.push('<path ' + currPath.fillString + opacityString + currPath.stroke + ' d="' + pathStr + '"/>\n');
 				}

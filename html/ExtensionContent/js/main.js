@@ -28,6 +28,7 @@ var saveAnimationSettings;
 var previewReloadButton;
 var previewFilename;
 var previewBrowser;
+var previewFrame;
 
 var timelineSettingsStr;
 var dir;
@@ -89,6 +90,9 @@ function onLoaded() {
     previewFilename = $( "#preview-filename" );
     previewBrowser = $( "#preview-browser" );
     previewReloadButton = $( "#preview-reload-button" );
+    previewFrame = $("#preview-img");
+
+    previewFrame.on('load', function(){onPreviewLoaded($(this).contents());});
 
     var version = 0;
    
@@ -168,6 +172,18 @@ function onLoaded() {
     nextLoad();
     
     $(document.body).children().css("display", "");
+}
+
+function onPreviewLoaded(innerDom){
+	var loadedSvg = innerDom.find( "svg" );
+	if(loadedSvg.attr("preserveAspectRatio")!="xMidYMid meet"){
+		loadedSvg.attr("preserveAspectRatio", "xMidYMid meet");
+		var x = parseFloat(loadedSvg.attr("x"));
+		var y = parseFloat(loadedSvg.attr("y"));
+		var width = parseFloat(loadedSvg.attr("width"));
+		var height = parseFloat(loadedSvg.attr("height"));
+		loadedSvg.attr("viewBox", x+" "+y+" "+width+" "+height);
+	}
 }
 
 function removeLastPathPart(uri){
@@ -497,7 +513,7 @@ var exportedPaths;
 var firstExportUri;
 function loadPreviewData(){
 
-	$("#preview-img").attr("src", firstExportUri);
+	previewFrame.attr("src", firstExportUri);
 	previewReloadButton.prop('disabled', !isExportReady && hasPreview);
 
 	if(hasPreview){
@@ -513,6 +529,7 @@ var unixFS = (platform.indexOf("win")==-1);
 
 function doOpenExport(){
 	if(!hasPreview)return;
+	alert(CSLibrary.openURLInDefaultBrowser);
 	window.cep.util.openURLInDefaultBrowser(firstExportUri);
 }
 function doReloadPreview(){
