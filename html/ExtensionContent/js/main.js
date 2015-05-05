@@ -264,6 +264,7 @@ function bindSettings(){
 	ControlBinder.bind(this.settings, Settings.PRECISION, decimalInput);
 	ControlBinder.bind(this.settings, Settings.RENDERING, $("#root-rendering"));
 	ControlBinder.bind(this.settings, Settings.ROOT_SCALING, $("#root-scaling"));
+	ControlBinder.bind(this.settings, Settings.ROOT_VIEWBOX, $("#root-viewbox"));
 	ControlBinder.bind(this.settings, Settings.EXPAND_SYMBOLS, $("#output-expand"));
 	ControlBinder.bind(this.settings, Settings.REMOVE_GROUPS, $("#output-ungroup"));
 	ControlBinder.bind(this.settings, Settings.COMPACT_OUTPUT, $("#output-compact"));
@@ -273,6 +274,7 @@ function bindSettings(){
 	ControlBinder.bind(this.settings, Settings.CONVERT_PATTERNS, $("#graphics-patterns"));
 	ControlBinder.bind(this.settings, Settings.CONVERT_TEXT_TO_OUTLINES, $("#text-outlines"));
 	ControlBinder.bind(this.settings, Settings.EMBED_IMAGES, $("#images-embed"));
+	ControlBinder.bind(this.settings, Settings.EMBED_AUDIO, $("#audio-embed"));
 	ControlBinder.bind(this.settings, Settings.INCLUDE_BG, $("#graphics-background"));
 	ControlBinder.bind(this.settings, Settings.LOOP, loopCheckbox);
 	ControlBinder.bind(this.settings, Settings.LOOP_TWEENS, loopTweensCheckbox);
@@ -440,16 +442,17 @@ function loadLastExport(){
 				hasPreview = (exportedPaths && exportedPaths.length);
 				firstExportUri = hasPreview ? exportedPaths[0].uri : null;
 
-				if(this.settings.getProp("embedImages")){
-					embedImagery();
-				}else{
-					finishExport();
+				var embedImages = this.settings.getProp(Settings.EMBED_IMAGES);
+				var embedAudio = this.settings.getProp(Settings.EMBED_AUDIO);
+				if(embedImages || embedAudio){
+					embedAssets(embedImages, embedAudio);
 				}
+				finishExport();
 			}
 	);
 }
 
-function embedImagery(){
+function embedAssets(doImages, doAudio){
 	for(var x=0; x<exportedPaths.length; x++){
 		var path = exportedPaths[x].path;
 		var dir;
@@ -462,27 +465,45 @@ function embedImagery(){
 		if (result.err == 0) {
 			var data = result.data;
 			var xml = $($.parseXML( data ));
-			var imageNodes = xml.find("image");
+			var tags = (doImages ? (doAudio ? "image audio" : "image") : "audio");
+			var assetNodes = xml.find(tags);
 			var changed = false;
 			var done = {};
-			for(var i=0; i<imageNodes.length; i++){
-				var node = $(imageNodes[i]);
+			for(var i=0; i<assetNodes.length; i++){
+				var node = $(assetNodes[i]);
 				var relative = node.attr("xlink:href");
+				if(!relative){
+					relative = node.find("source").attr("src");
+				}
 				if(done[relative])continue;
 				done[relative] = true;
 
 				var correctedRel = relative;
 				if(!unixFS)correctedRel = correctedRel.split("/").join("\\");
 
-				var imgPath = dir + correctedRel;
+				var assetPath = dir + correctedRel;
 
-				var b64 = window.cep.fs.readFile(imgPath, window.cep.encoding.Base64);
+				var b64 = window.cep.fs.readFile(assetPath, window.cep.encoding.Base64);
 				if (0 == b64.err) {
 					var b64Data = b64.data.split("\n").join("");
-					data = data.split(relative).join("data:image/png;base64,"+b64Data);
+					var mimetype = node.attr("type");
+					if(!mimetype){
+						mimetype = node.find("source").attr("type");
+					}
+					if(mimetype==null){
+						switch(node.prop("tagName")){
+							case "image" :
+								mimetype = "image/png";
+								break;
+							case "audio" :
+								mimetype = "audio/mpeg3";
+								break;
+						}
+					}
+					data = data.split(relative).join("data:"+mimetype+";base64,"+b64Data);
 					changed = true;
 				}else {
-					evalScript('fl.trace( "Failed to load image for embedding: '+imgPath+'")');
+					evalScript('fl.trace( "Failed to load asset for embedding: '+assetPath+'")');
 				}
 			}
 			if(changed){
@@ -498,7 +519,6 @@ function embedImagery(){
 			evalScript('fl.trace( "Failed to load SVG for embedding")');
 		}
 	}
-	finishExport();
 }
 
 function finishExport(){

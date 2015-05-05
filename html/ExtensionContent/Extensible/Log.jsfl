@@ -20,6 +20,21 @@
 		this.timers=new ext.Object({});
 		return this;
 	}
+
+	var zeroPad = function(str, length){
+		while(str.length < length){
+			str = "0"+str;
+		}
+		return str;
+	}
+
+	var convertTime = function(ms){
+		var secs = ms / 1000;
+		var mins = Math.floor(secs / 60);
+		secs = Math.round(secs - mins*60);
+		return zeroPad(String(mins), 2) + "m " + zeroPad(String(secs), 2) + "s"
+	}
+
 	Log.prototype={
 		__proto__:ext.Object.prototype,
 		type:Log,
@@ -58,7 +73,7 @@
 				var time=t.elapsed;
 				var runs=t.runs;
 				if(t.startTime){time+=(new Date()).getTime()-t.startTime;}
-				this.append(id+','+String(time)+','+String((time/runs))+','+String(runs)+'\n');
+				this.append(id+','+convertTime(time)+','+convertTime(time/runs)+','+String(runs)+'\n');
 				delete(this.timers[id]);
 			}
 		}

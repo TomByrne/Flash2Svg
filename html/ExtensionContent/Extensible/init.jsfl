@@ -164,9 +164,6 @@
 			if(this.warnings){
 				fl.trace(message);
 			}
-			if(this.log){
-				this.log.append(message);
-			}
 		},
 		message:function(message){
 			fl.trace(message);	
