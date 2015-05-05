@@ -3525,7 +3525,7 @@
 				this._soundIds[item.name] = soundId;
 				var soundURI = this._getAssetUri(item, this._sounds, "aud", "mp3");
 
-				var type = soundURI.extension=="wav" ? "audio/wav" : "audio/mpeg3";
+				var type = soundURI.extension=="wav" ? "audio/wav" : "audio/mpeg";
 
 				var elem = new XML('<audio xmlns="http://www.w3.org/1999/xhtml" id="'+soundId+'"><source src="'+soundURI+'" type="'+type+'" /></audio>');
 				this._soundNode.appendChild(elem);

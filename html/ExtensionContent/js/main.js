@@ -484,7 +484,8 @@ function embedAssets(doImages, doAudio){
 				var assetPath = dir + correctedRel;
 
 				var b64 = window.cep.fs.readFile(assetPath, window.cep.encoding.Base64);
-				if (0 == b64.err) {
+				if (0 == b64.err && b64.data.length > 1) {
+					evalScript('fl.trace( "Embed: '+relative+'  -  '+b64.data.length+'")');
 					var b64Data = b64.data.split("\n").join("");
 					var mimetype = node.attr("type");
 					if(!mimetype){
@@ -496,7 +497,7 @@ function embedAssets(doImages, doAudio){
 								mimetype = "image/png";
 								break;
 							case "audio" :
-								mimetype = "audio/mpeg3";
+								mimetype = "audio/mpeg";
 								break;
 						}
 					}
