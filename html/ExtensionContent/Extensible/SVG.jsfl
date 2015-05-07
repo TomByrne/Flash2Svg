@@ -1990,7 +1990,7 @@
 									elemSettings.repeatCount = this.precision((frameEnd - n) / ext.doc.frameRate)+"s";
 								}else{
 									elemSettings.loopTweens = settings.loopTweens;
-									if(settings.startFrame==0 && frameEnd==timeline.frameCount){
+									if(n==0 && frameEnd==timeline.frameCount){
 										// When a child timeline spans the entirity of it's parent, it is allowed to maintain it's own loop 
 										elemSettings.beginOffset = settings.beginOffset;
 										elemSettings.animOffset = settings.animOffset;
