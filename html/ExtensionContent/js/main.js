@@ -1,5 +1,49 @@
 var csInterface;
 
+var VERSION = 1;
+
+var EXPORT_SETTINGS = "exportSettings";
+var ACTIVE_PANELS = "activePanels";
+var AUTO_SAVE_TIMELINE = "autoSaveTimeline";
+
+var SOURCE = "source";
+var FILE = "file";
+var PRECISION = "decimalPointPrecision";
+var EXPAND_SYMBOLS = "expandSymbols";
+var RENDERING = "rendering";
+var ROOT_SCALING = "rootScaling";
+var ROOT_VIEWBOX = "animatedViewBox";
+var CONVERT_PATTERNS = "convertPatternsToSymbols";
+var APPLY_TRANSFORMS = "applyTransformations";
+var APPLY_EFFECTS = "applyColorEffects";
+var FLATTEN_MOTION = "flattenMotion";
+var CURVE_DEGREE = "curveDegree";
+var MASKING_TYPE = "maskingType";
+var OUTPUT = "output";
+var FRAMES = "frames";
+var START_FRAME = "startFrame";
+var END_FRAME = "endFrame";
+var ANIMATED = "animated";
+var TIMELINES = "timelines";
+var BG_COLOR = "backgroundColor";
+var INCLUDE_BG = "includeBackground";
+var INCLUDE_HIDDEN_LAYERS = "includeHiddenLayers";
+var INCLUDE_GUIDES = "includeGuides";
+var CONVERT_TEXT_TO_OUTLINES = "convertTextToOutlines";
+var EMBED_IMAGES = "embedImages";
+var EMBED_AUDIO = "embedAudio";
+var SELECTION = "selection";
+var TRACE_LOG = "traceLog";
+var BEGIN_ANIMATION = "beginAnimation";
+var REPEAT_COUNT = "repeatCount";
+var NON_ANIM_SHOW = "nonAnimatingShow";
+var LOOP = "loop";
+var LOOP_TWEENS = "loopTweens";
+var DISCRETE_EASING = "discreteEasing";
+var REMOVE_GROUPS = "removeGroups";
+var COMPACT_OUTPUT = "compactOutput";
+var AVOID_MITER = "avoidMiter";
+var TWEEN_TYPE = "tweenType";
 
 
 var accordion;
@@ -51,7 +95,7 @@ function onLoaded() {
     csInterface.addEventListener("com.adobe.events.flash.timelineChanged", onTimelineChanged);
     csInterface.addEventListener("com.adobe.events.flash.documentChanged", onDocumentChanged);
     csInterface.addEventListener("com.adobe.events.flash.documentClosed", onDocumentChanged);
-    csInterface.addEventListener("com.adobe.events.flash.documentSaved", onTimelineChanged);
+    csInterface.addEventListener("com.adobe.events.flash.documentSaved", checkDefaultName);
     onDocumentChanged();
 	
 
@@ -68,11 +112,13 @@ function onLoaded() {
     progLabel = $("#export-progress-label");
     exportButton = $( "#export-button" );
     
+    sourceSelect = $("#source-timelines");
 	frameSelect = $("#source-frames");
 	frameRange = $("#customFrameRange");
 	frameRangeStart = $("#frameRangeStart");
 	frameRangeEnd = $("#frameRangeEnd");
 	
+	fileNameLabel = $("#output-file-label");
 	fileNameInput = $("#output-file");
 	outputType = $("#output-type");
 	decimalInput = $("#output-decimal");
@@ -108,7 +154,7 @@ function onLoaded() {
     accordion.multiAccordion({active:[],
     	change:function(){
     	var list = accordion.multiAccordion("option", "active");
-    	if(self.baseSettings)self.baseSettings.setProp(Settings.ACTIVE_PANELS, list.join(","));
+    	if(self.baseSettings)self.baseSettings.setProp(ACTIVE_PANELS, list.join(","));
     }});
     
     dir = removeLastPathPart(window.location.href);
@@ -218,22 +264,22 @@ function loadPresets(onComplete){
 function loadInitialSettings(){
     setProgressState(false, "Loading settings", false, 0);
     
-	this.baseSettings = new Settings();
-	this.settings = new Settings();
-	this.baseSettings.setProp(Settings.EXPORT_SETTINGS, this.settings);
-	ControlBinder.bind(this.baseSettings, Settings.AUTO_SAVE_TIMELINE, autoSaveSetting);
+	this.baseSettings = new Settings(VERSION);
+	this.settings = new Settings(VERSION);
+	this.baseSettings.setProp(EXPORT_SETTINGS, this.settings);
+	ControlBinder.bind(this.baseSettings, AUTO_SAVE_TIMELINE, autoSaveSetting);
 
 	evalScript("extensible.loadAppSettings('svgPanel', '"+settingsDir+"')",
 		function(res) {
 			if(res)this.baseSettings.fill(res);
 			loadTimelineSettings(!res);
+   			onSourceTimelineChanged();
 		}
 	);
 
-    onTimelineChanged();
 }
 function loadTimelineSettings(forceLoad){
-    var openStore = this.baseSettings.getProp(Settings.ACTIVE_PANELS);
+    var openStore = this.baseSettings.getProp(ACTIVE_PANELS);
     if(openStore == null) {
     	accordion.multiAccordion("showAll");
     }else {
@@ -248,38 +294,38 @@ function loadTimelineSettings(forceLoad){
     setProgressState(true, "", 0, 0);
 	this.baseSettings.change = closure(this, onBaseSettingsChanged);
 	
-	if(forceLoad || this.baseSettings.getProp(Settings.AUTO_SAVE_TIMELINE)){
+	if(forceLoad || this.baseSettings.getProp(AUTO_SAVE_TIMELINE)){
 		doLoadSettings(bindSettings);
 	}else{
 		bindSettings();
 	}
 }
 function bindSettings(){
-	ControlBinder.bind(this.settings, Settings.FILE, fileNameInput);
-	ControlBinder.bind(this.settings, Settings.SOURCE, $("#source-timelines"));
-	ControlBinder.bind(this.settings, Settings.FRAMES, frameSelect);
-	ControlBinder.bind(this.settings, Settings.START_FRAME, frameRangeStart);
-	ControlBinder.bind(this.settings, Settings.END_FRAME, frameRangeEnd);
-	ControlBinder.bind(this.settings, Settings.OUTPUT, outputType);
-	ControlBinder.bind(this.settings, Settings.PRECISION, decimalInput);
-	ControlBinder.bind(this.settings, Settings.RENDERING, $("#root-rendering"));
-	ControlBinder.bind(this.settings, Settings.ROOT_SCALING, $("#root-scaling"));
-	ControlBinder.bind(this.settings, Settings.ROOT_VIEWBOX, $("#root-viewbox"));
-	ControlBinder.bind(this.settings, Settings.EXPAND_SYMBOLS, $("#output-expand"));
-	ControlBinder.bind(this.settings, Settings.REMOVE_GROUPS, $("#output-ungroup"));
-	ControlBinder.bind(this.settings, Settings.COMPACT_OUTPUT, $("#output-compact"));
-	ControlBinder.bind(this.settings, Settings.AVOID_MITER, $("#output-remove-miter"));
-	ControlBinder.bind(this.settings, Settings.MASKING_TYPE, $("#graphics-masks"));
-	ControlBinder.bind(this.settings, Settings.CURVE_DEGREE, $("#graphics-curves"));
-	ControlBinder.bind(this.settings, Settings.CONVERT_PATTERNS, $("#graphics-patterns"));
-	ControlBinder.bind(this.settings, Settings.CONVERT_TEXT_TO_OUTLINES, $("#text-outlines"));
-	ControlBinder.bind(this.settings, Settings.EMBED_IMAGES, $("#images-embed"));
-	ControlBinder.bind(this.settings, Settings.EMBED_AUDIO, $("#audio-embed"));
-	ControlBinder.bind(this.settings, Settings.INCLUDE_BG, $("#graphics-background"));
-	ControlBinder.bind(this.settings, Settings.LOOP, loopCheckbox);
-	ControlBinder.bind(this.settings, Settings.LOOP_TWEENS, loopTweensCheckbox);
-	ControlBinder.bind(this.settings, Settings.BEGIN_ANIMATION, $("#anim-begin"));
-	ControlBinder.bind(this.settings, Settings.TWEEN_TYPE, tweenTypeSelect);
+	ControlBinder.bind(this.settings, FILE, fileNameInput);
+	ControlBinder.bind(this.settings, SOURCE, sourceSelect);
+	ControlBinder.bind(this.settings, FRAMES, frameSelect);
+	ControlBinder.bind(this.settings, START_FRAME, frameRangeStart);
+	ControlBinder.bind(this.settings, END_FRAME, frameRangeEnd);
+	ControlBinder.bind(this.settings, OUTPUT, outputType);
+	ControlBinder.bind(this.settings, PRECISION, decimalInput);
+	ControlBinder.bind(this.settings, RENDERING, $("#root-rendering"));
+	ControlBinder.bind(this.settings, ROOT_SCALING, $("#root-scaling"));
+	ControlBinder.bind(this.settings, ROOT_VIEWBOX, $("#root-viewbox"));
+	ControlBinder.bind(this.settings, EXPAND_SYMBOLS, $("#output-expand"));
+	ControlBinder.bind(this.settings, REMOVE_GROUPS, $("#output-ungroup"));
+	ControlBinder.bind(this.settings, COMPACT_OUTPUT, $("#output-compact"));
+	ControlBinder.bind(this.settings, AVOID_MITER, $("#output-remove-miter"));
+	ControlBinder.bind(this.settings, MASKING_TYPE, $("#graphics-masks"));
+	ControlBinder.bind(this.settings, CURVE_DEGREE, $("#graphics-curves"));
+	ControlBinder.bind(this.settings, CONVERT_PATTERNS, $("#graphics-patterns"));
+	ControlBinder.bind(this.settings, CONVERT_TEXT_TO_OUTLINES, $("#text-outlines"));
+	ControlBinder.bind(this.settings, EMBED_IMAGES, $("#images-embed"));
+	ControlBinder.bind(this.settings, EMBED_AUDIO, $("#audio-embed"));
+	ControlBinder.bind(this.settings, INCLUDE_BG, $("#graphics-background"));
+	ControlBinder.bind(this.settings, LOOP, loopCheckbox);
+	ControlBinder.bind(this.settings, LOOP_TWEENS, loopTweensCheckbox);
+	ControlBinder.bind(this.settings, BEGIN_ANIMATION, $("#anim-begin"));
+	ControlBinder.bind(this.settings, TWEEN_TYPE, tweenTypeSelect);
 	this.settings.change = closure(this, onSettingsChanged);
 
 
@@ -300,12 +346,13 @@ function bindSettings(){
 }
 
 function onSettingsChanged(){
-	if(this.baseSettings.getProp(Settings.AUTO_SAVE_TIMELINE)){
+	if(this.baseSettings.getProp(AUTO_SAVE_TIMELINE)){
 		doSaveSettings();
 	}else{
 		checkSaveLoadButtons();
 	}
 	onBaseSettingsChanged();
+	onSourceTimelineChanged();
 }
 var saveWarned = false;
 function onBaseSettingsChanged(){
@@ -398,7 +445,7 @@ function onAutoSaveChanged(){
 }
 
 function doExport(){
-	if(this.baseSettings.getProp(Settings.AUTO_SAVE_TIMELINE)){
+	if(this.baseSettings.getProp(AUTO_SAVE_TIMELINE)){
 		// If settings haven't been modified while in the timeline but autosave is on we should save now
 		doSaveSettings();
 	}
@@ -442,8 +489,8 @@ function loadLastExport(){
 				hasPreview = (exportedPaths && exportedPaths.length);
 				firstExportUri = hasPreview ? exportedPaths[0].uri : null;
 
-				var embedImages = this.settings.getProp(Settings.EMBED_IMAGES);
-				var embedAudio = this.settings.getProp(Settings.EMBED_AUDIO);
+				var embedImages = this.settings.getProp(EMBED_IMAGES);
+				var embedAudio = this.settings.getProp(EMBED_AUDIO);
 				if(embedImages || embedAudio){
 					embedAssets(embedImages, embedAudio);
 				}
@@ -628,7 +675,7 @@ function doLoadSettings(onComplete){
 			timelineSettingsStr = res;
 			checkSaveLoadButtons();
 			
-			if(this.baseSettings.getProp(Settings.AUTO_SAVE_TIMELINE)){
+			if(this.baseSettings.getProp(AUTO_SAVE_TIMELINE)){
 				if(res)this.settings.fill(res);
 			}
 			if(onComplete)onComplete();
@@ -677,35 +724,35 @@ function doSavePreset(){
 	
 	var props = [];
 	if(source){
-		props.push(Settings.SOURCE);
-		props.push(Settings.FRAMES);
+		props.push(SOURCE);
+		props.push(FRAMES);
 	}
 	if(output){
-		props.push(Settings.OUTPUT);
-		props.push(Settings.FILE);
-		props.push(Settings.PRECISION);
-		props.push(Settings.EXPAND_SYMBOLS);
-		props.push(Settings.REMOVE_GROUPS);
-		props.push(Settings.COMPACT_OUTPUT);
-		props.push(Settings.AVOID_MITER);
+		props.push(OUTPUT);
+		props.push(FILE);
+		props.push(PRECISION);
+		props.push(EXPAND_SYMBOLS);
+		props.push(REMOVE_GROUPS);
+		props.push(COMPACT_OUTPUT);
+		props.push(AVOID_MITER);
 	}
 	if(root){
-		props.push(Settings.RENDERING);
-		props.push(Settings.ROOT_SCALING);
+		props.push(RENDERING);
+		props.push(ROOT_SCALING);
 	}
 	if(graphics){
-		props.push(Settings.MASKING_TYPE);
-		props.push(Settings.CURVE_DEGREE);
-		props.push(Settings.CONVERT_PATTERNS);
-		props.push(Settings.INCLUDE_BG);
-		props.push(Settings.CONVERT_TEXT_TO_OUTLINES);
-		props.push(Settings.EMBED_IMAGES);
+		props.push(MASKING_TYPE);
+		props.push(CURVE_DEGREE);
+		props.push(CONVERT_PATTERNS);
+		props.push(INCLUDE_BG);
+		props.push(CONVERT_TEXT_TO_OUTLINES);
+		props.push(EMBED_IMAGES);
 	}
 	if(animation){
-		props.push(Settings.TWEEN_TYPE);
-		props.push(Settings.LOOP);
-		props.push(Settings.LOOP_TWEENS);
-		props.push(Settings.BEGIN_ANIMATION);
+		props.push(TWEEN_TYPE);
+		props.push(LOOP);
+		props.push(LOOP_TWEENS);
+		props.push(BEGIN_ANIMATION);
 	}
 	var settings = this.settings.stringify(null, props);
 	evalScript("extensible.saveAppSettings('"+name+"', '"+presetsDir+"', '"+settings+"')",
@@ -728,14 +775,39 @@ function onPresetSelected(){
 	presetSelect.prop('selectedIndex', 0);
 }
 
+function onSourceTimelineChanged(){
+	if(this.settings.getProp(SOURCE)=="current"){
+		fileNameLabel.text("Output File:");
+	}else{
+		fileNameLabel.text("Output Folder:");
+	}
+	checkDefaultName();
+}
+
+
+function checkDefaultName(){
+	if(isProcessing || !this.settings)return;
+	if(this.settings.getProp(SOURCE)=="current"){
+		evalScript("extensible.getDefaultTimelineFileName()",
+				function(res) {
+					fileNameInput.attr("placeholder", res);
+				}
+			);
+	}else{
+		evalScript("extensible.getDefaultFolderName()",
+				function(res) {
+					fileNameInput.attr("placeholder", res);
+				}
+			);
+	}
+}
+
 function onTimelineChanged(event){
 	if(isProcessing || !this.settings)return;
 	doLoadSettings();
-	evalScript("extensible.getDefaultTimelineFileName()",
-			function(res) {
-				fileNameInput.attr("placeholder", res);
-			}
-		);
+	if(this.settings.getProp(SOURCE)=="current"){
+		checkDefaultName();
+	}
 }
 var hasDocument;
 function onDocumentChanged(event){

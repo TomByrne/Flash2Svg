@@ -236,6 +236,13 @@
 			fileName += ".svg";
 			return fileName;
 		},
+		getDefaultFolderName:function(){
+			var fileName;
+			if(!extensible.doc){
+				return "";
+			}
+			return extensible.doc.name.stripExtension() + "/";
+		},
 		loadSettingsListing:function(dir){
 			dir = fl.configURI + dir;
 			if(!FLfile.exists(dir)){

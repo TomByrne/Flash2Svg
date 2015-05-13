@@ -75,7 +75,8 @@
 			removeGroups:true,
 			compactOutput:true,
 			avoidMiter:true,
-			animatedViewBox:false
+			animatedViewBox:false,
+			drawStrokesOverFills:true
 		});
 		if(options instanceof XML || typeof(options)=='string'){
 			ext.Task.apply(this,[settings]);
@@ -131,6 +132,10 @@
 		if(extIndex==this.file.length - 4){
 			this.file = this.file.substr(0, this.file.length - 4);
 		}
+		var lastChar = this.file.charAt(this.file.length-1);
+		if(lastChar == "/" || lastChar == "\\"){
+			this.file = this.file.substr(0, this.file.length-1);
+		}
 		
 		if(this.tweenType){
 			switch(this.tweenType){
@@ -150,6 +155,7 @@
 		}
 
 		var timeline;
+		var selectedItems;
 		if(this.frames=='current'){
 			this.frames=new ext.Array([]);
 			if(this.source=='current'){
@@ -166,6 +172,11 @@
 				this.endFrame = ext.timeline.$.frameCount;
 			}else if(this.source=='libraryItems'){
 				this.endFrame=0;
+				selectedItems = ext.lib.getSelectedItems();
+				if(selectedItems.length==0){
+					alert("Please select items in the library or change export Source to Current Timeline");
+					return;
+				}
 				for(var i=0;i<selectedItems.length;i++){
 					timeline=selectedItems[i].timeline;
 					if(timeline.$.frameCount-1>this.endFrame){
@@ -247,7 +258,6 @@
 			this.timelines.push(timeline);
 		}else if(this.source=='libraryItems'){
 			this.timelines.clear();
-			var selectedItems=ext.lib.getSelectedItems();
 			var width,height;
 			for(var i=0;i<selectedItems.length;i++){
 				if(selectedItems[i] instanceof ext.SymbolItem){
@@ -260,7 +270,7 @@
 							libraryItem:selectedItems[i]
 						};
 						if(selectedItems.length>1){
-							timeline.filePath = this.file+"/"+timeline.name+".svg";
+							timeline.filePath = this.file+"/"+timeline.libraryItem.name+".svg";
 						}else{
 							timeline.filePath = this.file+".svg";
 						}
@@ -831,6 +841,7 @@
 			for(var k=0; k<this.timelines.length;k++){
 				var timeline = this.timelines[k];
 				var document = this.doms[k];
+				if(!document)continue; // Export failed
 
 				if(this.applyTransformations){
 					this.applyMatrices(document);
@@ -878,12 +889,12 @@
 					fl.trace("WARNING: Miter joins display incorrectly in current versions of Firefox (Oct 2014)");
 				}
 
-				fl.trace("finalise: "+timeline.filePath);
+				//fl.trace("finalise: "+timeline.filePath);
 				this.qData.push(closure(this.processFixUseLinks, [outputObject], this));
 				this.qData.push(closure(this.processCompactColours, [outputObject], this));
 				this.qData.push(closure(this.processRemoveIdentMatrices, [outputObject], this));
 				this.qData.push(closure(this.processConvertHairlineStrokes, [outputObject], this));
-				this.qData.push(closure(this.processSaveFile, [outputObject, timeline.filePath], this));
+				this.qData.push(closure(this.processSaveFile, [outputObject, timeline.filePath, timeline], this));
 					
 				//}
 			}
@@ -898,6 +909,7 @@
 				var uri = timeline.filePath.replace("file:///", "file://").replace("|", ":");
 				var path = FLfile.uriToPlatformPath(timeline.filePath);
 
+				if(k)ret += ",";
 				ret += '{"uri":"'+uri+'","path":"'+path+'"}';
 			}
 			ret += "]";
@@ -947,9 +959,10 @@
 				ext.log.pauseTimer(timer);
 			}
 		},
-		processSaveFile:function(outputObj, filePath){
+		processSaveFile:function(outputObj, filePath, timeline){
 			//if(this.timelines.length==1){
-				success=FLfile.write(filePath, outputObj.string);
+				success = FLfile.write(filePath, outputObj.string);
+				timeline.success = success;
 			/*}else{
 				var rPath=decodeURIComponent(
 					String(
@@ -1013,7 +1026,6 @@
 
 			this._timelineCopies = {};
 			ext.sel=this._origSelection;
-			var epSuccess=true;
 			if(this.swfPanel){
 				epSuccess=this.swfPanel.call('endProgress');	
 			}
@@ -1041,10 +1053,36 @@
 			}
 
 
-			if(epSuccess){
-				ext.message('Export Successful: ');
-				for(var i=0; i<this.timelines.length; ++i){
-					ext.message('\t'+this.timelines[i].filePath);
+			var failed = [];
+			var success = [];
+			for(var i=0; i<this.timelines.length; ++i){
+				var timeline = this.timelines[i];
+				if(timeline.success){
+					success.push(timeline);
+				}else{
+					failed.push(timeline);
+				}
+			}
+			if(failed.length){
+				ext.message('\n\nWARNING: Export'+(failed.length>1?"s":"")+' Failed: ');
+				for(var i=0; i<failed.length; ++i){
+					var timeline = failed[i];
+					if(timeline.timeline.libraryItem){
+						ext.message('\t'+timeline.timeline.libraryItem.name);
+					}else{
+						ext.message('\t'+timeline.timeline.name);
+					}
+				}
+			}
+			if(success.length){
+				ext.message('\n\nExport'+(success.length>1?"s":"")+' Succeeded: ');
+				for(var i=0; i<success.length; ++i){
+					var timeline = success[i];
+					if(timeline.timeline.libraryItem){
+						ext.message('\t'+timeline.timeline.libraryItem.name+" > "+timeline.filePath);
+					}else{
+						ext.message('\t'+timeline.timeline.name+" > "+timeline.filePath);
+					}
 				}
 			}
 		},
@@ -1828,7 +1866,7 @@
 						var items = this._getItemsByFrame(frame, settings.selection);
 						if(items.length==0){
 							if(!frame.soundName){
-								n += frame.duration;
+								n += frame.startFrame + frame.duration - n;
 								continue;
 							}
 						}else{
@@ -2749,13 +2787,14 @@
 			var layers = timeline.layers;
 			if(frame>timeline.frameCount-1)frame = timeline.frameCount-1;
 
+
 			for(var i=0; i<layers.length && !failed; i++){
 				var layer=layers[i];
 				if(layer.layerType=='guide')continue;
 
 				var thisFrame = layer.frames[frame];
 				if(thisFrame){
-					if(thisFrame.tweenType=="motion"){
+					if(thisFrame.tweenType=="motion" || thisFrame.tweenType=="shape"){
 						failed = true;
 						break;
 					}
@@ -3729,16 +3768,17 @@
 					}
 				}
 				for(var i=0; i<holeObj.maxPath; i++){
-					var otherG = pathList[i].node;
+					//var otherG = pathList[i].node;
+					var otherPaths = pathList[i].nodes;
 					var othEdges = edgeIdLists[i];
 					var othContour = validContours[i];
 					var othPolys = polygonsList[i];
-					var paths = otherG.path;
+					//var paths = otherG.path;
 
 					if(oppFills.length && !edgeIDs.intersect(othEdges).length && oppFills.indexOf(othContour.fill)==-1)continue;
 
-					for(var k=0; k<paths.length(); k++){
-						var pathNode = paths[k];
+					for(var k=0; k<otherPaths.length; k++){
+						var pathNode = otherPaths[k];
 						if(pathNode.@fill=="none")continue;
 
 						if(!ext.Geom.intersects(othPolys[k], holePoly)){
@@ -3751,7 +3791,8 @@
 
 						if(pathNode.@stroke.length()){
 							var newNode = new XML('<path fill="'+pathNode.@fill+'" d="'+d+'"/>\n');
-							otherG.insertChildBefore(pathNode, newNode);
+							//otherG.insertChildBefore(pathNode, newNode);
+							otherPaths.splice(k, 0, newNode);
 							pathNode.@fill = "none";
 							++k;
 						}else{
@@ -3763,8 +3804,38 @@
 			var svg=new XML('<g/>');
 			var matrixStr = this._getMatrix(matrix);
 			if(matrixStr!=this.IDENTITY_MATRIX)svg['@transform']=matrixStr;
-			for(var i=0;i<pathList.length;i++){
-				svg.appendChild(pathList[i].node);
+
+			if(!this.drawStrokesOverFills){
+				for(var i=0;i<pathList.length;i++){
+					var paths = pathList[i].nodes;
+					for(var j=0; j<paths.length; j++){
+						svg.appendChild(paths[j]);
+					}
+				}
+			}else{
+				var strokeNodes = []
+				for(var i=0; i<pathList.length; i++){
+					var paths = pathList[i].nodes;
+					for(var j=0; j<paths.length; j++){
+						var path = paths[j];
+						if(path.@fill.toString()!="none"){
+							svg.appendChild(path);
+							if(path.@stroke.length()){
+								var strokeNode = path.copy();
+								strokeNode.@fill = "none";
+								strokeNodes.push(strokeNode);
+
+								delete path.@stroke;
+							}
+						}else{
+							strokeNodes.push(path);
+						}
+					}
+				}
+				for(var i=0; i<strokeNodes.length; i++){
+					var path = strokeNodes[i];
+					svg.appendChild(path);
+				}
 			}
 			if(
 				shape.isGroup && 
@@ -3954,7 +4025,7 @@
 			var degPrefix=['M','L','Q','C'];
 			var pathNodes = [];
 			var polygons = [];
-			//fl.trace("\nContour: "+paths.length+" int: "+contour.interior+" ori: "+contour.orientation+" "+fillString+" cut:"+cutHole+" r:"+reverse);
+			//fl.trace("\nContour: "+paths.length+" int: "+contour.interior+" ori: "+contour.orientation+" "+fillString+" cut:"+cutHole+" r:"+reverse+" lastStroke: "+lastStroke);
 			//fl.trace("edges: "+edgeIDs+" "+filledPath);
 			for (var i=0; i<paths.length; i++) 
 			{ 
@@ -4011,12 +4082,18 @@
 				edgeIdLists.push(edgeIDs);
 				contoursList.push(contour);
 				polygonsList.push(polygons);
-				var xmlStr  = '<g'+xform+'>'+pathNodes.join("")+"</g>";
+				//var xmlStr  = '<g'+xform+'>'+pathNodes.join("")+"</g>";
+
+				var nodes = [];
+				for(var i=0; i<pathNodes.length; i++){
+					nodes.push(new XML(pathNodes[i]));
+				}
+				filledPath.nodes = nodes;
 
 				if(ext.log){
 					ext.log.pauseTimer(timer);	
 				}
-				filledPath.node = new XML(xmlStr);
+				//filledPath.node = new XML(xmlStr);
 				pathList.push(filledPath);
 			}
 		},

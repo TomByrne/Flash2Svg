@@ -44,7 +44,7 @@
 
 
 closure = function(scope, meth, args, passArgs){
-	if(passArgs || passArgs===null){
+	if(passArgs!==false){
 		return function(){
 			var args2 = Array.prototype.slice.call(arguments);
 			return meth.apply(scope, args2.concat(args));
@@ -58,57 +58,14 @@ closure = function(scope, meth, args, passArgs){
 
 
 // Settings
-function Settings(){
+function Settings(version){
 	this.props = {};
+	this.version = version;
 	return this;
 }
-Settings.VERSION = 1;
 
-Settings.EXPORT_SETTINGS = "exportSettings";
-Settings.ACTIVE_PANELS = "activePanels";
-Settings.AUTO_SAVE_TIMELINE = "autoSaveTimeline";
-
-Settings.SOURCE = "source";
-Settings.FILE = "file";
-Settings.PRECISION = "decimalPointPrecision";
-Settings.EXPAND_SYMBOLS = "expandSymbols";
-Settings.RENDERING = "rendering";
-Settings.ROOT_SCALING = "rootScaling";
-Settings.ROOT_VIEWBOX = "animatedViewBox";
-Settings.CONVERT_PATTERNS = "convertPatternsToSymbols";
-Settings.APPLY_TRANSFORMS = "applyTransformations";
-Settings.APPLY_EFFECTS = "applyColorEffects";
-Settings.FLATTEN_MOTION = "flattenMotion";
-Settings.CURVE_DEGREE = "curveDegree";
-Settings.MASKING_TYPE = "maskingType";
-Settings.OUTPUT = "output";
-Settings.FRAMES = "frames";
-Settings.START_FRAME = "startFrame";
-Settings.END_FRAME = "endFrame";
-Settings.ANIMATED = "animated";
-Settings.TIMELINES = "timelines";
-Settings.BG_COLOR = "backgroundColor";
-Settings.INCLUDE_BG = "includeBackground";
-Settings.INCLUDE_HIDDEN_LAYERS = "includeHiddenLayers";
-Settings.INCLUDE_GUIDES = "includeGuides";
-Settings.CONVERT_TEXT_TO_OUTLINES = "convertTextToOutlines";
-Settings.EMBED_IMAGES = "embedImages";
-Settings.EMBED_AUDIO = "embedAudio";
-Settings.SELECTION = "selection";
-Settings.TRACE_LOG = "traceLog";
-Settings.BEGIN_ANIMATION = "beginAnimation";
-Settings.REPEAT_COUNT = "repeatCount";
-Settings.NON_ANIM_SHOW = "nonAnimatingShow";
-Settings.LOOP = "loop";
-Settings.LOOP_TWEENS = "loopTweens";
-Settings.DISCRETE_EASING = "discreteEasing";
-Settings.REMOVE_GROUPS = "removeGroups";
-Settings.COMPACT_OUTPUT = "compactOutput";
-Settings.AVOID_MITER = "avoidMiter";
-Settings.TWEEN_TYPE = "tweenType";
-
-Settings.parse = function(str){
-	var ret = new Settings();
+Settings.parse = function(str, version){
+	var ret = new Settings(version);
 	ret.parse(str);
 	return ret;
 };
@@ -128,6 +85,7 @@ Settings.replacer = function(key, value) {
 
 Settings.prototype={
 	change:null,
+	version:null,
 	propChangeHandlers:{},
 	setProp:function(prop, value){
 		var existing = this.props[prop];
@@ -155,7 +113,7 @@ Settings.prototype={
 		this._dispatchChange([prop]);
 	},
 	toObject:function(){
-		return {version:Settings.VERSION, props:this.props};
+		return {version:this.version, props:this.props};
 	},
 	stringify:function(defaults, include){
 		var obj = this.toObject();
@@ -188,7 +146,7 @@ Settings.prototype={
 		else obj = str;
 		
 		if(obj.version && obj.props){
-			if(obj.version!=Settings.VERSION){
+			if(obj.version!=this.version){
 				// do future migrations here
 			}
 			obj = obj.props;
