@@ -1948,18 +1948,19 @@
 								var nextFrame = layer.frames[frameEnd];
 								if(nextFrame){
 									if(nextFrame.startFrame==frameEnd){
-										// keyframe
 										var nextElem = nextFrame.elements[0];
+										var isDiff = nextElem && (nextElem.libraryItem!=mainElem.libraryItem || mainElem.symbolType!=nextElem.symbolType || 
+														(mainElem.symbolType=="graphic" && mainElem.libraryItem.timeline.frameCount>1 &&
+														    ((nextElem.loop!=mainElem.loop && !((mainElem.loop=="single frame" || frame.duration==1) && (nextElem.loop=="single frame" || nextFrame.duration==1)))
+														 || (singleFrameStart!=this._getPriorFrame(nextElem.libraryItem.timeline, nextElem.firstFrame)))
+													    ));
+										// keyframe
 										if(!nextElem || nextFrame.elements.length!=1 ||
-											(nextElem.libraryItem!=mainElem.libraryItem && lastFrame.tweenType=='none')){ // tweening to a different symbol with no tween between, do not tween
+											(nextElem.libraryItem!=mainElem.libraryItem && lastFrame.tweenType=='none') || 
+											(lastFrame.duration==1 && isDiff)){ // tweening to a different symbol with no tween between, do not tween
 											break; // tweening to incompatible frame
 
-										}else if(nextElem.libraryItem!=mainElem.libraryItem || mainElem.symbolType!=nextElem.symbolType || 
-														(mainElem.symbolType=="graphic" && mainElem.libraryItem.timeline.frameCount>1 &&
-													    ((nextElem.loop!=mainElem.loop && !((mainElem.loop=="single frame" || frame.duration==1) && (nextElem.loop=="single frame" || nextFrame.duration==1)))
-													// || (nextElem.loop!="single frame" && nextFrame.duration!=1) 
-													 || (singleFrameStart!=this._getPriorFrame(nextElem.libraryItem.timeline, nextElem.firstFrame/* + (nextElem.loop=="single frame"?0:nextFrame.duration)*/)))
-													    )){
+										}else if(isDiff){
 											//tweening to different symbol
 											++frameEnd;
 											transToDiff = true;
@@ -2257,6 +2258,7 @@
 										}
 									}
 								}
+
 								var hasTransformAnim = this.hasDifferent(transAnimObj.rotList, transAnimObj.skyList, transAnimObj.skxList, transAnimObj.scxList, transAnimObj.scyList);
 								var hasTranslateAnim = this.hasDifferent(transAnimObj.xList, transAnimObj.yList);
 								if(!hasTransformAnim && hasTranslateAnim){
@@ -2280,39 +2282,41 @@
 								}
 
 								if(hasTransformAnim || hasTranslateAnim){
+									var stopTimes = [];
 									frameHasAnimated = true;
 									// the ordering of these animation nodes is important
-									this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, elementXML, "translate", [transAnimObj.xList, transAnimObj.yList], transAnimObj.timeList, timeDur, timePrecision, transAnimObj.splineList, null, settings.repeatCount, forceDiscrete);
-									this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, elementXML, "rotate", [transAnimObj.rotList, transAnimObj.trxList, transAnimObj.tryList], transAnimObj.timeList, timeDur, timePrecision, transAnimObj.splineList, null, settings.repeatCount, forceDiscrete, false);
-									this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, elementXML, "skewX", [transAnimObj.skxList], transAnimObj.timeList, timeDur, timePrecision, transAnimObj.splineList, null, settings.repeatCount, forceDiscrete);
-									this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, elementXML, "skewY", [transAnimObj.skyList], transAnimObj.timeList, timeDur, timePrecision, transAnimObj.splineList, null, settings.repeatCount, forceDiscrete);
-									this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, elementXML, "scale", [transAnimObj.scxList, transAnimObj.scyList], transAnimObj.timeList, timeDur, timePrecision, transAnimObj.splineList, 1, settings.repeatCount, forceDiscrete, true);
+									this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, elementXML, "translate", [transAnimObj.xList, transAnimObj.yList], transAnimObj.timeList, stopTimes, timeDur, timePrecision, transAnimObj.splineList, null, settings.repeatCount, forceDiscrete);
+									this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, elementXML, "rotate", [transAnimObj.rotList, transAnimObj.trxList, transAnimObj.tryList], transAnimObj.timeList, stopTimes, timeDur, timePrecision, transAnimObj.splineList, null, settings.repeatCount, forceDiscrete, false);
+									this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, elementXML, "skewX", [transAnimObj.skxList], transAnimObj.timeList, stopTimes, timeDur, timePrecision, transAnimObj.splineList, null, settings.repeatCount, forceDiscrete);
+									this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, elementXML, "skewY", [transAnimObj.skyList], transAnimObj.timeList, stopTimes, timeDur, timePrecision, transAnimObj.splineList, null, settings.repeatCount, forceDiscrete);
+									this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, elementXML, "scale", [transAnimObj.scxList, transAnimObj.scyList], transAnimObj.timeList, stopTimes, timeDur, timePrecision, transAnimObj.splineList, 1, settings.repeatCount, forceDiscrete, true);
 									if(!forceDiscrete){
 										if(combineSkewScales){
-											this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, elementXML, "scale", [transAnimObj.skyScaleXList, transAnimObj.skxScaleYList], transAnimObj.skxTimeList, timeDur, timePrecision, transAnimObj.skxSplineList, 1, settings.repeatCount, forceDiscrete, true);
+											this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, elementXML, "scale", [transAnimObj.skyScaleXList, transAnimObj.skxScaleYList], transAnimObj.skxTimeList, stopTimes, timeDur, timePrecision, transAnimObj.skxSplineList, 1, settings.repeatCount, forceDiscrete, true);
 										}else{
-											this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, elementXML, "scale", [transAnimObj.skxScaleXList, transAnimObj.skxScaleYList], transAnimObj.skxTimeList, timeDur, timePrecision, transAnimObj.skxSplineList, 1, settings.repeatCount, forceDiscrete, true);
-											this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, elementXML, "scale", [transAnimObj.skyScaleXList, transAnimObj.skyScaleYList], transAnimObj.skyTimeList, timeDur, timePrecision, transAnimObj.skySplineList, 1, settings.repeatCount, forceDiscrete, true);
+											this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, elementXML, "scale", [transAnimObj.skxScaleXList, transAnimObj.skxScaleYList], transAnimObj.skxTimeList, stopTimes, timeDur, timePrecision, transAnimObj.skxSplineList, 1, settings.repeatCount, forceDiscrete, true);
+											this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, elementXML, "scale", [transAnimObj.skyScaleXList, transAnimObj.skyScaleYList], transAnimObj.skyTimeList, stopTimes, timeDur, timePrecision, transAnimObj.skySplineList, 1, settings.repeatCount, forceDiscrete, true);
 										}
 									}
-									this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, elementXML, "translate", [transAnimObj.transXList, transAnimObj.transYList], transAnimObj.timeList, timeDur, timePrecision, transAnimObj.splineList, null, settings.repeatCount, forceDiscrete);
+									this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, elementXML, "translate", [transAnimObj.transXList, transAnimObj.transYList], transAnimObj.timeList, stopTimes, timeDur, timePrecision, transAnimObj.splineList, null, settings.repeatCount, forceDiscrete);
 								}
 								
 								var hasOpacityAnim = this.hasDifferent(transAnimObj.alphaMList);
 								var hasColorAnim = this.hasDifferent(transAnimObj.redOList, transAnimObj.redMList, transAnimObj.greenOList, transAnimObj.greenMList, transAnimObj.blueOList, transAnimObj.blueMList, transAnimObj.alphaOList);
 								if((hasOpacityAnim || hasColorAnim) && !isMask){
 									frameHasAnimated = true;
+									var stopTimes = [];
 									if(hasColorAnim){
-										this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, transAnimObj.colorTransNode.feFuncR, "intercept", [transAnimObj.redOList], transAnimObj.timeList, timeDur, timePrecision, transAnimObj.splineList, 0, settings.repeatCount, forceDiscrete);
-										this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, transAnimObj.colorTransNode.feFuncR, "slope", [transAnimObj.redMList], transAnimObj.timeList, timeDur, timePrecision, transAnimObj.splineList, 1, settings.repeatCount, forceDiscrete);
-										this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, transAnimObj.colorTransNode.feFuncG, "intercept", [transAnimObj.greenOList], transAnimObj.timeList, timeDur, timePrecision, transAnimObj.splineList, 0, settings.repeatCount, forceDiscrete);
-										this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, transAnimObj.colorTransNode.feFuncG, "slope", [transAnimObj.greenMList], transAnimObj.timeList, timeDur, timePrecision, transAnimObj.splineList, 1, settings.repeatCount, forceDiscrete);
-										this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, transAnimObj.colorTransNode.feFuncB, "intercept", [transAnimObj.blueOList], transAnimObj.timeList, timeDur, timePrecision, transAnimObj.splineList, 0, settings.repeatCount, forceDiscrete);
-										this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, transAnimObj.colorTransNode.feFuncB, "slope", [transAnimObj.blueMList], transAnimObj.timeList, timeDur, timePrecision, transAnimObj.splineList, 1, settings.repeatCount, forceDiscrete);
-										this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, transAnimObj.colorTransNode.feFuncA, "intercept", [transAnimObj.alphaOList], transAnimObj.timeList, timeDur, timePrecision, transAnimObj.splineList, 0, settings.repeatCount, forceDiscrete);
-										this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, transAnimObj.colorTransNode.feFuncA, "slope", [transAnimObj.alphaMList], transAnimObj.timeList, timeDur, timePrecision, transAnimObj.splineList, 1, settings.repeatCount, forceDiscrete);
+										this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, transAnimObj.colorTransNode.feFuncR, "intercept", [transAnimObj.redOList], transAnimObj.timeList, stopTimes, timeDur, timePrecision, transAnimObj.splineList, 0, settings.repeatCount, forceDiscrete);
+										this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, transAnimObj.colorTransNode.feFuncR, "slope", [transAnimObj.redMList], transAnimObj.timeList, stopTimes, timeDur, timePrecision, transAnimObj.splineList, 1, settings.repeatCount, forceDiscrete);
+										this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, transAnimObj.colorTransNode.feFuncG, "intercept", [transAnimObj.greenOList], transAnimObj.timeList, stopTimes, timeDur, timePrecision, transAnimObj.splineList, 0, settings.repeatCount, forceDiscrete);
+										this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, transAnimObj.colorTransNode.feFuncG, "slope", [transAnimObj.greenMList], transAnimObj.timeList, stopTimes, timeDur, timePrecision, transAnimObj.splineList, 1, settings.repeatCount, forceDiscrete);
+										this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, transAnimObj.colorTransNode.feFuncB, "intercept", [transAnimObj.blueOList], transAnimObj.timeList, stopTimes, timeDur, timePrecision, transAnimObj.splineList, 0, settings.repeatCount, forceDiscrete);
+										this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, transAnimObj.colorTransNode.feFuncB, "slope", [transAnimObj.blueMList], transAnimObj.timeList, stopTimes, timeDur, timePrecision, transAnimObj.splineList, 1, settings.repeatCount, forceDiscrete);
+										this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, transAnimObj.colorTransNode.feFuncA, "intercept", [transAnimObj.alphaOList], transAnimObj.timeList, stopTimes, timeDur, timePrecision, transAnimObj.splineList, 0, settings.repeatCount, forceDiscrete);
+										this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, transAnimObj.colorTransNode.feFuncA, "slope", [transAnimObj.alphaMList], transAnimObj.timeList, stopTimes, timeDur, timePrecision, transAnimObj.splineList, 1, settings.repeatCount, forceDiscrete);
 
-									}else if(hasOpacityAnim && this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, elementXML, "opacity", [transAnimObj.alphaMList], transAnimObj.timeList, timeDur, timePrecision, transAnimObj.splineList, 1, settings.repeatCount, forceDiscrete)){
+									}else if(hasOpacityAnim && this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, elementXML, "opacity", [transAnimObj.alphaMList], transAnimObj.timeList, stopTimes, timeDur, timePrecision, transAnimObj.splineList, 1, settings.repeatCount, forceDiscrete)){
 										if(this.showEndFrame)elementXML.@opacity = lastElement.colorAlphaPercent / 100;
 										transAnimObj.colorTransNode.feFuncA.@slope = 1;
 									}
@@ -2730,7 +2734,7 @@
 						scaleList.push(sc);
 						othScaleList.push(1);
 						scaleTimeList.push(t);
-						if(scaleList.length>1)scaleSplineList.push(this._getFractSpline(ease));
+						scaleSplineList.push(this._getFractSpline(ease));
 					}
 				}
 			}
@@ -2738,7 +2742,7 @@
 			scaleList.push(this.precision(Math.cos(rads)));
 			othScaleList.push(1);
 			scaleTimeList.push(this.precision(time));
-			if(scaleList.length>1)scaleSplineList.push(doEase ? this._getFractSpline(0) : this.NO_TWEEN_SPLINE_TOKEN);
+			scaleSplineList.push(doEase ? this._getFractSpline(0) : this.NO_TWEEN_SPLINE_TOKEN);
 
 			return diff>0;
 		},
@@ -2841,7 +2845,7 @@
 			xml.prependChild(mg);
 			masked.clear();
 		},
-		_addAnimationNodes:function(beginAnimation, beginOffset, toNode, type, valueLists, times, totalTime, timePrecision, splineList, defaultValue, repeatCount, forceDiscrete, validateAllLists){
+		_addAnimationNodes:function(beginAnimation, beginOffset, toNode, type, valueLists, times, stopTimes, totalTime, timePrecision, splineList, defaultValue, repeatCount, forceDiscrete, validateAllLists){
 			var values = new Array();
 
 			var getValue = function(i){
@@ -2865,8 +2869,10 @@
 			var lastEndTime = 0;
 			var lastTakenTo = 0;
 			var ret = false;
+			var stopI = 0;
 			while(lastTakenTo < times.length-1){
-				var takenTo = this._addAnimationNode(lastTakenTo, beginAnimation, beginOffset, lastEndTime, toNode, type, values, valueLists, times, timePrecision, splineList, defaultValue, repeatCount, forceDiscrete, validateAllLists, doReplace);
+				var stopTime = stopTimes.length ? stopTimes[stopI] : null;
+				var takenTo = this._addAnimationNode(lastTakenTo, beginAnimation, beginOffset, lastEndTime, toNode, type, values, valueLists, times, stopTime, timePrecision, splineList, defaultValue, repeatCount, forceDiscrete, validateAllLists, doReplace);
 				if(takenTo===false){
 					lastTakenTo += 31;
 				}else{
@@ -2874,28 +2880,38 @@
 						ret = true;
 					}
 					lastTakenTo = takenTo; // minus one so that animations overlap by one keyframe
-					if(doReplace && lastTakenTo < times.length-1){
-						// when multiple animateTransform nodes are atacked, sometimes the "replace" logic gets applied in the wrong order, this prevents that.
-						doReplace = false;
-						var nodes = toNode.animateTransform;
-						for(var i=0; i<nodes.length(); i++){
-							nodes[i].@additive = "sum";
+
+					if(lastTakenTo < times.length-1){
+						var time = times[takenTo];
+						if(time < stopTime || stopTime==null){
+							stopTimes.splice(stopI, 0, time);
+							stopI++;
+						}else if(time == stopTime){
+							stopI++;
 						}
-						if(beginAnimation=="0s"){
-							beginAnim = (beginOffset ? beginOffset + "s": "0s");
-						}else{
-							beginAnim = beginAnimation + (beginOffset ? "+" + beginOffset + "s" : "");
+						if(doReplace && lastTakenTo < times.length-1){
+							// when multiple animateTransform nodes are atacked, sometimes the "replace" logic gets applied in the wrong order, this prevents that.
+							doReplace = false;
+							var nodes = toNode.animateTransform;
+							for(var i=0; i<nodes.length(); i++){
+								nodes[i].@additive = "sum";
+							}
+							if(beginAnimation=="0s"){
+								beginAnim = (beginOffset ? beginOffset + "s": "0s");
+							}else{
+								beginAnim = beginAnimation + (beginOffset ? "+" + beginOffset + "s" : "");
+							}
+							var animNode = new XML('<animateTransform attributeName="transform" additive="replace" type="translate" dur="'+totalTime+'s" keyTimes="0;1" values="0;0"/>')
+							if(beginAnim!="0s")animNode.@begin = beginAnim;
+							toNode.prependChild(animNode);
 						}
-						var animNode = new XML('<animateTransform attributeName="transform" additive="replace" type="translate" dur="'+totalTime+'s" keyTimes="0;1" values="0;0"/>')
-						if(beginAnim!="0s")animNode.@begin = beginAnim;
-						toNode.prependChild(animNode);
 					}
 				}
 				lastEndTime = times[lastTakenTo];
 			}
 			return ret;
 		},
-		_addAnimationNode:function(offset, beginAnimation, beginOffset, startTime, toNode, type, values, valueLists, times, timePrecision, splineList, defaultValue, repeatCount, forceDiscrete, validateAllLists, doReplace){
+		_addAnimationNode:function(offset, beginAnimation, beginOffset, startTime, toNode, type, values, valueLists, times, stopTime, timePrecision, splineList, defaultValue, repeatCount, forceDiscrete, validateAllLists, doReplace){
 			var beginAnim;
 			beginOffset = this.precision(beginOffset + startTime);
 			if(beginAnimation=="0s"){
@@ -2996,6 +3012,23 @@
 				takenTo++;
 
 				lastSpline = newSpline;
+
+				if(stopTime!=null){
+					if(lastTime == stopTime){
+						break;
+
+					}else if(lastTime > stopTime){
+
+						if(validV[validV.length-1]!=validV[validV.length-2]){
+							fl.trace("WARNING: Forced tween break, may see issues in tween");
+						}
+
+						takenTo--;
+						validT[validT.length-1] = stopTime;
+
+						break;
+					}
+				}
 			}
 			var endTime = lastTime;
 			var totalTime = endTime - startTime;
@@ -3169,7 +3202,7 @@
 				}
 			}
 			if(hasNoDef){
-				this._addAnimationNodes(beginAnimation, 0, rootNode, "viewBox", [values], times, timeDur, timePrecision, splines, null, repeatCount, false);
+				this._addAnimationNodes(beginAnimation, 0, rootNode, "viewBox", [values], times, [], timeDur, timePrecision, splines, null, repeatCount, false);
 			}
 
 			return frameInd;
