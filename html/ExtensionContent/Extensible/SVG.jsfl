@@ -1930,7 +1930,7 @@
 							ext.log.pauseTimer(timer2);
 						}
 
-						var doCollateFrames = (doAnim && items.length==1 && tweenType!="shape" && items[0].$.elementType=="instance");
+						var doCollateFrames = (doAnim && items.length==1 && tweenType!="shape" && items[0].$.instanceType=="symbol");
 						var frameEnd = n+1;
 						var transToDiff = false;
 						if(doCollateFrames){
@@ -2863,7 +2863,8 @@
 				if(values[0]==values[1])times[1] = 0.5; // reduces unneeded decimal points if all points are the same
 				this._addTimeValue(times.length-1, times.length, totalTime, times, valueLists.concat([values, splineList])); // add additional keyframe if only two exist
 			}*/
-			var doReplace = toNode.animateTransform.length()==0;
+			var isTrans = (type=="scale" || type=="translate" || type=="rotate" || type=="skewX" || type=="skewY");
+			var doReplace = isTrans && toNode.animateTransform.length()==0;
 
 			var count = times.length + (times[times.length-1] < totalTime ? 1 : 0);
 			var lastEndTime = 0;
@@ -2872,7 +2873,7 @@
 			var stopI = 0;
 			while(lastTakenTo < times.length-1){
 				var stopTime = stopTimes.length ? stopTimes[stopI] : null;
-				var takenTo = this._addAnimationNode(lastTakenTo, beginAnimation, beginOffset, lastEndTime, toNode, type, values, valueLists, times, stopTime, timePrecision, splineList, defaultValue, repeatCount, forceDiscrete, validateAllLists, doReplace);
+				var takenTo = this._addAnimationNode(lastTakenTo, beginAnimation, beginOffset, lastEndTime, toNode, type, values, valueLists, times, stopTime, timePrecision, splineList, defaultValue, repeatCount, forceDiscrete, validateAllLists, doReplace, isTrans);
 				if(takenTo===false){
 					lastTakenTo += 31;
 				}else{
@@ -2911,7 +2912,7 @@
 			}
 			return ret;
 		},
-		_addAnimationNode:function(offset, beginAnimation, beginOffset, startTime, toNode, type, values, valueLists, times, stopTime, timePrecision, splineList, defaultValue, repeatCount, forceDiscrete, validateAllLists, doReplace){
+		_addAnimationNode:function(offset, beginAnimation, beginOffset, startTime, toNode, type, values, valueLists, times, stopTime, timePrecision, splineList, defaultValue, repeatCount, forceDiscrete, validateAllLists, doReplace, isTrans){
 			var beginAnim;
 			beginOffset = this.precision(beginOffset + startTime);
 			if(beginAnimation=="0s"){
@@ -3058,7 +3059,6 @@
 
 			validS.pop(); // spline list should be one element shorter than other lists
 
-			var isTrans = (type=="scale" || type=="translate" || type=="rotate" || type=="skewX" || type=="skewY");
 			if(!isTrans){
 				var animNode = <animate />;
 				animNode.@attributeName = type;
@@ -3501,6 +3501,7 @@
 														        '<feFuncB type="linear" slope="'+bm+'" intercept="'+bo+'"/>'+
 														        '<feFuncA type="linear" slope="'+am+'" intercept="'+ao+'"/>'+
 														      '</feComponentTransfer>');
+
 						src = "colorTrans";
 						transAnimObj.colorTransNode = feComponentTransfer;
 						filter.appendChild(feComponentTransfer);

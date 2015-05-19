@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<ExtensionManifest Version="4.0" ExtensionBundleId="org.tbyrne.SvgAnimationForFlash" ExtensionBundleVersion="3.3.0"
+<ExtensionManifest Version="4.0" ExtensionBundleId="org.tbyrne.SvgAnimationForFlash" ExtensionBundleVersion="{version}"
 		ExtensionBundleName="SvgAnimationForFlash" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 	<Author>
 		<![CDATA[tbyrne.org]]>
