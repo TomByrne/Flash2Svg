@@ -860,7 +860,7 @@
 					for(var i=0; i<children; i++){
 						var child = document.children()[i];
 						var childName = child.localName();
-						if(childName=="g" || childName=="path" || childName=="path"){
+						if(childName=="g" || childName=="path" || childName=="mask"){
 							this._applyMatrix(child, trans, transMat, false);
 						}
 					}
@@ -1808,8 +1808,9 @@
 				 * processing ( enables use of a progress bar ), 
 				 * or process them immediately ( for debugging purposes ).
 				 */
-				var masked=new ext.Array();
-				var maskId = null;
+				//var masked=new ext.Array();
+				//var maskId = null;
+				var maskXML = null;
 				for(var i=0;i<layers.length;i++){
 					var layer=layers[i];
 					if(layer.layerType=="guide" || layer.layerType=="folder")continue;
@@ -1828,18 +1829,24 @@
 						layer.locked=false;
 					}
 
-					if(masked.length && layer.layerType!='masked'){
+					/*if(masked.length && layer.layerType!='masked'){
 						// masked layers have ended group
 						this._doMask(xml, masked, maskId);
-					}
+					}*/
 
 					var frameCacheList = [];
 
 					var colorX=null;
 					var isMask = false;
 					var isMasked = false;
+					var layerXML = null;
 					if(layer.layerType=='mask'){
 						isMask = true;
+						layerXML = new XML("<mask id='"+this._uniqueID('mask_')+"'/>");
+						xml.prependChild(layerXML);
+						maskXML = layerXML;
+
+
 						if(this.maskingType=='alpha'){
 							// This makes semi-transparent parts of masks fully opaque
 							colorX=new ext.Color('#FFFFFF00');
@@ -1847,12 +1854,32 @@
 							colorX=new ext.Color('#FFFFFF00');
 							colorX.percent[3]=999999999999999;						
 						};
+
+						if(!this._maskFilter){
+							this._maskFilter=this._getFilters(
+								null,layerXML,{
+									color:colorX,
+									boundingBox:boundingBox
+								}, dom.defs
+							);
+						}
+						if(this._maskFilter){
+							layerXML.@filter="url(#"+this._maskFilter+")";
+						}
+
 					}else if(layer.layerType=='masked' && (
 								layer.parentLayer && 
 								(layer.parentLayer.visible || this.includeHiddenLayers) &&
 								(layer.parentLayer.layerType!='guide' || this.includeGuides))){
-						isMasked = true; 
+
+						isMasked = true;
+						layerXML = new XML("<g mask='url(#"+maskXML.@id+")'/>");
+						xml.prependChild(layerXML);
+
+					}else{
+						layerXML = xml;
 					}
+
 					var frames = layer.frames;
 					var n=settings.startFrame;
 					layerSelected = false;
@@ -1901,7 +1928,7 @@
 						 * the proper behavior
 						 */
 						//var filtered;
-						if(isMask){
+						/*if(isMask){
 							frameXML=<mask id={layerFrameId}/>;
 							maskId = layerFrameId;
 							if(colorX){
@@ -1920,9 +1947,9 @@
 									frameXML.@filter="url(#"+this._maskFilter+")";
 								}
 							}
-						}else{
+						}else{*/
 							frameXML=new XML('<g />');
-						}
+						//}
 						if(frame.soundName && this.animated){
 							this._addSoundNode(dom.defs, frameXML, frame, settings.beginAnimation, settings.beginOffset, n);
 						}
@@ -2039,7 +2066,7 @@
 								}
 							}
 							if(element.instanceType=="symbol" && element.blendMode!="normal"){
-								ext.warn('Blend modes are not yet supported (in timeline "'+timeline.name+'", layer '+(i+1)+' at frame '+(j+1)+")");
+								ext.warn('Blend modes are not yet supported (in timeline "'+timeline.name+'", layer '+(i+1)+' at frame '+(n+1)+")");
 							}
 
 							if(!elemSettings.lookupName || !this._symbols[elemSettings.lookupName]){
@@ -2073,7 +2100,7 @@
 							}else if(elementXML){
 								frameXML.appendChild(elementXML);
 							}
-
+							
 							if(!doCollateFrames && element.elementType=="instance"){
 								//var colTransNode = this._addColorTrans(elementXML, element, !doCollateFrames);
 								var filterID=this._getFilters(element, elementXML, elemSettings, dom.defs, null);
@@ -2370,15 +2397,19 @@
 							}
 						}
 
+						if(frameXML.children().length()==1){
+							frameXML = frameXML.children()[0];
+						}
+
 						/*
 						 * Masked layers are grouped together and inserted after
 						 * the mask.
 						 */
-						if(isMasked){  // 
+						/*if(isMasked){  // 
 							masked.unshift(frameXML);
-						}else{
-							xml.prependChild(frameXML);
-						}
+						}else{*/
+							layerXML.prependChild(frameXML);
+						//}
 						if(!frameHasAnimated && (n!=0 || frameEnd!=layer.frameCount)){
 							frameCacheList.push(frameXML);
 						}
@@ -2392,10 +2423,10 @@
 						this._layerCacheLists.push(frameCacheList);
 					}
 				}
-				if(masked.length){
+				/*if(masked.length){
 					// masked layers have ended group
 					this._doMask(xml, masked, maskId);
-				}
+				}*/
 			}else{
 				/*var vb=String(xml['@viewBox']).split(' ');
 				instanceXML['@width']=vb[2];
@@ -2837,14 +2868,14 @@
 			while(deg<0)deg += 360;
 			return deg;
 		},
-		_doMask:function(xml, masked, maskId){
+		/*_doMask:function(xml, masked, maskId){
 			var mg = <g mask={"url(#"+maskId+")"}/>;
 			for(var m=0;m<masked.length;m++){
 				mg.appendChild(masked[m]);
 			}
 			xml.prependChild(mg);
 			masked.clear();
-		},
+		},*/
 		_addAnimationNodes:function(beginAnimation, beginOffset, toNode, type, valueLists, times, stopTimes, totalTime, timePrecision, splineList, defaultValue, repeatCount, forceDiscrete, validateAllLists){
 			var values = new Array();
 
@@ -3903,7 +3934,11 @@
 			if(ext.log){
 				ext.log.pauseTimer(timer);	
 			}
-			return svg;		
+			if(svg.children().length()==1){
+				return svg.children()[0];
+			}else{
+				return svg;
+			}
 		},
 		_getContour:function(contour, polygonsList, options){
 			if(ext.log){
