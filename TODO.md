@@ -1,4 +1,5 @@
 ##Unsupported features
+- Rotation direction (CW or CCW) should be respected
 - Filter tweens
 - Drop Shadow filter
 - Bevel filter
@@ -13,3 +14,4 @@
 - transforms on infinitely looping animated nodes aren't needed
 - Images should be referenced like symbols (this will improve the embedding system)
 - Restrict character entry on custom frame fields
+- Add smil2css post-process
