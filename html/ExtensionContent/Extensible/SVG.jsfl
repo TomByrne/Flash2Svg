@@ -2115,7 +2115,7 @@
 						if(doCollateFrames){
 							var transAnimObj = {xList:[], yList:[], scxList:[], scyList:[], skxList:[], skyList:[], rotList:[], trxList:[], tryList:[],
 												redOList:[], redMList:[], greenOList:[], greenMList:[], blueOList:[], blueMList:[], alphaOList:[], alphaMList:[],
-												timeList:[], splineList:[],
+												timeList:[], splineList:[], rotSplineList:[],
 												skxScaleXList:[], skxScaleYList:[], skxTimeList:[], skxSplineList:[],
 												skyScaleXList:[], skyScaleYList:[], skyTimeList:[], skySplineList:[],
 												transXList:[], transYList:[]};
@@ -2191,26 +2191,8 @@
 									var allowSkewRot = allowRotateList[keyframeI] || withinQuad;
 									keyframeI++;
 
-									var attemptForeRot = true;
-									var attemptBackRot = true;
-									//var time = (settings.animOffset+nextInd/ext.doc.frameRate)/animDur;
 									var time = (settings.animOffset + nextInd) / ext.doc.frameRate;
 									var isLast = (nextFrame.duration + nextInd >= frameEnd);
-									/*if(addTweenKiller){
-										var smallT = this.precision(time-1/Math.pow(10, this.decimalPointPrecision));
-										transAnimObj.timeList.push(smallT);
-									}else */if(lastFrame.tweenType=="motion"){
-										switch(lastFrame.motionTweenRotate){
-											case "clockwise":
-												if(lastFrame.duration>1)autoRotate += lastFrame.motionTweenRotateTimes*360;
-												attemptBackRot = false;
-												break;
-											case "counter-clockwise":
-												if(lastFrame.duration>1)autoRotate += lastFrame.motionTweenRotateTimes*-360;
-												attemptForeRot = false;
-												break;
-										}
-									}
 
 									var nextElement = nextFrame.elements[0];
 									var rot = this._getRotation(nextElement, allowSkewRot) - firstRot;
@@ -2221,16 +2203,40 @@
 										var skewX = nextElement.skewX - firstSkX;
 										var skewY = nextElement.skewY - firstSkY;
 									}
+									var allowRotTween = true;
+									if(lastFrame.tweenType=="motion"){
+										switch(lastFrame.motionTweenRotate){
+											case "clockwise":
+												if(lastFrame.duration>1)autoRotate += lastFrame.motionTweenRotateTimes*360;
+												while(rot < lastRot){
+													rot += 360;
+												}
+												break;
 
-									while(attemptForeRot && Math.abs(rot-lastRot)>Math.abs(rot+360-lastRot)){
-										rot += 360;
-										skewX += 360;
-										skewY += 360;
-									}
-									while(attemptBackRot && Math.abs(rot-lastRot)>Math.abs(rot-360-lastRot)){
-										rot -= 360;
-										skewX -= 360;
-										skewY -= 360;
+											case "counter-clockwise":
+												if(lastFrame.duration>1)autoRotate += lastFrame.motionTweenRotateTimes*-360;
+												while(rot > lastRot){
+													rot -= 360;
+												}
+												break;
+
+											case "auto":
+												while(Math.abs(rot-lastRot)>Math.abs(rot+360-lastRot)){
+													rot += 360;
+													skewX += 360;
+													skewY += 360;
+												}
+												while(Math.abs(rot-lastRot)>Math.abs(rot-360-lastRot)){
+													rot -= 360;
+													skewX -= 360;
+													skewY -= 360;
+												}
+												break;
+
+											case "none":
+												allowRotTween = false;
+												break;
+										}
 									}
 
 									// if there is a rotation tween of up to 45 degrees, we add extra bounds to accomodate it.
@@ -2262,7 +2268,7 @@
 									var transPoint = nextElement.getTransformationPoint();
 									this.checkSkewQuadrant(skewX, time, lastSkX, lastTime, transAnimObj.skxScaleYList, transAnimObj.skxScaleXList, transAnimObj.skxTimeList, transAnimObj.skxSplineList, transPoint.x, transPoint.y, lastFrame.tweenType!="none")
 									this.checkSkewQuadrant(skewY, time, lastSkY, lastTime, transAnimObj.skyScaleXList, transAnimObj.skyScaleYList, transAnimObj.skyTimeList, transAnimObj.skySplineList, transPoint.y, transPoint.x, lastFrame.tweenType!="none")
-									this._addAnimFrame(nextFrame, nextElement, invMatrix, time, startTime, forceDiscrete, rot, skewX, skewY, autoRotate, transAnimObj, timeline, i);
+									this._addAnimFrame(nextFrame, nextElement, invMatrix, time, startTime, forceDiscrete, rot, skewX, skewY, autoRotate, transAnimObj, timeline, i, allowRotTween);
 									
 									lastFrame = nextFrame;
 									lastRot = rot;
@@ -2313,7 +2319,7 @@
 									frameHasAnimated = true;
 									// the ordering of these animation nodes is important
 									this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, elementXML, "translate", [transAnimObj.xList, transAnimObj.yList], transAnimObj.timeList, stopTimes, timeDur, timePrecision, transAnimObj.splineList, null, settings.repeatCount, forceDiscrete);
-									this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, elementXML, "rotate", [transAnimObj.rotList, transAnimObj.trxList, transAnimObj.tryList], transAnimObj.timeList, stopTimes, timeDur, timePrecision, transAnimObj.splineList, null, settings.repeatCount, forceDiscrete, false);
+									this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, elementXML, "rotate", [transAnimObj.rotList, transAnimObj.trxList, transAnimObj.tryList], transAnimObj.timeList, stopTimes, timeDur, timePrecision, transAnimObj.rotSplineList, null, settings.repeatCount, forceDiscrete, false);
 									this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, elementXML, "skewX", [transAnimObj.skxList], transAnimObj.timeList, stopTimes, timeDur, timePrecision, transAnimObj.splineList, null, settings.repeatCount, forceDiscrete);
 									this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, elementXML, "skewY", [transAnimObj.skyList], transAnimObj.timeList, stopTimes, timeDur, timePrecision, transAnimObj.splineList, null, settings.repeatCount, forceDiscrete);
 									this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, elementXML, "scale", [transAnimObj.scxList, transAnimObj.scyList], transAnimObj.timeList, stopTimes, timeDur, timePrecision, transAnimObj.splineList, 1, settings.repeatCount, forceDiscrete, true);
@@ -2585,7 +2591,7 @@
 		},
 		_addAnimFrame:function(frame, element, invMatrix, time, startTime, forceDiscrete,
 								rot, skewX, skewY, autoRotate,
-								transAnimObj, timeline, layerI){
+								transAnimObj, timeline, layerI, allowRotTween){
 
 			if(!isNaN(element.rotation)){
 				element.rotation += 0; // sometimes fixes invalid matrices
@@ -2661,6 +2667,7 @@
 
 			var spline = this._getFrameSpline(frame, timeline, layerI);
 			transAnimObj.splineList.push(spline);
+			transAnimObj.rotSplineList.push( allowRotTween ? spline : this.NO_TWEEN_SPLINE_TOKEN );
 
 			transAnimObj.timeList.push(time - startTime);
 		},
@@ -2933,7 +2940,7 @@
 							}else{
 								beginAnim = beginAnimation + (beginOffset ? "+" + beginOffset + "s" : "");
 							}
-							var animNode = new XML('<animateTransform attributeName="transform" additive="replace" type="translate" dur="'+totalTime+'s" keyTimes="0;1" values="0;0"/>')
+							var animNode = new XML('<animateTransform attributeName="transform" additive="replace" type="translate" dur="'+totalTime+'s" keyTimes="0;1" values="0,0;0,0"/>')
 							if(beginAnim!="0s")animNode.@begin = beginAnim;
 							toNode.prependChild(animNode);
 						}
@@ -3141,7 +3148,7 @@
 					var p2 = ease[2];
 					return this.precision(p1.x)+" "+this.precision(p1.y)+" "+this.precision(p2.x)+" "+this.precision(p2.y);
 				}else{
-					ext.warn('Custom easing is only supported with two control points (in timeline "'+timeline.name+'", layer '+(layerI+1)+' at frame '+(frame.startFrame+1)+")");
+					ext.warn('Custom easing is only supported with no control points, use endpoint handles only (in timeline "'+timeline.name+'", layer '+(layerI+1)+' at frame '+(frame.startFrame+1)+")");
 				}
 			}
 			if(!frame.useSingleEaseCurve) ext.warn('Per property custom easing is not supported (in timeline "'+timeline.name+'", layer '+(layerI+1)+' at frame '+(frame.startFrame+1)+")");
