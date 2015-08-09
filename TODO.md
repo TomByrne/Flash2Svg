@@ -1,5 +1,5 @@
 ##Unsupported features
-- Rotation direction (CW or CCW) should be respected
+- Motion guidess
 - Filter tweens
 - Drop Shadow filter
 - Bevel filter
@@ -8,6 +8,7 @@
 - Primative Shape support (rect, circle, etc)
 - Detect rectangle paths and use primative shape
 - Button symbols export with mouseenter and mouseleave
+- Text inputs (as html foreignObject)
 
 ##Enhancements
 - When opening flash by double-clicking FLA, error alerts are shown
