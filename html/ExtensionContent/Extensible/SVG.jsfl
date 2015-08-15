@@ -3974,15 +3974,15 @@
 				if(edgeIDs.indexOf(e.id)<0){
 					edgeIDs.push(e.id);
 				}
-				try{
-					var cubicSegmentIndex = curveDeg==3?e.cubicSegmentIndex:-1;
-				}catch(e){
-					cubicSegmentIndex = -1;
-				}
 				var cp;
 				if(e.isLine){
 					cp =[e.getControl(0), e.getControl(2)];
 				}else{
+					try{
+						var cubicSegmentIndex = curveDeg==3?e.cubicSegmentIndex:-1;
+					}catch(e){
+						cubicSegmentIndex = -1;
+					}
 					if(curveDeg==3){
 						if(cubicSegmentIndex && cubicSegmentIndex!=-1){
 							cp = shape.getCubicSegmentPoints(cubicSegmentIndex);
