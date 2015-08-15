@@ -473,6 +473,7 @@
 			this._symbols={};
 			this._symbolBounds={};
 			this._fillMap={};
+			this._fillUseCount={};
 			this._maskFilter = null;
 			this._symbolList = [];
 			this._bitmaps={};
@@ -847,7 +848,7 @@
 					this.applyMatrices(document);
 				}
 				if(this.applyColorEffects){
-					this._applyColorEffects(document, document.defs);
+					this._applyColorEffects(document, document, document.defs);
 				}
 				this._deleteUnusedFilters(document);
 				document['@xmlns']="http://www.w3.org/2000/svg";
@@ -1357,19 +1358,6 @@
 			var settings=new ext.Object({});
 			settings.extend(options);
 			var result;
-			/*if(this.swfPanel){
-				var progressIncrements=this._getProgressIncrements(
-					element,
-					settings.frame
-				);
-				if(progressIncrements){
-					this._progress+=progressIncrements;
-				}else{
-					ext.warn(
-						'extensible.SVG.getElement()\n\t'+progressIncrements+'\n\t'+e
-					);
-				}
-			}*/
 			if(element instanceof ext.Instance){
 				if(element.instanceType=='symbol'){
 					result=this._getSymbolInstance(element, settings);
@@ -1378,7 +1366,7 @@
 				}
 			}else{
 				if(element instanceof ext.Shape){
-					result=this._getShape(element,settings);
+					result = this._getShape(element,settings);
 				}else if(
 					element instanceof ext.Text || 
 					element instanceof ext.TLFText
@@ -1408,8 +1396,7 @@
 
 					if(timeline){
 						// If this element is in a newly cloned timeline sometimes the correct bounds haven't been calculated
-						if(typeof(timelineRef)=="number") ext.doc.editScene(timelineRef);
-						else ext.doc.library.editItem(timelineRef);
+						this.editTimeline(timeline)
 						timeline.setSelectedLayers(layerInd, true);
 						timeline.currentFrame = frameInd;
 						bounds = {top:item.top, left:item.left, right:item.right, bottom:item.bottom};
@@ -1437,6 +1424,13 @@
 				return {left:0, right:0, top:0, bottom:0};
 			}
 		},
+		editTimeline:function(timeline){
+			if(timeline.libraryItem){
+				ext.doc.library.editItem(timeline.libraryItem.name);
+			}else{
+				ext.doc.editScene(ext.doc.timelines.indexOf(timeline.$ || timeline));
+			}
+		},
 		hasTweensInRange:function(options){
 			if(ext.log){
 				var timer=ext.log.startTimer('extensible.SVG.hasTweensInRange()');	
@@ -1458,16 +1452,12 @@
 				// deselection must occur on the original timeline, not a copy or flash crashes
 				var layersVis = [];
 				var layersLocked = [];
-				if(settings.timeline.libraryItem){
-					ext.doc.library.editItem(settings.timeline.libraryItem.name);
-				}else{
-					ext.doc.editScene(ext.doc.timelines.indexOf(settings.timeline.$));
-				}
+				this.editTimeline(settings.timeline);
 			}
 			var ret = false;
 			var f=new ext.Array();
 			var layers=settings.timeline.$.layers;
-			for(var l=0;l<layers.length;l++){
+			for(var l=0; l<layers.length; l++){
 				var layer = layers[l];
 				if( !ret &&
 					( layer.visible || settings.includeHiddenLayers ) && 
@@ -1487,7 +1477,7 @@
 							) && settings.frame!=frame.startFrame
 						){
 							ret = true;
-							break;
+							if(!(deselect))break;
 						}
 						if( settings.includeGraphicChanges && frame.duration>1){
 							var elems = frame.elements;
@@ -2071,7 +2061,7 @@
 
 							if(!elemSettings.lookupName || !this._symbols[elemSettings.lookupName]){
 								if(this._delayedProcessing){
-									var elementXML = new XML( elemSettings.lookupName ? '<symbol overflow="visible"/>' : '<g/>' );
+									var elementXML = new XML( elemSettings.lookupName ? '<symbol id="'+elemSettings.lookupName+'" overflow="visible"/>' : '<g/>' );
 									this.qData.push(closure(this.processElement, [elementXML, element, elemSettings, dom], this));
 								}else{
 									var elementXML = this._getElement( element, elemSettings );
@@ -3749,54 +3739,21 @@
 			var descendantMatrix=new ext.Matrix();
 			var pathMatrix=null;
 			var layerLocked=shape.layer.locked;
-			//var id;
-			if( shape.isRectangleObject || shape.isOvalObject ){ // ! important
-				/*id=(
-					shape.isRectangleObject?
-					this._uniqueID('rectangleObject'):
-					this._uniqueID('ovalObject')
-				);*/
-				shape.setTransformationPoint({x:0.0,y:0.0});
-				var origin=new ext.Point({
-					x:(shape.objectSpaceBounds.left-shape.objectSpaceBounds.right)/2,
-					y:(shape.objectSpaceBounds.top-shape.objectSpaceBounds.bottom)/2
-				}).transform(matrix);
-				matrix.tx=origin.x;
-				matrix.ty=origin.y;
-				//matrix=matrix.concat(settings.matrix);
-				matrix=fl.Math.concatMatrix(matrix, settings.matrix);
-				if(shape.objectSpaceBounds.left!=0 || shape.objectSpaceBounds.top!=0){
-					pathMatrix=new ext.Matrix({
-						tx:-shape.objectSpaceBounds.left,
-						ty:-shape.objectSpaceBounds.top
-					});
-				}
-			}else if(shape.isDrawingObject){
-				//id=this._uniqueID('drawingObject');
-				//matrix=matrix.concat(settings.matrix);
-				matrix=fl.Math.concatMatrix(matrix, settings.matrix);
-			}else if(shape.isGroup){
-				//id=this._uniqueID('group');
-
-				descendantMatrix = matrix.invert();
+			
+			if(shape.isGroup || shape.isRectangleObject || shape.isOvalObject || shape.isDrawingObject){
+				descendantMatrix = matrix;
 				matrix = new ext.Matrix();
 				if(this._appVersion<12){
 					// an issue before CS6 resulted in groups having incorrect transforms
 				}else{
-					matrix=fl.Math.concatMatrix(matrix, settings.matrix);
+					descendantMatrix = new ext.Matrix(fl.Math.concatMatrix(descendantMatrix, settings.matrix));
 				}
-				//matrix=matrix.concat(settings.matrix);
 			}else{
-				//id=this._uniqueID('shape');
 				matrix.tx = 0;//shape.left;
 				matrix.ty = 0;//shape.top;
-				//matrix=matrix.concat(settings.matrix);
 				matrix = fl.Math.concatMatrix(matrix, settings.matrix);
-				/*if(shape.left!=0 || shape.top!=0 ){
-					pathMatrix = new ext.Matrix({tx:shape.left, ty:shape.top});
-					pathMatrix = pathMatrix.invert();
-				}*/
 			}
+			pathMatrix = descendantMatrix;
 			var contours=shape.contours;
 			if(!(contours && contours.length) && !shape.isGroup){
 				return;	
@@ -3970,10 +3927,10 @@
 			var holes = settings.holes;
 			var strokesDone = settings.strokesDone;
 
-			var xform='';
+			/*var xform='';
 			if(settings.matrix){
 				xform=' transform="'+this._getMatrix(settings.matrix)+'" ';
-			}
+			}*/
 
 
 			var fill=this._getFill(contour.fill,{
@@ -4122,6 +4079,9 @@
 						cp.reverse();
 					}
 					var firstPoint = cp[0];
+					if(settings.matrix){
+						firstPoint = settings.matrix.transformPoint(firstPoint.x, firstPoint.y, true);
+					}
 					if(!lastPoint || lastPoint.x!=firstPoint.x || lastPoint.y!=firstPoint.y){
 						lastDeg = degPrefix[0];
 						pathStr += lastDeg+this.precision(firstPoint.x)+","+this.precision(firstPoint.y);
@@ -4137,6 +4097,9 @@
 					for(var k=1; k<cp.length; k++){
 						if(k!=1)pathStr += " ";
 						var point = cp[k];
+						if(settings.matrix){
+							point = settings.matrix.transformPoint(point.x, point.y, true);
+						}
 						pathStr += this.precision(point.x)+","+this.precision(point.y);
 					}
 					polygon.push({x:point.x, y:point.y});
@@ -4326,9 +4289,11 @@
 			var cached = this._fillMap[str];
 			if(cached){
 				xml = cached;
+				this._fillUseCount[xml.@id.toString()]++;
 			}else{
 				this._fillMap[str] = xml;
 				xml['@id']=id;
+				this._fillUseCount[id] = 1;
 			}
 			if(ext.log){ext.log.pauseTimer(timer);}
 			return xml;
@@ -4343,7 +4308,7 @@
 		 * @return {String} Returns stroke attributes.
 		 * @private
 		 */
-		_getStroke:function(stroke,options){
+		_getStroke:function(stroke, options){
 			if(ext.log){
 				var timer=ext.log.startTimer('extensible.SVG._getStroke()');	
 			}
@@ -5023,7 +4988,7 @@
 			}
 			return xml;
 		},
-		_applyColorEffects:function(xml,defs,colorX){
+		_applyColorEffects:function(doc, xml, defs, colorX){
 			if(ext.log){
 				var timer=ext.log.startTimer('extensible.SVG._applyColorEffects()');	
 			}
@@ -5094,9 +5059,20 @@
 						var paintStr=String(xml['@'+paintProperties[i]]);
 						var paintID=paintStr.match(/(?:url\(#)(.*?)(?:\))/);
 						if(paintID && paintID.length>1){
-							paintID=paintID[1];
-							var paint=defs.*.(@id.toString()==paintID);
+							paintID = paintID[1];
+							var paint = defs.*.(@id.toString()==paintID);
 							if(paint && paint.length()){
+								// first check if others are using this definition (don't want to affect all instances, just one)
+								if(this._fillUseCount[paintID] > 1){
+									var newPaint = paint.copy();
+									var newPaintID = this._uniqueID(String(newPaint.@id));
+									newPaint.@id = newPaintID;
+									xml['@'+paintProperties[i]] = "url(#"+newPaintID+")";
+									defs.appendChild(newPaint);
+									paint = newPaint;
+									paintID = newPaintID;
+								}
+
 								for each(var stop in paint[0].stop){
 									var stopColor=new ext.Color(
 										String(stop['@stop-color'])
@@ -5127,7 +5103,7 @@
 			}
 			if(this.applyColorEffects){
 				for each(var element in xml.*){
-					this._applyColorEffects(element,defs,color);
+					this._applyColorEffects(doc, element, defs, color);
 				}
 			}
 			if(ext.log){
@@ -5246,7 +5222,7 @@
 								useNode['@xlink-href'] = "#"+existing.@id;
 							}
 						}else{
-							fl.trace("\nCOULDN'T COMBINE: "+symbol.toXMLString());
+							fl.trace("\nCOULDN'T COMBINE: "+symbol.toXMLString()+"\n"+timelineIndex);
 						}
 					}else{
 						map[key] = symbol;

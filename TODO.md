@@ -9,6 +9,7 @@
 - Detect rectangle paths and use primative shape
 - Button symbols export with mouseenter and mouseleave
 - Text inputs (as html foreignObject)
+- Blend modes
 
 ##Enhancements
 - When opening flash by double-clicking FLA, error alerts are shown
