@@ -2055,9 +2055,6 @@
 									}
 								}
 							}
-							if(element.instanceType=="symbol" && element.blendMode!="normal"){
-								ext.warn('Blend modes are not yet supported (in timeline "'+timeline.name+'", layer '+(i+1)+' at frame '+(n+1)+")");
-							}
 
 							if(!elemSettings.lookupName || !this._symbols[elemSettings.lookupName]){
 								if(this._delayedProcessing){
@@ -2097,6 +2094,7 @@
 								if(filterID && dom.defs.filter.(@id.toString()==filterID).length()){
 									elementXML['@filter']='url(#'+filterID+')';
 								}
+								this.addBlendMode(element, elementXML);
 							}
 							
 						}
@@ -2117,6 +2115,7 @@
 							if(filterID && dom.defs.filter.(@id.toString()==filterID).length()){
 								elementXML['@filter']='url(#'+filterID+')';
 							}
+							this.addBlendMode(element, elementXML);
 						}
 
 						if(doAnim){
@@ -2372,7 +2371,7 @@
 									fAnimNode.@values="inline;none;none";
 
 									if(!this.showStartFrame){
-										frameXML.@style = "display:none;";
+										frameXML.@style += "display:none;";
 									}
 								}else{
 									if(frameTimeEnd==1){
@@ -2380,13 +2379,13 @@
 										fAnimNode.@values="none;inline;none";
 
 										if(!this.showEndFrame){
-											frameXML.@style = "display:none;";
+											frameXML.@style += "display:none;";
 										}
 									}else{
 										fAnimNode.@keyTimes = "0;"+frameTimeStart+";"+frameTimeEnd+";1";
 										fAnimNode.@values="none;inline;none;none";
 
-										frameXML.@style = "display:none;";
+										frameXML.@style += "display:none;";
 									}
 								}
 								frameXML.appendChild(fAnimNode);
@@ -3272,6 +3271,42 @@
 				ext.log.pauseTimer(timer);
 			}
 			return xml;
+		},
+		addBlendMode:function(instance, xml){
+			var blendMode = instance.blendMode;
+			switch(blendMode){
+				case "multiply":
+				case "screen":
+				case "overlay":
+				case "lighten":
+				case "darken":
+				case "difference":
+					// These all have the same name in CSS
+					break;
+
+				case "hardLight":
+					blendMode = "hard-light";
+					break;
+
+				case "invert":
+					blendMode = "exclusion";
+					break;
+
+				case "layer":
+				case "erase":
+				case "add":
+				case "subtract":
+				case "alpha":
+					fl.trace("WARNING: Blend mode '"+blendMode+"' is not currently supported");
+					// intentional non-break
+
+				default:
+					blendMode = null;
+
+			}
+			if(blendMode){
+				xml.@style += "mix-blend-mode:"+blendMode+";";
+			}
 		},
 		_getFilters:function(element, xml, options, defs, transAnimObj){
 			var settings=new ext.Object({
