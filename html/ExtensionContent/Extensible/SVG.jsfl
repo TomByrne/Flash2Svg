@@ -530,7 +530,7 @@
 					discreteEasing:this.discreteEasing
 				}
 			);
-			this._explodeNode(x, xml);
+			//this._explodeNode(x, xml);
 			this.doms[timelineIndex] = xml;
 
 			if(ext.log){
@@ -678,7 +678,7 @@
 			var i=0;
 			if(verbose)fl.trace("\n\nBEFORE:\n"+frameNode.toXMLString());
 			var toDelete = [];
-			var graphChildren = frameNode.g.length() + frameNode.path.length() + frameNode.use.length();
+			var graphChildren = frameNode.g.length() + frameNode.path.length() + frameNode.use.length() + frameNode.mask.length();
 			var canExplode = frameName=="g";
 			while( i<length ){
 				var childNode = frameNode.children()[i];
@@ -817,7 +817,7 @@
 
 
 					length = frameNode.children().length();
-					graphChildren = frameNode.g.length() + frameNode.path.length() + frameNode.use.length();
+					graphChildren = frameNode.g.length() + frameNode.path.length() + frameNode.use.length() + frameNode.mask.length();
 					continue;
 
 				}
@@ -853,7 +853,11 @@
 				this._deleteUnusedFilters(document);
 				document['@xmlns']="http://www.w3.org/2000/svg";
 
-				var trans = document.@transform;
+				if(document.defs.children().length()==0){
+					delete document.children()[document.defs.childIndex()];
+				}
+
+				/*var trans = document.@transform;
 				if(trans.length()){
 					// transform doesn't work on the root node, so transfer it to it's children
 					var transMat = new ext.Matrix(trans.toString());
@@ -866,7 +870,7 @@
 						}
 					}
 					delete document.@transform;
-				}
+				}*/
 				if(document.@preserveAspectRatio.length()){
 					document['@viewBox']=String(this.x)+' '+String(this.y)+' '+String(this.width)+' '+String(this.height);
 				}
@@ -1801,6 +1805,8 @@
 				//var masked=new ext.Array();
 				//var maskId = null;
 				var maskXML = null;
+				var maskAnim = null;
+				var lastMaskState = null;
 				for(var i=0;i<layers.length;i++){
 					var layer=layers[i];
 					if(layer.layerType=="guide" || layer.layerType=="folder")continue;
@@ -1835,7 +1841,8 @@
 						layerXML = new XML("<mask id='"+this._uniqueID('mask_')+"'/>");
 						xml.prependChild(layerXML);
 						maskXML = layerXML;
-
+						maskAnim = null;
+						lastMaskState = null;
 
 						if(this.maskingType=='alpha'){
 							// This makes semi-transparent parts of masks fully opaque
@@ -1863,7 +1870,12 @@
 								(layer.parentLayer.layerType!='guide' || this.includeGuides))){
 
 						isMasked = true;
-						layerXML = new XML("<g mask='url(#"+maskXML.@id+")'/>");
+						if(maskAnim!=null){
+							layerXML = new XML("<g/>");
+							layerXML.appendChild(maskAnim.copy());
+						}else{
+							layerXML = new XML("<g mask='url(#"+maskXML.@id+")'/>");
+						}
 						xml.prependChild(layerXML);
 
 					}else{
@@ -1881,6 +1893,18 @@
 						var tweenType = frame.tweenType;
 
 						var items = this._getItemsByFrame(frame, settings.selection);
+						if(isMask){
+							var maskState = (items.length ? "url(#"+maskXML.@id+")" : "none");
+							if(lastMaskState==null){
+								lastMaskState = maskState;
+							}else if(lastMaskState!=maskState){
+								if(maskAnim==null)maskAnim = new XML('<animate attributeName="mask" repeatCount="'+settings.repeatCount+'" dur="'+timeDur+'s" keyTimes="0" values="'+lastMaskState+'"/>');
+								maskAnim.@keyTimes += ";" + this.precision((settings.animOffset + n - settings.startFrame)/animDur);
+								maskAnim.@values += ";" + maskState;
+								lastMaskState = maskState;
+							}
+						}
+
 						if(items.length==0){
 							if(!frame.soundName){
 								n += frame.startFrame + frame.duration - n;
@@ -2411,6 +2435,19 @@
 
 						n = transToDiff ? frameEnd-1 : frameEnd;
 					}
+					if(isMask && (maskAnim || layerEnd < settings.endFrame)){
+						if(layerEnd < settings.endFrame && (lastMaskState!="none" || !maskAnim)){
+							if(maskAnim==null)maskAnim = new XML('<animate attributeName="mask" repeatCount="'+settings.repeatCount+'" dur="'+timeDur+'s" keyTimes="0" values="'+lastMaskState+'"/>');
+							maskAnim.@keyTimes += ";" + this.precision((settings.animOffset + layerEnd - settings.startFrame)/animDur);
+							maskAnim.@values += ";none";
+							lastMaskState = "none";
+						}
+						var times = maskAnim.@keyTimes.split(";");
+						if(times[times.length-1]!="1"){
+							maskAnim.@keyTimes += ";1";
+							maskAnim.@values += ";"+lastMaskState;
+						}
+					}
 					if(layer.visible!=lVisible) layer.visible=lVisible;
 					if(layer.locked!=lLocked) layer.locked=lLocked;
 
@@ -2454,7 +2491,9 @@
 				if(settings.isRoot && this.clipToScalingGrid && settings.libraryItem){
 					boundingBox=settings.libraryItem.scalingGridRect;
 				}
-				if(!settings.isRoot){
+				if(settings.isRoot){
+					dom.appendChild(xml);
+				}else{
 					dom.defs.appendChild(xml);
 				}
 			}
@@ -4218,13 +4257,20 @@
 							xml['@spreadMethod']='repeat';
 							break;
 					}
+					var outerPos;
+					var outerCol;
 					for(var i=0;i<fillObj.colorArray.length;i++){
 						var stop=new XML('<stop/>');
 						var c=new ext.Color(fillObj.colorArray[i]);
 						stop['@stop-color']=c.hex;
 						stop['@stop-opacity']=c.opacity;
 						if(i<fillObj.posArray.length){
-							stop['@offset']=String(Math.roundTo((fillObj.posArray[i]/255.0),this.decimalPointPrecision+2));
+							var pos = fillObj.posArray[i];
+							stop['@offset']=String(Math.roundTo((pos/255.0),this.decimalPointPrecision+2));
+							if(outerPos==null || pos < outerPos){
+								outerPos = pos;
+								outerCol = c;
+							}
 						}
 						xml.appendChild(stop);
 					}
@@ -4263,21 +4309,28 @@
 							matrix=mx.invert().concat(matrix);
 							var bias=(fillObj.focalPoint+255)/510;
 							var fp=p0.midPoint(p2,bias);
-							xml['@r']=String(p1.distanceTo(p2))+unitID;
-							xml['@cx']=String(p1.x)+unitID;
-							xml['@cy']=String(p1.y)+unitID;
-							xml['@fx']=String(fp.x)+unitID;
-							xml['@fy']=String(fp.y)+unitID;
+							var radius = this.precision(p1.distanceTo(p2));
+							xml['@r']=String(radius)+unitID;
+							xml['@cx']=String(this.precision(p1.x))+unitID;
+							xml['@cy']=String(this.precision(p1.y))+unitID;
+							xml['@fx']=String(this.precision(fp.x))+unitID;
+							xml['@fy']=String(this.precision(fp.y))+unitID;
 							xml['@gradientTransform']=this._getMatrix(matrix);
+
+							if(radius==0 && outerCol){
+								xml=new XML('<solidColor/>');
+								xml['@solid-color']=outerCol.hex;
+								if(outerCol.opacity<1)xml['@solid-opacity']=this.precision(outerCol.opacity);
+							}
 							break;
 						case 'linearGradient':
 							p0=p0.transform(matrix);
 							p1=p1.transform(matrix);
 							p2=p2.transform(matrix);
-							xml['@x1']=String(p0.x)+unitID;
-							xml['@y1']=String(p0.y)+unitID;
-							xml['@x2']=String(p2.x)+unitID;
-							xml['@y2']=String(p2.y)+unitID;
+							xml['@x1']=String(this.precision(p0.x))+unitID;
+							xml['@y1']=String(this.precision(p0.y))+unitID;
+							xml['@x2']=String(this.precision(p2.x))+unitID;
+							xml['@y2']=String(this.precision(p2.y))+unitID;
 							break;
 					}
 					break;
