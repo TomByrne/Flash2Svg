@@ -1481,7 +1481,7 @@
 							) && settings.frame!=frame.startFrame
 						){
 							ret = true;
-							if(!(deselect))break;
+							/*if(!(deselect))*/break;
 						}
 						if( settings.includeGraphicChanges && frame.duration>1){
 							var elems = frame.elements;
@@ -1491,6 +1491,19 @@
 									ret = true;
 									break;
 								}
+							}
+						}
+
+						var elements = frame.elements;
+						if(deselect && elements.length==1){
+							var element = elements[0];
+							if(element.elementType=="shape" && (element.isDrawingObject || element.isGroup || element.isRectangleObject || element.isOvalObject)){
+								// ext.doc.selection = [element];
+								// fl.trace("BREAK: "+ext.doc.selection.length+" "+elements.length);
+								// ext.doc.breakApart();
+								// ext.doc.selectNone();
+								ret = true;
+								break;
 							}
 						}
 					}
@@ -1508,6 +1521,7 @@
 				var end = (settings.endFrame+1 < settings.timeline.frameCount ? settings.endFrame+1 : settings.timeline.frameCount)
 				for(var i=settings.startFrame;i<end;i++){
 					settings.timeline.currentFrame = i;
+
 					if(ext.doc.selection.length){
 						ext.doc.selectNone();
 					}
@@ -1627,13 +1641,14 @@
 				 * Create temporary timelines where tweens exist & convert to
 				 * keyframes.
 				 */
-				var originalScene,timelines;
+				var originalScene,timelines,isEditing;
 				if(hasTweens){
 					/*if(settings.libraryItem==undefined){
 						originalScene=timelineName;
 					}*/
 					timeline = this._getTimelineCopy(settings.libraryItem, timeline, settings.startFrame, settings.endFrame);
 					var layers = timeline.$.layers;
+					isEditing = false;
 
 					if(ext.log){
 						var timer2=ext.log.startTimer('extensible.SVG._getTimeline() >> Check break apart tweens');	
@@ -1642,16 +1657,20 @@
 						var layer=layers[i];
 						if(layer.layerType=="guide" || layer.layerType=="folder")continue;
 
+						layer.locked = false;
+
 						var layerEnd = settings.endFrame;
 						if(layerEnd > layer.frameCount)layerEnd = layer.frameCount;
 
 						var layerSelected = false;
 						for(var n=settings.startFrame; n<layerEnd; ++n){
+
 							var frame=layer.frames[n];
 							var start=frame.startFrame;
 							var startFrame=layer.frames[start];
 							var breakApart = false;
-							var firstElement = frame.elements[0];
+							var elements = frame.elements;
+							var firstElement = elements[0];
 							if(  frame.tweenType=='shape' || 
 								(n==frame.startFrame && layer.layerType=="guided" && frame.tweenType!="none") ||
 								(settings.flattenMotion && frame.tweenType=="motion") ||
@@ -1689,9 +1708,29 @@
 								}
 								n = end-1;
 							}
+							while(elements.length==1){
+								var element = firstElement;
+								if(hasTweens && element.elementType=="shape" &&
+									(element.isDrawingObject || element.isGroup || element.isRectangleObject || element.isOvalObject)
+									){
+									if(!isEditing){
+										this.editTimeline(timeline);
+									}
+									timeline.currentFrame = n;
 
+									ext.doc.selectNone();
+									ext.doc.selection = [element];
+									ext.doc.breakApart();
+
+									elements = frame.elements;
+								}else{
+									break;
+								}
+							}
 						}
 					}
+					if(isEditing && timeline.libraryItem) ext.doc.exitEditMode();
+
 					if(ext.log){
 						ext.log.pauseTimer(timer2);
 					}
@@ -4230,10 +4269,11 @@
 				if(ext.log){ext.log.pauseTimer(timer);}
 				return;
 			}
-			id=this._uniqueID(fillObj.style);
-			var xml,defaultMeasurement;
-			var shape=settings.shape;
-			var matrix=fillObj.matrix;
+			id = this._uniqueID(fillObj.style);
+			var xml, defaultMeasurement;
+			var shape = settings.shape;
+			var matrix = fillObj.matrix;
+
 			switch(fillObj.style){
 				case 'linearGradient':
 					defaultMeasurement=this.DEFAULT_GRADIENT_LENGTH;
@@ -4303,12 +4343,12 @@
 								tx:matrix.tx,
 								ty:matrix.ty
 							});
-							p0=p0.transform(mx);
-							p1=p1.transform(mx);
-							p2=p2.transform(mx);
-							matrix=mx.invert().concat(matrix);
-							var bias=(fillObj.focalPoint+255)/510;
-							var fp=p0.midPoint(p2,bias);
+							p0 = p0.transform(mx);
+							p1 = p1.transform(mx);
+							p2 = p2.transform(mx);
+							matrix = mx.invert().concat(matrix);
+							var bias = (fillObj.focalPoint+255)/510;
+							var fp = p0.midPoint(p2,bias);
 							var radius = this.precision(p1.distanceTo(p2));
 							xml['@r']=String(radius)+unitID;
 							xml['@cx']=String(this.precision(p1.x))+unitID;
