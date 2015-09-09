@@ -1461,6 +1461,7 @@
 			var ret = false;
 			var f=new ext.Array();
 			var layers=settings.timeline.$.layers;
+			var doShapeBreak = (!settings.timeline.libraryItem || settings.timeline.libraryItem.name.indexOf(".ai ")==-1);
 			for(var l=0; l<layers.length; l++){
 				var layer = layers[l];
 				if( !ret &&
@@ -1495,13 +1496,9 @@
 						}
 
 						var elements = frame.elements;
-						if(deselect && elements.length==1){
+						if(deselect && elements.length==1 && doShapeBreak){
 							var element = elements[0];
 							if(element.elementType=="shape" && (element.isDrawingObject || element.isGroup || element.isRectangleObject || element.isOvalObject)){
-								// ext.doc.selection = [element];
-								// fl.trace("BREAK: "+ext.doc.selection.length+" "+elements.length);
-								// ext.doc.breakApart();
-								// ext.doc.selectNone();
 								ret = true;
 								break;
 							}
