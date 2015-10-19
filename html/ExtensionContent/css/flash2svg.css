@@ -124,6 +124,15 @@
     right: 4px;
     position: absolute;
 }
+#export-options{
+	position:absolute;
+	top: 64px;
+	left:0;
+	right:0;
+	border-top:1px solid #202020;
+	padding: 4px;
+	text-align: right;
+}
 #settings-add-panel{
 	position: absolute;
 	z-index: 200;
@@ -157,7 +166,7 @@
 	position:absolute;
 	overflow: auto;
 	border:none;
-	top: 64px;
+	top: 87px;
 	left:0;
 	bottom:0;
 	right:0;

@@ -44,6 +44,7 @@ var REMOVE_GROUPS = "removeGroups";
 var COMPACT_OUTPUT = "compactOutput";
 var AVOID_MITER = "avoidMiter";
 var TWEEN_TYPE = "tweenType";
+var REVERT = "revert";
 
 
 var accordion;
@@ -326,6 +327,7 @@ function bindSettings(){
 	ControlBinder.bind(this.settings, LOOP_TWEENS, loopTweensCheckbox);
 	ControlBinder.bind(this.settings, BEGIN_ANIMATION, $("#anim-begin"));
 	ControlBinder.bind(this.settings, TWEEN_TYPE, tweenTypeSelect);
+	ControlBinder.bind(this.settings, REVERT, $("#export-revert"));
 	this.settings.change = closure(this, onSettingsChanged);
 
 

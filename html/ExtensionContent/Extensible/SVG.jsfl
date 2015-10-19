@@ -76,7 +76,8 @@
 			compactOutput:true,
 			avoidMiter:true,
 			animatedViewBox:false,
-			drawStrokesOverFills:true
+			drawStrokesOverFills:true,
+			revert:false
 		});
 		if(options instanceof XML || typeof(options)=='string'){
 			ext.Task.apply(this,[settings]);
@@ -87,6 +88,10 @@
 			}
 			settings.extend(options);
 			ext.Task.apply(this,[settings]);
+		}
+		if(settings.revert && !ext.doc.canRevert()){
+			alert("Can't revert document, please deselect revert or use a revertable document");
+			return;
 		}
 		var fileUri;
 		var fileDir;
@@ -1090,6 +1095,10 @@
 					}
 				}
 			}
+
+			if(this.revert){
+				ext.doc.revert();
+			}
 		},
 		/**
 		 * Expands symbol instances ( use tags ).
@@ -1654,7 +1663,14 @@
 						var layer=layers[i];
 						if(layer.layerType=="guide" || layer.layerType=="folder")continue;
 
-						layer.locked = false;
+						var lVisible=layer.visible;
+						var lLocked=layer.locked;
+						if(!lVisible){
+							layer.visible=true;
+						}
+						if(lLocked){
+							layer.locked=false;
+						}
 
 						var layerEnd = settings.endFrame;
 						if(layerEnd > layer.frameCount)layerEnd = layer.frameCount;
@@ -1717,7 +1733,11 @@
 
 									ext.doc.selectNone();
 									ext.doc.selection = [element];
-									ext.doc.breakApart();
+									try{
+										ext.doc.breakApart();
+									}catch(e){
+										break;
+									}
 
 									elements = frame.elements;
 								}else{
@@ -1725,6 +1745,8 @@
 								}
 							}
 						}
+						layer.visible = lVisible;
+						layer.locked = lLocked;
 					}
 					if(isEditing && timeline.libraryItem) ext.doc.exitEditMode();
 
@@ -2253,7 +2275,8 @@
 										var skewY = nextElement.skewY - firstSkY;
 									}
 									var allowRotTween = true;
-									if(lastFrame.tweenType=="motion"){
+
+									if(lastFrame.tweenType=="motion" && nextInd!=n){
 										switch(lastFrame.motionTweenRotate){
 											case "clockwise":
 												if(lastFrame.duration>1)autoRotate += lastFrame.motionTweenRotateTimes*360;
@@ -2698,7 +2721,7 @@
 					matrix.d = -matrix.d;
 				}*/
 			}else{
-				transAnimObj.rotList.push(0);
+				transAnimObj.rotList.push(autoRotate);
 				var rotCos = Math.cos(0);
 				var rotSin = Math.sin(0);
 				matrix = new ext.Matrix(fl.Math.concatMatrix(matrix, invMatrix));

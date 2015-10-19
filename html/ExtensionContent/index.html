@@ -77,6 +77,14 @@
 	<input id="export-button" type="button" value="Export" onclick="doExport()" disabled="disabled" />
 </div>
 
+
+<div id="export-options">
+	<label>
+		<label for="export-revert">Revert all changes after export</label>
+		<input id="export-revert" type="checkbox"/>
+	</label>
+</div>
+
 <div id="accordion-resizer">
 	<div id="accordion" role="tablist">
 		<h3><a href="#">Timeline settings</a></h3>
@@ -84,7 +92,7 @@
 			<span class="section-help ui-icon ui-icon-help"></span>
 		    <label>
 		  		<input id="settings-autosave" type="checkbox" disabled="disabled"/>
-		  		<label for="output-ungroup">Auto-save settings in timelines</label>
+		  		<label for="settings-autosave">Auto-save settings in timelines</label>
 		        <span class="option-hint">Each scene/symbol will retain it's settings.</span>
 		    </label>
 		    <label>
