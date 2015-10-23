@@ -1096,7 +1096,7 @@
 				}
 			}
 
-			if(this.revert){
+			if(this.revert && this.revert!="none"){
 				ext.doc.revert();
 			}
 		},
@@ -1486,7 +1486,7 @@
 						if(
 							(
 								(settings.includeShapeTweens && frame.tweenType=='shape') ||
-								(settings.includeMotionTweens && frame.tweenType=='motion') ||
+								(settings.includeMotionTweens && (frame.tweenType=='motion' || frame.tweenType=='motion object')) ||
 								(settings.includeGuidedTweens && frame.tweenType=='motion' && layer.layerType=="guided")
 							) && settings.frame!=frame.startFrame
 						){
@@ -1641,6 +1641,7 @@
 						deselectItems:true
 					});
 
+
 				 var origTimeline = settings.libraryItem;
 
 				/*
@@ -1684,7 +1685,8 @@
 							var breakApart = false;
 							var elements = frame.elements;
 							var firstElement = elements[0];
-							if(  frame.tweenType=='shape' || 
+							var convertMotionObject = (frame.tweenType=="motion object" && !settings.flattenMotion);
+							if(  frame.tweenType=='shape' || frame.tweenType=="motion object" ||
 								(n==frame.startFrame && layer.layerType=="guided" && frame.tweenType!="none") ||
 								(settings.flattenMotion && frame.tweenType=="motion") ||
 								(n==settings.startFrame && start!=n && startFrame.tweenType!='none') || // this backtracks from the first frame if our range starts mid-tween
@@ -1714,10 +1716,17 @@
 									timeline.$.setSelectedLayers(i);
 								}
 								var end = start+frame.duration;
-								timeline.$.convertToKeyframes(start, end);
+								if(frame.convertToFrameByFrameAnimation!=null){
+									frame.convertToFrameByFrameAnimation();
+								}else{
+									timeline.$.convertToKeyframes(start, end);
+								}
 								for(var v=start; v<end; v++){
 									var frame = layer.frames[v];
 									frame.hasCustomEase = false;
+									if(convertMotionObject){
+										frame.tweenType = "motion";
+									}
 								}
 								n = end-1;
 							}

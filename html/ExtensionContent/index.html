@@ -79,10 +79,17 @@
 
 
 <div id="export-options">
-	<label>
-		<label for="export-revert">Revert all changes after export</label>
-		<input id="export-revert" type="checkbox"/>
-	</label>
+    <label>
+        <div class="select-wrapper">
+	        <select id="export-revert" disabled="disabled">
+                <option value="revertOptionalSave">Optional Pre-save, Post-Revert</option>
+                <option value="revertForcedSave">Auto Pre-save, Post-Revert</option>
+                <option value="none">No save, No Revert</option>
+                <option value="revert">No save, Post-Revert</option>
+            </select>
+        </div>
+		<span id="revert-hint" class="option-hint"></span>
+    </label>
 </div>
 
 <div id="accordion-resizer">

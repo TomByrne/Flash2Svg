@@ -166,7 +166,7 @@
 	position:absolute;
 	overflow: auto;
 	border:none;
-	top: 87px;
+	top: 116px;
 	left:0;
 	bottom:0;
 	right:0;
@@ -179,6 +179,7 @@
 	color:#888;
 	width: 100%;
 	display: block;
+	text-align: left;
 }
 #accordion-resizer label:not([for]) {
     display: block;

@@ -74,6 +74,8 @@ var previewReloadButton;
 var previewFilename;
 var previewBrowser;
 var previewFrame;
+var revertSelect;
+var revertHint;
 
 var timelineSettingsStr;
 var dir;
@@ -85,7 +87,7 @@ function onLoaded() {
 	var self = this;
 
 	accordion = $( "#accordion" );
-	inputs = $("#accordion input,#accordion select");
+	inputs = $("#accordion input,#accordion select,#export-revert");
 
     csInterface = new CSInterface();
 	
@@ -112,6 +114,8 @@ function onLoaded() {
     progBar = $( "#export-progress" );
     progLabel = $("#export-progress-label");
     exportButton = $( "#export-button" );
+    revertSelect = $("#export-revert");
+    revertHint = $("#revert-hint");
     
     sourceSelect = $("#source-timelines");
 	frameSelect = $("#source-frames");
@@ -327,8 +331,11 @@ function bindSettings(){
 	ControlBinder.bind(this.settings, LOOP_TWEENS, loopTweensCheckbox);
 	ControlBinder.bind(this.settings, BEGIN_ANIMATION, $("#anim-begin"));
 	ControlBinder.bind(this.settings, TWEEN_TYPE, tweenTypeSelect);
-	ControlBinder.bind(this.settings, REVERT, $("#export-revert"));
+	ControlBinder.bind(this.settings, REVERT, revertSelect);
 	this.settings.change = closure(this, onSettingsChanged);
+	
+	revertSelect.on("change", closure(this, onRevertChanged));
+	onRevertChanged();
 
 
 	loopCheckbox.on("change", closure(this, onLoopChanged));
@@ -414,6 +421,25 @@ function onOutputChanged(e){
 }
 function onFramesChanged(e){
 	frameRange.css("display", frameSelect.val()=="custom" ? "" : "none");
+}
+function onRevertChanged(e){
+	switch(revertSelect.val()){
+		case "none":
+			revertHint.text("Changes from export will remain (can cause issues with files which already contain corrupted items).");
+			break;
+
+		case "revertOptionalSave":
+			revertHint.text("Optional save before export reverts after export.\nSafest option.");
+			break;
+
+		case "revertForcedSave":
+			revertHint.text("Auto save before export, reverts after export.");
+			break;
+
+		case "revert":
+			revertHint.text("Reverts after export, will lose any unsaved changes.");
+			break;
+	}
 }
 function roundTo(num, points){
 	var pow = Math.pow(10, points);
@@ -725,6 +751,7 @@ function doSavePreset(){
 	var animation = saveAnimationSettings.prop("checked");
 	
 	var props = [];
+	props.push(REVERT);
 	if(source){
 		props.push(SOURCE);
 		props.push(FRAMES);
