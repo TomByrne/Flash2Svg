@@ -142,12 +142,13 @@
             if (p1s.y!=lastY1 && Geom.doIntersect(p1s, p1e, p2, extreme2))
             {
                 var ignorePoint = false;
-                var onStart = (p1s.x==p2.x && p1s.y==p2.y);
-                var onEnd = (p1e.x==p2.x && p1e.y==p2.y);
+                var onStart = (p1s.y==p2.y);
+                var onEnd = (p1e.y==p2.y);
                 if(onStart || onEnd){
                     // point is on one end of line
                     var nextNext = onStart ? (i==0? n1-1 : i-1) : (i+2)%n1;
                     var next = polygon1[nextNext];
+
                     if( (onStart && (p1e.y<p2.y)==(next.y<p2.y)) ||
                         (onEnd && (p1s.y<p2.y)==(next.y<p2.y))){
 
@@ -160,7 +161,7 @@
                     // otherwise false
                     if (Geom.orientation(p1s, p2, p1e) == 0 && Geom.onSegment(p1s, p2, p1e))
                        onEdge1 = true;
-         
+                    
                     count1++;
                     lastY1 = p2.y==p1e.y ? p1e.y : p1s.y;
                 }
@@ -178,8 +179,8 @@
                 if (p2s.y!=lastY2 && Geom.doIntersect(p2s, p2e, p1, extreme1))
                 {
                     var ignorePoint = false;
-                    var onStart = (p2s.x==p1.x && p2s.y==p1.y);
-                    var onEnd = (p2e.x==p1.x && p2e.y==p1.y);
+                    var onStart = (p2s.y==p1.y);
+                    var onEnd = (p2e.y==p1.y);
                     if(onStart || onEnd){
                         // point is on one end of line
                         var nextNext = onStart ? (k==0? n2-1 : k-1) : (k+2)%n2;

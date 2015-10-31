@@ -2122,10 +2122,10 @@
 								elemSettings.lookupName = timelineName+"_"+i+"."+frame.startFrame+(items.length>1?"."+j:"");
 
 							}else if(element.symbolType=="graphic"){
-								elemSettings.frameCount = 1;
 								var childFrame = element.firstFrame;
 								if(element.loop!="single frame")childFrame += (n - frame.startFrame);
 								elemSettings.startFrame = this._getPriorFrame(element.timeline, childFrame);
+								elemSettings.frameCount = Math.min(frame.duration, element.timeline.frameCount - elemSettings.startFrame);
 
 							}else if(element.symbolType=="movie clip"){
 								if((element.libraryItem.timeline.frameCount<(frameEnd-n)) && frameEnd>n+1 && settings.repeatCount!="indefinite"){
@@ -2146,7 +2146,6 @@
 									}
 								}
 							}
-
 							if(!elemSettings.lookupName || !this._symbols[elemSettings.lookupName]){
 								if(this._delayedProcessing){
 									var elementXML = new XML( elemSettings.lookupName ? '<symbol id="'+elemSettings.lookupName+'" overflow="visible"/>' : '<g/>' );
