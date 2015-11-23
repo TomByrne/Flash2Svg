@@ -43,7 +43,7 @@ To build on other operating systems, the build.bat file will have to be converte
 
 ### Animation ###
 - Classic motion tweens
-- Shape Tweens (get ceonverted to keyframes)
+- Shape Tweens (get converted to keyframes)
 - Motion Guides (get converted to keyframes)
 - Auto-rotation tweens (CW & CCW)
 - Color/Tint/Alpha tweens
@@ -80,3 +80,12 @@ To build on other operating systems, the build.bat file will have to be converte
 - Add
 - Subtract
 - Alpha
+
+## Added features ##
+Some features are not in flash but are added to improve the output, they're all optional.
+
+### High FPS ###
+This allows tween animations to play at whatever framerate the browser chooses (normally 60 fps). It makes animations look much smoother than their SWF counterpart.
+
+### Animated View Box ###
+If you have a scene which you'd like to pan and zoom around during the animation, you can add a rectangular symbol and name it "viewBox" (with exactly that capitalisation) and animate it around your scene. When the animation is exported, this area will be considered the 'camera' and will animate the visible area of the scene during playback.
