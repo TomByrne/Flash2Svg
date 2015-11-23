@@ -29,3 +29,54 @@ If you've installed the plugin but it isn't showing up, it's probably due to lan
 - Run the `build/build.bat` file
 
 To build on other operating systems, the build.bat file will have to be converted, if you do this send me a pull request and I'll add your script into the main repo.
+
+## Supported features ##
+### Core ###
+- Symbols
+- Bitmaps
+- Vector Paths (inc. gradient fills)
+- Bitmap fills
+- Bitmaps (embedded or as sidecar files)
+- Sounds (embedded or as sidecar files, relies on JS in SVG)
+- Static Text (as paths)
+- Dynamic/Input Text (as HTML foreign objects)
+
+### Animation ###
+- Classic motion tweens
+- Shape Tweens (get ceonverted to keyframes)
+- Motion Guides (get converted to keyframes)
+- Auto-rotation tweens (CW & CCW)
+- Color/Tint/Alpha tweens
+
+### Filters ###
+- Glow
+- Blur
+- Adjust Color
+
+### Blend Modes ###
+- Multiply
+- Screen
+- Overlay
+- Lighten
+- Darken
+- Difference
+- Hard Light
+- Invert
+
+## Unsupported features ##
+### Animation ###
+- Newer style, per-property tweens
+- Tweens on filter properties
+
+### Filters ###
+- Drop Shadow
+- Bevel
+- Gradient Glow
+- Gradient Bevel 
+
+### Blend Modes ###
+- Layer
+- Erase
+- Add
+- Subtract
+- Alpha
