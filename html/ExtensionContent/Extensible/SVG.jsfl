@@ -2071,6 +2071,7 @@
 										}else if(isDiff){
 											//tweening to different symbol
 											++frameEnd;
+											lastFrame = nextFrame;
 											transToDiff = true;
 											break;
 										}
@@ -2434,7 +2435,7 @@
 										transAnimObj.colorTransNode.feFuncA.@slope = 1;
 									}
 								}
-								this._simplifyColorTrans(transAnimObj.colorTransNode, elementXML);
+								if(transAnimObj.colorTransNode)this._simplifyColorTrans(transAnimObj.colorTransNode, elementXML);
 
 								elementXML.@transform = this._getMatrix(matrix);
 
@@ -2694,8 +2695,14 @@
 			var matrix = new ext.Matrix(element.matrix);
 			var transPoint = element.getTransformationPoint();
 
-			transAnimObj.transXList.push(-transPoint.x);
-			transAnimObj.transYList.push(-transPoint.y);
+			if(element.instanceType=="symbol"){
+				transAnimObj.transXList.push(-transPoint.x);
+				transAnimObj.transYList.push(-transPoint.y);
+			}else{
+				// tweening to a Shape/DrawingObject
+				transAnimObj.transXList.push(transAnimObj.transXList[transAnimObj.transXList.length-1]);
+				transAnimObj.transXList.push(transAnimObj.transYList[transAnimObj.transYList.length-1]);
+			}
 
 			//transPoint = matrix.transformPoint(transPoint.x, transPoint.y, false);
 			var outerTransPoint = matrix.transformPoint(transPoint.x, transPoint.y, true);
@@ -2751,14 +2758,19 @@
 			transAnimObj.skxList.push(this.precision(skewX));
 			transAnimObj.skyList.push(this.precision(skewY));
 
-			transAnimObj.redOList.push(element.colorRedAmount / 0xff);
-			transAnimObj.redMList.push(element.colorRedPercent / 100);
-			transAnimObj.greenOList.push(element.colorGreenAmount / 0xff);
-			transAnimObj.greenMList.push(element.colorGreenPercent / 100);
-			transAnimObj.blueOList.push(element.colorBlueAmount / 0xff);
-			transAnimObj.blueMList.push(element.colorBluePercent / 100);
-			transAnimObj.alphaOList.push(element.colorAlphaAmount / 0xff);
-			transAnimObj.alphaMList.push(element.colorAlphaPercent / 100);
+			var def = function(defVal, val){
+				return (isNaN(val) ? defVal : val);
+			}
+
+			// If a frame has just been converted to a keyframe these values can be undefined
+			transAnimObj.redOList.push(def(0, element.colorRedAmount / 0xff));
+			transAnimObj.redMList.push(def(1, element.colorRedPercent / 100));
+			transAnimObj.greenOList.push(def(0, element.colorGreenAmount / 0xff));
+			transAnimObj.greenMList.push(def(1, element.colorGreenPercent / 100));
+			transAnimObj.blueOList.push(def(0, element.colorBlueAmount / 0xff));
+			transAnimObj.blueMList.push(def(1, element.colorBluePercent / 100));
+			transAnimObj.alphaOList.push(def(0, element.colorAlphaAmount / 0xff));
+			transAnimObj.alphaMList.push(def(1, element.colorAlphaPercent / 100));
 
 			var spline = this._getFrameSpline(frame, timeline, layerI);
 			transAnimObj.splineList.push(spline);
@@ -3433,7 +3445,7 @@
 			var color=(
 				settings.color ?
 				new ext.Color(settings.color) : (
-					element?
+					element && element.elementType=="instance"?
 					new ext.Color(element):
 					undefined
 				)
@@ -3652,7 +3664,7 @@
 					filter.@x='-10%';
 					filter.@y='-10%';
 				}
-				if( ( element?element.colorMode!='none':false ) || settings.color || transAnimObj ){
+				if(color && (( element?element.colorMode!='none':false ) || settings.color || transAnimObj )){
 
 					if(transAnimObj){
 						var ro = this.precision(color.amount[0] / 0xff);
@@ -3808,37 +3820,38 @@
 		_getAssetUri:function(item, cache, type, fileExt){
 			var uri=cache[item.name];
 			if(!uri){
-				uri=this.file.dir+'/'+type+"/"+item.name;
-				if(!uri.extension){
-					var ext = item.sourceFilePath.extension;
-					if(ext){
-						var re=new RegExp('\.'+ext+'$');
-						uri+='.'+ext;
-					}else{
-						uri += "."+fileExt;
-					}
+
+				var ext = item.extension;
+				if(!ext)ext = fileExt;
+				var baseUri = item.name.stripExtension();
+
+				baseUri = baseUri.split("<").join("");
+				baseUri = baseUri.split(">").join("");
+				baseUri = baseUri.split(":").join("");
+				baseUri = baseUri.split("*").join("");
+				baseUri = baseUri.split("?").join("");
+				baseUri = baseUri.split("|").join("");
+				baseUri = baseUri.split('"').join("");
+				baseUri = baseUri.split(' ').join("_");
+
+				var uri = this.file.dir+'/'+type+"/"+baseUri + "." + ext;
+				var origUri;
+				
+				var count = 0;
+				while(FLfile.exists(uri)){
+					origUri = uri;
+					uri = this.file.dir+'/'+type+"/"+baseUri + "_" + count + "." + ext;
+					count++;
 				}
 				var success,xml;
 				if(item.sourceFileExists && item.sourceFileIsCurrent){
-					if(item.sourceFilePath!=uri){
+					if(item.sourceFilePath != uri){
 						if(FLfile.exists(uri)){
 							FLfile.remove(uri);
 						}
-						success=FLfile.copy(item.sourceFilePath, uri);
+						success = FLfile.copy(item.sourceFilePath, uri);
 						if(!success){
-							FLfile.write(uri,FLfile.read(item.sourceFilePath));
-						}
-					}
-				}else if(FLfile.exists(uri)){
-					var uniqueFileName=uri.uniqueFileName;
-					if(!item.exportToFile(uniqueFileName)){
-						fl.trace("WARNING: Failed to export image to url "+uniqueFileName);
-					}else{
-						var compareStr=FLfile.read(uri);
-						if(FLfile.read(uniqueFileName)==FLfile.read(uri)){
-							FLfile.remove(uniqueFileName);
-						}else{
-							uri=uniqueFileName;
+							FLfile.write(uri, FLfile.read(item.sourceFilePath));
 						}
 					}
 				}else{
@@ -3847,9 +3860,15 @@
 					}
 					if(!item.exportToFile(uri)){
 						fl.trace("WARNING: Failed to export image to url "+uri);
+					}else {
+						// Compare to previously saved item (probably from last export)
+						if(origUri!=null && FLfile.read(origUri) == FLfile.read(uri)){
+							FLfile.remove(uri);
+							uri = origUri;
+						}
 					}
 				}
-				uri=uri.relativeTo(this.file.dir);
+				uri = uri.relativeTo(this.file.dir);
 				cache[item.name]=uri;
 			}
 			return uri;
@@ -5451,9 +5470,23 @@
 						if(!value){
 							var value2 = values2[i];
 							if(value2=="inline" || lastWasOn){
-								times1.splice(j+skip, 0, time2);
-								values1.splice(j+skip, 0, value2);
-								lastWasOn = value2=="inline";
+								var remove = 0;
+								var doInsert = true;
+								var insertAt = j+skip-1;
+								if(insertAt>=0 && times1[insertAt]==time2){
+									remove = 1;
+									if(insertAt>0 && values1[insertAt-1]==value2){
+										doInsert = false;
+									}
+								}
+								if(doInsert){
+									times1.splice(insertAt, remove, time2);
+									values1.splice(insertAt, remove, value2);
+								}else{
+									times1.splice(insertAt, remove);
+									values1.splice(insertAt, remove);
+								}
+								lastWasOn = value2 == "inline";
 								skip++;
 							}
 						}

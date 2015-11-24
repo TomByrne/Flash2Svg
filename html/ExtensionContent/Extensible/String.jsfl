@@ -13,7 +13,7 @@
 	String.prototype.__defineGetter__(
 		'extension',
 		function(){
-			var res = this.match(/(?:\.)([^\.]*?$)/);
+			var res = this.match(/\.([^\.\\\/]?$)/);
 			return(res?res[1]:'');
 		}
 	);
@@ -147,7 +147,7 @@
 	 * @addon
 	 */
 	String.prototype.stripExtension=function(){
-		return(this.replace(/\.[^\.]*?$/g,""));
+		return(this.replace(/\.[^\.\\\/]*$/g,""));
 	};
 	/**
 	 * Removes the whitespace at the beginning and end of a string.
@@ -156,31 +156,6 @@
 	String.prototype.trim=function(){
 	    return this.replace(/^\s+|\s+$/g,"");
 	};
-	String.prototype.__defineGetter__(
-		'uniqueFileName',
-		function(){
-			var str=this;
-			if(!/^file\:/.test(str)){
-				str=FLfile.platformPathToURI(str);
-			}
-			if(FLfile.exists(str)){
-				var ext=str.extension;
-				var parts=str.stripExtension().match(/(.*[^\d])([\d][\d]*$)?/);
-				if(parts.length>1){
-					return(
-						(
-							parts[1]
-							+(parts[2]?String(Number(parts[2])+1):'1')
-							+'.'
-							+ext
-						).uniqueFileName
-					);
-				};
-			}else{
-				return str;	
-			}
-		}
-	);
 	String.prototype.__defineGetter__(
 		'bytes',
 		function(){
