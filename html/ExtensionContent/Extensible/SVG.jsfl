@@ -1470,7 +1470,7 @@
 			var ret = false;
 			var f=new ext.Array();
 			var layers=settings.timeline.$.layers;
-			var doShapeBreak = (!settings.timeline.libraryItem || settings.timeline.libraryItem.name.indexOf(".ai ")==-1);
+			//var doShapeBreak = (!settings.timeline.libraryItem || settings.timeline.libraryItem.name.indexOf(".ai ")==-1);
 			for(var l=0; l<layers.length; l++){
 				var layer = layers[l];
 				if( !ret &&
@@ -1491,7 +1491,7 @@
 							) && settings.frame!=frame.startFrame
 						){
 							ret = true;
-							/*if(!(deselect))*/break;
+							if(!(deselect))break;
 						}
 						if( settings.includeGraphicChanges && frame.duration>1){
 							var elems = frame.elements;
@@ -1505,13 +1505,13 @@
 						}
 
 						var elements = frame.elements;
-						if(deselect && elements.length==1 && doShapeBreak){
+						/*if(deselect && elements.length==1 && doShapeBreak){
 							var element = elements[0];
 							if(element.elementType=="shape" && (element.isDrawingObject || element.isGroup || element.isRectangleObject || element.isOvalObject)){
 								ret = true;
 								break;
 							}
-						}
+						}*/
 					}
 					if(ret && !deselect)break;
 				}
@@ -1648,14 +1648,14 @@
 				 * Create temporary timelines where tweens exist & convert to
 				 * keyframes.
 				 */
-				var originalScene,timelines,isEditing;
+				var originalScene,timelines;
 				if(hasTweens){
 					/*if(settings.libraryItem==undefined){
 						originalScene=timelineName;
 					}*/
 					timeline = this._getTimelineCopy(settings.libraryItem, timeline, settings.startFrame, settings.endFrame);
 					var layers = timeline.$.layers;
-					isEditing = false;
+					//isEditing = false;
 
 					if(ext.log){
 						var timer2=ext.log.startTimer('extensible.SVG._getTimeline() >> Check break apart tweens');	
@@ -1664,14 +1664,14 @@
 						var layer=layers[i];
 						if(layer.layerType=="guide" || layer.layerType=="folder")continue;
 
-						var lVisible=layer.visible;
+						/*var lVisible=layer.visible;
 						var lLocked=layer.locked;
 						if(!lVisible){
 							layer.visible=true;
 						}
 						if(lLocked){
 							layer.locked=false;
-						}
+						}*/
 
 						var layerEnd = settings.endFrame;
 						if(layerEnd > layer.frameCount)layerEnd = layer.frameCount;
@@ -1730,7 +1730,7 @@
 								}
 								n = end-1;
 							}
-							while(elements.length==1){
+							/*while(elements.length==1){
 								var element = firstElement;
 								if(hasTweens && element.elementType=="shape" &&
 									(element.isDrawingObject || element.isGroup || element.isRectangleObject || element.isOvalObject)
@@ -1752,12 +1752,12 @@
 								}else{
 									break;
 								}
-							}
+							}*/
 						}
-						layer.visible = lVisible;
-						layer.locked = lLocked;
+						//layer.visible = lVisible;
+						//layer.locked = lLocked;
 					}
-					if(isEditing && timeline.libraryItem) ext.doc.exitEditMode();
+					//if(isEditing && timeline.libraryItem) ext.doc.exitEditMode();
 
 					if(ext.log){
 						ext.log.pauseTimer(timer2);
@@ -3899,6 +3899,9 @@
 			var descendantMatrix=new ext.Matrix();
 			var pathMatrix=null;
 			var layerLocked=shape.layer.locked;
+
+
+			
 			
 			if(shape.isGroup || shape.isRectangleObject || shape.isOvalObject || shape.isDrawingObject){
 				descendantMatrix = matrix;
@@ -3913,6 +3916,10 @@
 				matrix.ty = 0;//shape.top;
 				matrix = fl.Math.concatMatrix(matrix, settings.matrix);
 			}
+
+
+
+
 			pathMatrix = descendantMatrix;
 			var contours=shape.contours;
 			if(!(contours && contours.length) && !shape.isGroup){
@@ -4094,7 +4101,8 @@
 
 
 			var fill=this._getFill(contour.fill,{
-				shape : contour.shape
+				shape : contour.shape,
+				matrix : options.matrix
 			});
 
 			var opacityString = "";
@@ -4307,7 +4315,8 @@
 			}
 			var settings=new ext.Object({
 				shape:undefined,
-				gradientUnits:'userSpaceOnUse' // objectBoundingBox, userSpaceOnUse
+				gradientUnits:'userSpaceOnUse', // objectBoundingBox, userSpaceOnUse
+				matrix : null
 			});
 			settings.extend(options);
 			if(typeof fillObj=='string'){
@@ -4320,6 +4329,14 @@
 			var xml, defaultMeasurement;
 			var shape = settings.shape;
 			var matrix = fillObj.matrix;
+
+			if(settings.matrix){
+				if(matrix){
+					matrix = new ext.Matrix(fl.Math.concatMatrix(matrix, settings.matrix));
+				}else{
+					matrix = settings.matrix;
+				}
+			}
 
 			switch(fillObj.style){
 				case 'linearGradient':
