@@ -64,6 +64,9 @@ To build on other operating systems, the build.bat file will have to be converte
 - Invert
 
 ## Unsupported features ##
+### Core ###
+- Button symbols with mouseenter and mouseleave
+
 ### Animation ###
 - Newer style, per-property tweens
 - Tweens on filter properties
