@@ -3581,8 +3581,8 @@
 								filter.appendChild(feColorMatrix);
 							}
 							break;
-						case "bevelFilter":
-							break;
+						/*case "bevelFilter":
+							break;*/
 						case "blurFilter":
 							if(
 								f.blurX!=0 ||
@@ -3604,7 +3604,6 @@
 							}
 							break;
 						case "dropShadowFilter":
-							break;
 						case "glowFilter":
 
 				  				if(f.color.length==7){
@@ -3631,6 +3630,19 @@
 										                 <feFuncA type="linear" slope={f.strength/100} intercept="0" />
 										             </feComponentTransfer>   );
 
+
+								if(f.name=="dropShadowFilter"){
+									var rads = (f.angle / 180 * Math.PI);
+									rads = -rads + Math.PI/2;
+									var offset = ext.Geom.projectPoint(rads, f.distance);
+
+									fl.trace("Shadow: "+f.angle+" "+f.distance+" - "+offset.x+" "+offset.y);
+									
+									var feOffset = <feOffset dx={offset.x} dy={offset.y}/>;
+									filter.appendChild(feOffset);
+								}
+
+
 								filter.appendChild(  <feMerge>
 										                 <feMergeNode />
 										                 <feMergeNode in="SourceGraphic" />
@@ -3642,10 +3654,13 @@
 								bottomMargin+=f.blurY*4/sy;
 
 							break;
-						case "gradientBevelFilter":
+						/*case "gradientBevelFilter":
 							break;
 						case "gradientGlowFilter":
-							break;
+							break;*/
+
+						default:
+							fl.trace("WARNING: Filter type '"+f.name+"' is not currently supported");
 					}
 				}
 				filter.@filterUnits="objectBoundingBox";

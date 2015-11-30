@@ -4,6 +4,17 @@
 
     Geom.POSITIVE_INFINITY = 100000000000000000000000000000000;
 
+    
+    // Project point
+    Geom.projectPoint = function(rads, dist, fromX, fromY)
+    {
+        var ret = {x:(fromX==null ? 0 : fromX), y:(fromY==null ? 0 : fromY)};
+        ret.x += Math.sin(rads) * dist;
+        ret.y += Math.cos(rads) * dist;
+        return ret;
+    }
+     
+
     // Given three colinear points p, q, r, the function checks if
     // point q lies on line segment 'pr'
     Geom.onSegment = function(p, q, r)
