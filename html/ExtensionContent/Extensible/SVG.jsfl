@@ -193,6 +193,8 @@
 			this.startFrame--; // So that 1>1 actually equates to 0>1
 		}
 
+		if(this.startFrame<0)this.startFrame = 0;
+
 		if(this.repeatCount===true)this.repeatCount = "indefinite";
 		else if(this.repeatCount===false)this.repeatCount = "1";
 
@@ -1948,7 +1950,6 @@
 					}else{
 						layerXML = xml;
 					}
-
 					var frames = layer.frames;
 					var n=settings.startFrame;
 					layerSelected = false;
@@ -3635,8 +3636,6 @@
 									var rads = (f.angle / 180 * Math.PI);
 									rads = -rads + Math.PI/2;
 									var offset = ext.Geom.projectPoint(rads, f.distance);
-
-									fl.trace("Shadow: "+f.angle+" "+f.distance+" - "+offset.x+" "+offset.y);
 									
 									var feOffset = <feOffset dx={offset.x} dy={offset.y}/>;
 									filter.appendChild(feOffset);
@@ -4016,7 +4015,7 @@
 			var matrixStr = this._getMatrix(matrix);
 			if(matrixStr!=this.IDENTITY_MATRIX)svg['@transform']=matrixStr;
 
-			if(!this.drawStrokesOverFills){
+			if(!this.drawStrokesOverFills || pathList.length < 2){
 				for(var i=0;i<pathList.length;i++){
 					var paths = pathList[i].nodes;
 					for(var j=0; j<paths.length; j++){
@@ -5488,12 +5487,21 @@
 				var j=0;
 				var time2;
 				var lastWasOn = false;
+				// fl.trace("\n--------------");
+				// fl.trace("times1: "+times1);
+				// fl.trace("values1: "+values1);
+				// fl.trace("-");
+				// fl.trace("times2: "+times2);
+				// fl.trace("values2: "+values2);
+				// fl.trace("-");
 				while( j<times1.length ){
 					var time = times1[j];
 					var value = values1[j]=="inline";
 					if(lastWasOn && !value){
 						times1.splice(j, 1);
 						values1.splice(j, 1);
+						//fl.trace("1 times1: "+times1);
+						//fl.trace("1 values1: "+values1);
 						continue;
 					}
 					var skip = 0;
@@ -5504,22 +5512,29 @@
 							if(value2=="inline" || lastWasOn){
 								var remove = 0;
 								var doInsert = true;
-								var insertAt = j+skip-1;
-								if(insertAt>=0 && times1[insertAt]==time2){
+								var insertAt = j+skip;
+								if(insertAt>=0 && times1[insertAt-1]==time2){
 									remove = 1;
-									if(insertAt>0 && values1[insertAt-1]==value2){
+									if(insertAt>0 && values1[insertAt-2]==value2){
 										doInsert = false;
+										skip--;
 									}
+									insertAt--;
 								}
+								//fl.trace("--time: "+time+" insertAt:"+insertAt+" skip:"+skip+" = "+j+" "+skip+" "+remove);
 								if(doInsert){
 									times1.splice(insertAt, remove, time2);
 									values1.splice(insertAt, remove, value2);
+									//fl.trace("2 times1: "+times1);
+									//fl.trace("2 values1: "+values1);
+									skip++;
 								}else{
 									times1.splice(insertAt, remove);
 									values1.splice(insertAt, remove);
+									//fl.trace("3 times1: "+times1);
+									//fl.trace("3 values1: "+values1);
 								}
 								lastWasOn = value2 == "inline";
-								skip++;
 							}
 						}
 						i++;
