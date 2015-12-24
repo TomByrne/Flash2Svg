@@ -139,10 +139,10 @@ package{
 			_exportSettings.addSetting(controlsLayout.curvesRow.input, "selectedIndex", "curveDegree", 2, true, comboGetter, comboSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.expandRow.input, "selectedIndex", "expandSymbols", "usedOnce", true, comboGetter, comboSetter, Event.CHANGE, true, {All:"all", None:"none", Nested:"nested"});
 			_exportSettings.addSetting(controlsLayout.beginRow.input, "selectedIndex", "beginAnimation", "0s", true, comboGetter, comboSetter, Event.CHANGE);
-			_exportSettings.addSetting(controlsLayout.showFrameRow.input, "selectedIndex", "nonAnimatingShow", "start", true, comboGetter, comboSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.renderingRow.input, "selectedIndex", "rendering", "auto", true, comboGetter, comboSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.applyTransformationsCheckBox, "selected", "applyTransformations", true, true, radioGetter, radioSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.convertPatternsToSymbolsCheckBox, "selected", "convertPatternsToSymbols", true, true, radioGetter, radioSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.convertTextToOutlines, "selected", "convertTextToOutlines", true, true, radioGetter, radioSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.flattenMotionCheckBox, "selected", "flattenMotion", false, true, radioGetter, radioSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.includeBackgroundCheckBox, "selected", "includeBackground", false, true, radioGetter, radioSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.loopCheckBox, "selected", "repeatCount", true, true, radioGetter, radioSetter, Event.CHANGE);
@@ -151,6 +151,7 @@ package{
 			_exportSettings.addSetting(controlsLayout.removeGroupsCheckBox, "selected", "removeGroups", true, true, radioGetter, radioSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.compactOutputCheckBox, "selected", "compactOutput", true, true, radioGetter, radioSetter, Event.CHANGE);
 			_exportSettings.addSetting(controlsLayout.avoidMiterCheckBox, "selected", "avoidMiter", true, true, radioGetter, radioSetter, Event.CHANGE);
+			_exportSettings.addSetting(controlsLayout.useViewbox, "selected", "animatedViewBox", false, true, radioGetter, radioSetter, Event.CHANGE);
 
 			this.controlsLayout.flattenMotionCheckBox.addEventListener(Event.CHANGE, onFlattenMotionChanged);
 			this.controlsLayout.discreteEasingCheckBox.addEventListener(Event.CHANGE, onDiscreteEasingChanged);
@@ -453,12 +454,12 @@ package{
 
 			var isAnim:Boolean = (this.controlsLayout.outputRow.input.selectedItem && this.controlsLayout.outputRow.input.selectedItem.showFlattenMotion);
 			this.controlsLayout.beginRow.visible = isAnim;
-			this.controlsLayout.showFrameRow.visible = isAnim;
 			this.controlsLayout.flattenMotionCheckBox.visible = isAnim;
 			this.controlsLayout.loopCheckBox.visible = isAnim;
 			this.controlsLayout.discreteEasingCheckBox.visible = isAnim;
 			this.controlsLayout.loopTweensCheckBox.visible = isAnim;
 			this.controlsLayout.applyTransformationsCheckBox.visible = !isAnim;
+			this.controlsLayout.useViewbox.visible = isAnim;
 			controlsLogic.update();
 		}
 		private function onFlattenMotionChanged(e:Event=null):void{

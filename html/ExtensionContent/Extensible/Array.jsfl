@@ -245,6 +245,21 @@
 			}
 			return -1;
 		},
+		doesIntersect:function(array){
+			if(!array instanceof Array){
+				return false;
+			}
+			if(array.length==0){
+				return false;
+			}
+			for(var i=0; i<array.length; i++){
+				var e = array[i];
+				for(var j=0; j<this.length; j++){
+					if(e == this[j])return true;
+				}
+			}
+			return false;
+		},
 		/**
 		 * @parameter {Array} array An array with which to compare [this].
 		 * @return An Array object of type this.type containing the elements

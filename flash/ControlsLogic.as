@@ -48,9 +48,9 @@ package{
 								layout.expandRow.input,
 								layout.renderingRow.input,
 								layout.beginRow.input,
-								layout.showFrameRow.input,
 								layout.applyTransformationsCheckBox,
 								layout.convertPatternsToSymbolsCheckBox,
+								layout.convertTextToOutlines,
 								layout.flattenMotionCheckBox,
 								layout.discreteEasingCheckBox,
 								layout.loopTweensCheckBox,
@@ -58,7 +58,8 @@ package{
 								layout.loopCheckBox,
 								layout.removeGroupsCheckBox,
 								layout.compactOutputCheckBox,
-								layout.avoidMiterCheckBox];
+								layout.avoidMiterCheckBox,
+								layout.useViewbox];
 
 			rightControls = [   layout.helpButton,
 								layout.fileRow.button,
@@ -81,9 +82,9 @@ package{
 						layout.expandRow,
 						layout.renderingRow,
 						layout.beginRow,
-						layout.showFrameRow,
 						layout.applyTransformationsCheckBox,
 						layout.convertPatternsToSymbolsCheckBox,
+						layout.convertTextToOutlines,
 						layout.flattenMotionCheckBox,
 						layout.discreteEasingCheckBox,
 						layout.loopTweensCheckBox,
@@ -91,7 +92,8 @@ package{
 						layout.loopCheckBox,
 						layout.removeGroupsCheckBox,
 						layout.compactOutputCheckBox,
-						layout.avoidMiterCheckBox];
+						layout.avoidMiterCheckBox,
+						layout.useViewbox];
 
 			enable = [	layout.fileRow.input,
 						layout.sourceRow.input,
@@ -106,13 +108,13 @@ package{
 						layout.expandRow.input,
 						layout.renderingRow.input,
 						layout.beginRow.input,
-						layout.showFrameRow.input,
 						layout.fileRow.button,
 						layout.customFramesRow,
 						layout.presetRow.deleteButton,
 						layout.presetRow.saveButton,
 						layout.applyTransformationsCheckBox,
 						layout.convertPatternsToSymbolsCheckBox,
+						layout.convertTextToOutlines,
 						layout.flattenMotionCheckBox,
 						layout.discreteEasingCheckBox,
 						layout.loopTweensCheckBox,
@@ -120,7 +122,8 @@ package{
 						layout.loopCheckBox,
 						layout.removeGroupsCheckBox,
 						layout.compactOutputCheckBox,
-						layout.avoidMiterCheckBox];
+						layout.avoidMiterCheckBox,
+						layout.useViewbox];
 
 		}
 

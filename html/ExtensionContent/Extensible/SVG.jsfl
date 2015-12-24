@@ -69,7 +69,6 @@
 			beginAnimation:"0s",
 			repeatCount:"indefinite",
 			loop:null,
-			nonAnimatingShow:"end",
 			loopTweens:true,
 			discreteEasing:true,
 			removeGroups:true,
@@ -199,12 +198,6 @@
 		else if(this.repeatCount===false)this.repeatCount = "1";
 
 		this._showMiterWarning = false;
-
-		if(this.nonAnimatingShow=="start"){
-			this.showStartFrame = true;
-		}else if(this.nonAnimatingShow=="end"){
-			this.showEndFrame = true;
-		}
 
 		if(this.output=='animation'){
 			this.animated = true;
@@ -1824,6 +1817,7 @@
 
 					var animNode = <animate
 								      attributeName="display"/>;
+					if(settings.repeatCount!="indefinite")animNode.@fill = "freeze";
 
 					var beginAnim;
 					if(settings.beginAnimation=="0s"){
@@ -1967,6 +1961,7 @@
 								lastMaskState = maskState;
 							}else if(lastMaskState!=maskState){
 								if(maskAnim==null)maskAnim = new XML('<animate attributeName="mask" repeatCount="'+settings.repeatCount+'" dur="'+timeDur+'s" keyTimes="0" values="'+lastMaskState+'"/>');
+								if(settings.repeatCount!="indefinite")maskAnim.@fill = "freeze";
 								maskAnim.@keyTimes += ";" + this.precision((settings.animOffset + n - settings.startFrame)/animDur);
 								maskAnim.@values += ";" + maskState;
 								lastMaskState = maskState;
@@ -2200,9 +2195,7 @@
 												skyScaleXList:[], skyScaleYList:[], skyTimeList:[], skySplineList:[],
 												transXList:[], transYList:[]};
 
-							if(this.showEndFrame){
-								filterElement = lastFrame.elements[0];
-							}
+							
 							var filterID=this._getFilters(filterElement, elementXML, elemSettings, dom.defs, transAnimObj);
 							if(filterID && dom.defs.filter.(@id.toString()==filterID).length()){
 								elementXML['@filter']='url(#'+filterID+')';
@@ -2235,12 +2228,9 @@
 								}
 								var withinQuad = (maxRot - minRot) <= 90;
 								allowRotateList.push(allowRotateList[allowRotateList.length-1]);
-								if(this.showEndFrame){
-									matrix = new ext.Matrix(lastElement.matrix);
-								}else{
-									nextElement = element;
-									matrix = element.matrix.clone();
-								}
+								nextElement = element;
+								matrix = element.matrix.clone();
+
 								var invMatrix = new ext.Matrix();
 								var firstRot = 0;
 								var firstScX = 0;
@@ -2421,6 +2411,7 @@
 								if((hasOpacityAnim || hasColorAnim) && !isMask){
 									frameHasAnimated = true;
 									var stopTimes = [];
+									if(settings.repeatCount!="indefinite")elementXML.@opacity = transAnimObj.alphaMList[0];
 									if(hasColorAnim){
 										this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, transAnimObj.colorTransNode.feFuncR, "intercept", [transAnimObj.redOList], transAnimObj.timeList, stopTimes, timeDur, timePrecision, transAnimObj.splineList, 0, settings.repeatCount, forceDiscrete);
 										this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, transAnimObj.colorTransNode.feFuncR, "slope", [transAnimObj.redMList], transAnimObj.timeList, stopTimes, timeDur, timePrecision, transAnimObj.splineList, 1, settings.repeatCount, forceDiscrete);
@@ -2432,7 +2423,6 @@
 										this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, transAnimObj.colorTransNode.feFuncA, "slope", [transAnimObj.alphaMList], transAnimObj.timeList, stopTimes, timeDur, timePrecision, transAnimObj.splineList, 1, settings.repeatCount, forceDiscrete);
 
 									}else if(hasOpacityAnim && this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, elementXML, "opacity", [transAnimObj.alphaMList], transAnimObj.timeList, stopTimes, timeDur, timePrecision, transAnimObj.splineList, 1, settings.repeatCount, forceDiscrete)){
-										if(this.showEndFrame)elementXML.@opacity = lastElement.colorAlphaPercent / 100;
 										transAnimObj.colorTransNode.feFuncA.@slope = 1;
 									}
 								}
@@ -2463,22 +2453,15 @@
 									fAnimNode.@keyTimes = frameTimeStart+";"+frameTimeEnd+";1";
 									fAnimNode.@values="inline;none;none";
 
-									if(!this.showStartFrame){
-										frameXML.@style += "display:none;";
-									}
 								}else{
+									frameXML.@style += "display:none;";
 									if(frameTimeEnd==1){
 										fAnimNode.@keyTimes = "0;"+frameTimeStart+";"+frameTimeEnd;
-										fAnimNode.@values="none;inline;none";
-
-										if(!this.showEndFrame){
-											frameXML.@style += "display:none;";
-										}
+										fAnimNode.@values="none;inline;inline";
+										
 									}else{
 										fAnimNode.@keyTimes = "0;"+frameTimeStart+";"+frameTimeEnd+";1";
 										fAnimNode.@values="none;inline;none;none";
-
-										frameXML.@style += "display:none;";
 									}
 								}
 								frameXML.appendChild(fAnimNode);
@@ -2507,6 +2490,7 @@
 					if(isMask && (maskAnim || layerEnd < settings.endFrame)){
 						if(layerEnd < settings.endFrame && (lastMaskState!="none" || !maskAnim)){
 							if(maskAnim==null)maskAnim = new XML('<animate attributeName="mask" repeatCount="'+settings.repeatCount+'" dur="'+timeDur+'s" keyTimes="0" values="'+lastMaskState+'"/>');
+							if(settings.repeatCount!="indefinite")maskAnim.@fill = "freeze";
 							maskAnim.@keyTimes += ";" + this.precision((settings.animOffset + layerEnd - settings.startFrame)/animDur);
 							maskAnim.@values += ";none";
 							lastMaskState = "none";
@@ -3048,7 +3032,8 @@
 							}else{
 								beginAnim = beginAnimation + (beginOffset ? "+" + beginOffset + "s" : "");
 							}
-							var animNode = new XML('<animateTransform attributeName="transform" additive="replace" type="translate" dur="'+totalTime+'s" keyTimes="0;1" values="0,0;0,0"/>')
+							var animNode = new XML('<animateTransform attributeName="transform" additive="replace" type="translate" dur="'+totalTime+'s" keyTimes="0;1" values="0,0;0,0"/>');
+							if(repeatCount!="indefinite")animNode.@fill = "freeze";
 							if(beginAnim!="0s")animNode.@begin = beginAnim;
 							toNode.prependChild(animNode);
 						}
@@ -3206,7 +3191,7 @@
 			validS.pop(); // spline list should be one element shorter than other lists
 
 			if(!isTrans){
-				var animNode = <animate />;
+				var animNode = <animate/>;
 				animNode.@attributeName = type;
 			}else{
 				var animNode = <animateTransform
@@ -3214,6 +3199,7 @@
 				animNode.@type = type;
 				if(doReplace)animNode.@additive = "replace";
 			}
+			if(repeatCount!="indefinite")animNode.@fill = "freeze";
 
 
 			if(beginAnim!="0s")animNode.@begin = beginAnim;
@@ -3933,7 +3919,6 @@
 
 
 
-
 			pathMatrix = descendantMatrix;
 			var contours=shape.contours;
 			if(!(contours && contours.length) && !shape.isGroup){
@@ -3961,22 +3946,33 @@
 					dom:dom
 				});
 			}
+				
+			if(ext.log){
+				var timer2=ext.log.startTimer('extensible.SVG._getShape() holes');	
+			}
 			for(var j=0; j<holes.length; j++){
 				var holeObj = holes[j];
 				var contour = holeObj.contour;
 				var edgeIDs = holeObj.edgeIDs;
 				var pathStr = holeObj.pathStr;
 				var holePoly = holeObj.polygon;
+				if(!holePoly.bounds)holePoly.bounds = ext.Geom.polygonBounds(holePoly);
 
-				var oppFills = new ext.Array();;
+				var oppFills = new ext.Array();
+			if(ext.log){
+				var timer1=ext.log.startTimer('extensible.SVG._getShape() edges');	
+			}
 				for(var i=0;i<contours.length;i++){
 					var othContour = contours[i];
 					if(othContour==contour)continue;
 
-					if(othContour.edgeIDs.intersect(edgeIDs).length>0){
+					if(othContour.edgeIDs.doesIntersect(edgeIDs)){
 						oppFills.push(othContour.fill);
 					}
 				}
+			if(ext.log){
+				ext.log.pauseTimer(timer1);	
+			}
 				for(var i=0; i<holeObj.maxPath; i++){
 					//var otherG = pathList[i].node;
 					var otherPaths = pathList[i].nodes;
@@ -3985,16 +3981,24 @@
 					var othPolys = polygonsList[i];
 					//var paths = otherG.path;
 
-					if(oppFills.length && !edgeIDs.intersect(othEdges).length && oppFills.indexOf(othContour.fill)==-1)continue;
+					if(oppFills.length && !edgeIDs.doesIntersect(othEdges) && oppFills.indexOf(othContour.fill)==-1)continue;
 
 					for(var k=0; k<otherPaths.length; k++){
 						var pathNode = otherPaths[k];
 						if(pathNode.@fill=="none")continue;
 
-						if(!ext.Geom.intersects(othPolys[k], holePoly)){
+						var otherPoly = othPolys[k];
+						if(!otherPoly.bounds)otherPoly.bounds = ext.Geom.polygonBounds(otherPoly);
+						if(!ext.Geom.boundsIntersect(otherPoly.bounds, holePoly.bounds)){
+							// Do bounds test first because it's much quicker
+							continue;
+						}
+		
+						if(!ext.Geom.intersects(otherPoly, holePoly)){
 							continue;
 						}
 
+		
 						var d = pathNode.@d.toString();
 						d = d.replace("z", '');
 						d += " "+pathStr;
@@ -4010,6 +4014,9 @@
 						}
 					}
 				}
+			}
+			if(ext.log){
+				ext.log.pauseTimer(timer2);	
 			}
 			var svg=new XML('<g/>');
 			var matrixStr = this._getMatrix(matrix);
@@ -4112,7 +4119,6 @@
 			if(settings.matrix){
 				xform=' transform="'+this._getMatrix(settings.matrix)+'" ';
 			}*/
-
 
 			var fill=this._getFill(contour.fill,{
 				shape : contour.shape,
@@ -4311,11 +4317,11 @@
 				}
 				filledPath.nodes = nodes;
 
-				if(ext.log){
-					ext.log.pauseTimer(timer);	
-				}
 				//filledPath.node = new XML(xmlStr);
 				pathList.push(filledPath);
+			}
+			if(ext.log){
+				ext.log.pauseTimer(timer);	
 			}
 		},
 		/**

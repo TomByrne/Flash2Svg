@@ -115,6 +115,38 @@
         return count&1;  // Same as (count%2 == 1)
     }
 
+    Geom.polygonBounds = function(polygon)
+    {
+        var length = polygon.length;
+        var ret;
+        for(var i=0; i<length; i++){
+            var point = polygon[i];
+            if(!ret){
+                ret = { left:point.x, top:point.y, right:point.x, bottom:point.y};
+            }else{
+                if(point.x < ret.left){
+                    ret.left = point.x;
+                }else if(point.x > ret.right){
+                    ret.right = point.x;
+                }
+                if(point.y < ret.top){
+                    ret.top = point.y;
+                }else if(point.y > ret.bottom){
+                    ret.bottom = point.y;
+                }
+            }
+        }
+        return ret;
+    }
+
+    Geom.boundsIntersect = function(bounds1, bounds2)
+    {
+        return !(  bounds2.left   > bounds1.right || 
+                   bounds2.right  < bounds1.left || 
+                   bounds2.top    > bounds1.bottom ||
+                   bounds2.bottom < bounds1.top);
+    }
+    
     /*
     To know whether two polygons intersect, check two things:
     - If any segments intersect then polys intersect

@@ -124,7 +124,7 @@
 					}
 				}
 				if(all){
-					if(contours[i].edgeIDs.intersect(edgeIDs).length>0){
+					if(contours[i].edgeIDs.doesIntersect(edgeIDs)){
 						this.cache.oppositeFills.push(contours[i].fill);
 						opposites.push(contours[i].fill);
 					}
