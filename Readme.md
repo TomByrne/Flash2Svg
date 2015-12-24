@@ -1,8 +1,12 @@
 # Animated SVG Exporter for Flash Professional#
 
-## To Install ##
-- Select latest release from [releases page](https://github.com/TomByrne/Flash2Svg/releases).
-- Install with Extension Manager
+## To Install from ZXP ##
+- Select latest release from [releases page](https://github.com/TomByrne/Flash2Svg/releases)
+- Install with Extension Manager (or [ExManCmd](https://www.adobeexchange.com/resources/28))
+
+## To Install from Adobe Add-ons ##
+- Go to the plugin page at [Adobe Addons](https://creative.adobe.com/addons/products/7232)
+- Click the 'Free' button to install
 
 ## To Use in Flash CC / CC 2014 ##
 - Open panel through menus, Window > Extensions > SVG Animation
