@@ -2120,9 +2120,13 @@
 
 							}else if(element.symbolType=="graphic"){
 								var childFrame = element.firstFrame;
-								if(element.loop!="single frame")childFrame += (n - frame.startFrame);
-								elemSettings.startFrame = this._getPriorFrame(element.timeline, childFrame);
-								elemSettings.frameCount = Math.min(frame.duration, element.timeline.frameCount - elemSettings.startFrame);
+								if(element.loop=="single frame" || frame.duration==1){
+									elemSettings.startFrame = this._getPriorFrame(element.timeline, element.firstFrame);
+									elemSettings.frameCount = 1;
+								}else{
+									elemSettings.startFrame = element.firstFrame + (n - frame.startFrame);
+									elemSettings.frameCount = Math.min(frame.duration, element.timeline.frameCount - elemSettings.startFrame);
+								}
 
 							}else if(element.symbolType=="movie clip"){
 								if((element.libraryItem.timeline.frameCount<(frameEnd-n)) && frameEnd>n+1 && settings.repeatCount!="indefinite"){
@@ -3004,9 +3008,19 @@
 			while(lastTakenTo < times.length-1){
 				var stopTime = stopTimes.length ? stopTimes[stopI] : null;
 				var takenTo = this._addAnimationNode(lastTakenTo, beginAnimation, beginOffset, lastEndTime, toNode, type, values, valueLists, times, stopTime, timePrecision, splineList, defaultValue, repeatCount, forceDiscrete, validateAllLists, doReplace, isTrans);
+				
 				if(takenTo===false){
 					lastTakenTo += 31;
+					if(stopTimes.length){
+						while(stopTimes[stopI] < times[lastTakenTo]){
+							stopI++;
+						}
+					}
 				}else{
+					if(takenTo == lastTakenTo){
+						fl.trace("WARNING: Something went wrong with the animation node splitting" );
+						takenTo++;
+					}
 					if(takenTo){
 						ret = true;
 					}
@@ -3021,7 +3035,7 @@
 							stopI++;
 						}
 						if(doReplace && lastTakenTo < times.length-1){
-							// when multiple animateTransform nodes are atacked, sometimes the "replace" logic gets applied in the wrong order, this prevents that.
+							// when multiple animateTransform nodes are stacked, sometimes the "replace" logic gets applied in the wrong order, this prevents that.
 							doReplace = false;
 							var nodes = toNode.animateTransform;
 							for(var i=0; i<nodes.length(); i++){
@@ -3032,14 +3046,18 @@
 							}else{
 								beginAnim = beginAnimation + (beginOffset ? "+" + beginOffset + "s" : "");
 							}
-							var animNode = new XML('<animateTransform attributeName="transform" additive="replace" type="translate" dur="'+totalTime+'s" keyTimes="0;1" values="0,0;0,0"/>');
-							if(repeatCount!="indefinite")animNode.@fill = "freeze";
+							var animNode = new XML('<animateTransform attributeName="transform" additive="replace" type="translate" dur="'+totalTime+'s" keyTimes="0;1" values="0,0;0,0" fill="freeze"/>');
 							if(beginAnim!="0s")animNode.@begin = beginAnim;
 							toNode.prependChild(animNode);
 						}
 					}
 				}
 				lastEndTime = times[lastTakenTo];
+			}
+			var animNodes = toNode.elements();
+			if(animNodes.length()){
+				animNode = animNodes[animNodes.length() - 1];
+				if(repeatCount!="indefinite")animNode.@fill = "freeze";
 			}
 			return ret;
 		},
@@ -3157,7 +3175,6 @@
 
 						takenTo--;
 						validT[validT.length-1] = stopTime;
-
 						break;
 					}
 				}
@@ -3199,7 +3216,6 @@
 				animNode.@type = type;
 				if(doReplace)animNode.@additive = "replace";
 			}
-			if(repeatCount!="indefinite")animNode.@fill = "freeze";
 
 
 			if(beginAnim!="0s")animNode.@begin = beginAnim;
@@ -5547,6 +5563,7 @@
 					}
 					j += skip+1;
 				}
+				if(lastWasOn) values1[values1.length - 1] = "inline";
 				anim1.@keyTimes = times1.join(";");
 				anim1.@values = values1.join(";");
 				delete frameNode.parent().children()[frameNode.childIndex()];
