@@ -3007,7 +3007,7 @@
 			var stopI = 0;
 			while(lastTakenTo < times.length-1){
 				var stopTime = stopTimes.length ? stopTimes[stopI] : null;
-				var takenTo = this._addAnimationNode(lastTakenTo, beginAnimation, beginOffset, lastEndTime, toNode, type, values, valueLists, times, stopTime, timePrecision, splineList, defaultValue, repeatCount, forceDiscrete, validateAllLists, doReplace, isTrans);
+				var takenTo = this._addAnimationNode(lastTakenTo, beginAnimation, beginOffset, totalTime, lastEndTime, toNode, type, values, valueLists, times, stopTime, timePrecision, splineList, defaultValue, repeatCount, forceDiscrete, validateAllLists, doReplace, isTrans);
 				
 				if(takenTo===false){
 					lastTakenTo += 31;
@@ -3061,9 +3061,17 @@
 			}
 			return ret;
 		},
-		_addAnimationNode:function(offset, beginAnimation, beginOffset, startTime, toNode, type, values, valueLists, times, stopTime, timePrecision, splineList, defaultValue, repeatCount, forceDiscrete, validateAllLists, doReplace, isTrans){
+		_addAnimationNode:function(offset, beginAnimation, beginOffset, totalTime, startTime, toNode, type, values, valueLists, times, stopTime, timePrecision, splineList, defaultValue, repeatCount, forceDiscrete, validateAllLists, doReplace, isTrans){
+			/*
+				When looping, the timing of stacked nodes is handled very differently.
+				Each node runs the full duration of the animation with long dormant parts at the beginning and/or end.
+				When not looping, each node has only a partial duration. 
+			*/
+
+			var looping = repeatCount=="indefinite";
 			var beginAnim;
-			beginOffset = this.precision(beginOffset + startTime);
+			var timeAtom = 1/Math.pow(10, timePrecision);
+			beginOffset = this.precision(beginOffset + (looping ? 0 : startTime));
 			if(beginAnimation=="0s"){
 				beginAnim = (beginOffset ? beginOffset + "s": "0s");
 			}else{
@@ -3102,42 +3110,41 @@
 					}
 				}
 			}
-			/*while(times.length>splineList.length){
-				// we use this so that scale values can use the short spline list (improves easing)
-				splineList.push(splineList[offset]);
-			}*/
 
 			var lastVal = values[offset];
-			var lastTime = times[offset];//this.precision((times[offset]-startTime)/totalTime, timePrecision);
+			var lastTime = times[offset];
 			var lastSpline = splineList[offset];
 			var secVal = values[offset+1];
 
-			// if(lastTime<=0 || (secVal==lastVal && lastSpline==this.NO_TWEEN_SPLINE_TOKEN)){
+			var spline = lastSpline==this.NO_TWEEN_SPLINE_TOKEN ? this.NO_TWEEN_SPLINE : lastSpline;
+
+			if(looping && offset > 0){
+				var validV = [defaultValue,lastVal];
+				var validT = [0,lastTime];
+				var validS = [this.NO_TWEEN_SPLINE,spline];
+			}else{
 				var validV = [lastVal];
 				var validT = [lastTime];
-				var validS = [lastSpline==this.NO_TWEEN_SPLINE_TOKEN ? this.NO_TWEEN_SPLINE : lastSpline];
-			// }else{
-			// 	var validV = [lastVal,lastVal];
-			// 	var validT = [0,lastTime];
-			// 	var validS = [this.LINEAR_SPLINE, lastSpline==this.NO_TWEEN_SPLINE_TOKEN ? this.NO_TWEEN_SPLINE : lastSpline];
-			// }
+				var validS = [spline];
+			}
 
 
 			var endPointMode = false;
 			n = times.length;
 			var takenTo = offset;
+			var capLength = (looping ? 29 : 31);
 			for(var i=offset + 1; i<n && validT.length<32; ++i){
 				lastTime = times[i];//this.precision((times[i]-startTime)/totalTime, timePrecision);
 				var newVal = values[i];
 				var newSpline = splineList[i];
+				var doStop = false;
 
 				if(lastSpline==this.NO_TWEEN_SPLINE_TOKEN){
-					if(validT.length==31){
+					if(validT.length==capLength){
 						lastTime = times[i-1];
 						n--; // no room to add a tween killer
-						break;
-					}
-					if(lastVal==validV[validV.length-2]){
+						doStop = true;
+					}else if(lastVal==validV[validV.length-2]){
 						validT[validT.length-1] = lastTime - 1/Math.pow(10, this.decimalPointPrecision);
 						validS[validS.length-1] = this.NO_TWEEN_SPLINE;
 					}else{
@@ -3147,54 +3154,84 @@
 					}
 				}
 
-				if(newVal==lastVal && (endPointMode || (validV.length>1 && lastVal==validV[validV.length-2]))){
-					validT[validT.length-1] = lastTime;
-					validS[validS.length-1] = (newSpline==this.NO_TWEEN_SPLINE_TOKEN ? this.NO_TWEEN_SPLINE : newSpline);
+				if(!doStop){
+					if(newVal==lastVal && (endPointMode || (validV.length>1 && lastVal==validV[validV.length-2]))){
+						validT[validT.length-1] = lastTime;
+						validS[validS.length-1] = (newSpline==this.NO_TWEEN_SPLINE_TOKEN ? this.NO_TWEEN_SPLINE : newSpline);
 
-				}else{
+					}else{
 
-					endPointMode = (newVal==lastVal);
-					lastVal = newVal;
-					validV.push(newVal);
-					validT.push(lastTime);
-					validS.push(newSpline==this.NO_TWEEN_SPLINE_TOKEN ? this.NO_TWEEN_SPLINE : newSpline);
-				}
-				takenTo++;
-
-				lastSpline = newSpline;
-
-				if(stopTime!=null){
-					if(lastTime == stopTime){
-						break;
-
-					}else if(lastTime > stopTime){
-
-						if(validV[validV.length-1]!=validV[validV.length-2]){
-							fl.trace("WARNING: Forced tween break, may see issues in tween");
-						}
-
-						takenTo--;
-						validT[validT.length-1] = stopTime;
-						break;
+						endPointMode = (newVal==lastVal);
+						lastVal = newVal;
+						validV.push(newVal);
+						validT.push(lastTime);
+						validS.push(newSpline==this.NO_TWEEN_SPLINE_TOKEN ? this.NO_TWEEN_SPLINE : newSpline);
 					}
+					takenTo++;
+
+					lastSpline = newSpline;
+
+					if(stopTime!=null){
+						if(lastTime == stopTime){
+							doStop = true;
+
+						}else if(lastTime > stopTime){
+
+							if(validV[validV.length-1]!=validV[validV.length-2]){
+								fl.trace("WARNING: Forced tween break, may see issues in tween");
+							}
+
+							takenTo--;
+							validT[validT.length-1] = stopTime;
+							doStop = true;
+						}
+					}
+				}
+				if(!looping && doStop)break;
+
+				if(doStop || (validT.length == 30 && i < n-1)){
+					// this only applies to looping animations
+
+					var count = 1;
+					var matchTime = lastTime
+					while(validT[validT.length-count] >= matchTime){
+						validT[validT.length-count] -= timeAtom*count*totalTime;
+						matchTime = validT[validT.length-count];
+						count++;
+					}
+
+
+					validV.push(defaultValue);
+					validT.push(lastTime);
+					validS.push(this.NO_TWEEN_SPLINE);
+
+					validV.push(defaultValue);
+					validT.push(totalTime);
+					validS.push(this.NO_TWEEN_SPLINE);
+					break;
 				}
 			}
 			var endTime = lastTime;
-			var totalTime = endTime - startTime;
+			var nodeDur = endTime - startTime;
 			var lastTime;
 			for(var i=0; i<validT.length; i++){
 				var time = validT[i];
-				time = this.precision((time-startTime)/totalTime, timePrecision);
+				if(looping){
+					time = this.precision(time/totalTime, timePrecision);
+				}else{
+					time = this.precision((time-startTime)/nodeDur, timePrecision);
+				}
 				if(lastTime == time){
-					if(i==validT.length-1){
-						validT[i-1] -= 1/Math.pow(10, timePrecision);
+					if(i>=validT.length-1){
+						validT[i-1] -= timeAtom;
 					}else{
-						time += 1/Math.pow(10, timePrecision);
+						time += timeAtom;
 					}
 				}
 				validT[i] = time;
 				lastTime = time;
 			}
+
 			/*if(validT[validT.length-1]<1){
 				if(validV.length==2 && validV[0]==validV[1]){
 					validT[1] = 0.5; // reduces unneeded decimal points
