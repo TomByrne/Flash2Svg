@@ -450,6 +450,7 @@
 			this._origSelection=ext.sel;
 			ext.doc.selectNone(); // selection slows performance & can cause crashes
 			this.doms = [];
+			this._timelineCopies = {};
 			if(ext.log){
 				ext.log.pauseTimer(timer);	
 			}
@@ -469,7 +470,6 @@
 				ext.lib.deleteItem(this._tempFolder);	
 			}
 			this._ids={}; // Used by uniqueID() for cross-checking IDs.
-			this._timelineCopies = {};
 			this._symbols={};
 			this._symbolBounds={};
 			this._fillMap={};
@@ -1591,7 +1591,7 @@
 				}
 			}
 			var timelineName = timeline.libraryItem?timeline.libraryItem.name:timeline.name;
-			var timelineRef = options.timelineRef == null ? timeline.libraryItem.name : timelineRef;
+			var timelineRef = options.timelineRef == null ? timelineName : timelineRef;
 
 			var symbolIDString = timelineName.split("/").join("_");
 			if(settings.color){
@@ -1637,17 +1637,13 @@
 					});
 
 
-				 var origTimeline = settings.libraryItem;
-
 				/*
 				 * Create temporary timelines where tweens exist & convert to
 				 * keyframes.
 				 */
-				var originalScene,timelines;
+				var timelines;
+				var origTimeline = timeline;
 				if(hasTweens){
-					/*if(settings.libraryItem==undefined){
-						originalScene=timelineName;
-					}*/
 					timeline = this._getTimelineCopy(settings.libraryItem, timeline, settings.startFrame, settings.endFrame);
 					var layers = timeline.$.layers;
 					//isEditing = false;
@@ -1658,15 +1654,6 @@
 					for(var i=0;i<layers.length;i++){
 						var layer=layers[i];
 						if(layer.layerType=="guide" || layer.layerType=="folder")continue;
-
-						/*var lVisible=layer.visible;
-						var lLocked=layer.locked;
-						if(!lVisible){
-							layer.visible=true;
-						}
-						if(lLocked){
-							layer.locked=false;
-						}*/
 
 						var layerEnd = settings.endFrame;
 						if(layerEnd > layer.frameCount)layerEnd = layer.frameCount;
@@ -1700,10 +1687,6 @@
 										break;
 									}
 								}
-								// This screws up chained keyframes
-								/*if(!breakApart){
-									firstElement.loop = "single frame";
-								}*/
 							}
 							if(breakApart){
 								if(!layerSelected){
@@ -1725,34 +1708,8 @@
 								}
 								n = end-1;
 							}
-							/*while(elements.length==1){
-								var element = firstElement;
-								if(hasTweens && element.elementType=="shape" &&
-									(element.isDrawingObject || element.isGroup || element.isRectangleObject || element.isOvalObject)
-									){
-									if(!isEditing){
-										this.editTimeline(timeline);
-									}
-									timeline.currentFrame = n;
-
-									ext.doc.selectNone();
-									ext.doc.selection = [element];
-									try{
-										ext.doc.breakApart();
-									}catch(e){
-										break;
-									}
-
-									elements = frame.elements;
-								}else{
-									break;
-								}
-							}*/
 						}
-						//layer.visible = lVisible;
-						//layer.locked = lLocked;
 					}
-					//if(isEditing && timeline.libraryItem) ext.doc.exitEditMode();
 
 					if(ext.log){
 						ext.log.pauseTimer(timer2);
@@ -2125,6 +2082,7 @@
 									elemSettings.frameCount = 1;
 								}else{
 									elemSettings.startFrame = element.firstFrame + (n - frame.startFrame);
+									if(elemSettings.startFrame >= element.timeline.frameCount) elemSettings.startFrame = element.timeline.frameCount-1;
 									elemSettings.frameCount = Math.min(frame.duration, element.timeline.frameCount - elemSettings.startFrame);
 								}
 
@@ -2524,26 +2482,7 @@
 				instanceXML['@y']=vb[1];*/
 				//instanceXML['@overflow']="visible";
 				this._useNodeMap[id].push(instanceXML);
-			}
-			/*
-			 *  If this is a temporary scene, delete it and return to the original.
-			 */
-			/*if(originalScene!=undefined){
-				var timelines=ext.timelines;
-				ext.doc.deleteScene();
-				for(i=0;i<ext.timelines.length;i++){
-					if(timelines[i].name==originalScene){
-						ext.doc.editScene(i);
-						break;	
-					}
-				}
-			}
-			if(tempName!=undefined){
-				if(ext.lib.itemExists(tempName)){
-					ext.lib.deleteItem(tempName);	
-				}
-			}*/
-						
+			}		
 			if(isNew){ // set the viewBox
 				if(settings.isRoot && this.clipToScalingGrid && settings.libraryItem){
 					boundingBox=settings.libraryItem.scalingGridRect;
@@ -2626,7 +2565,7 @@
 					var collides = false;
 					for(var j=0; j<pack.ranges.length; j++){
 						var range = pack.ranges[j];
-						if(!(range[0]>endFrame || range[1]<startFrame)){
+						if(!(range[0]>=endFrame || range[1]<=startFrame)){
 							collides = true;
 							break;
 						}
