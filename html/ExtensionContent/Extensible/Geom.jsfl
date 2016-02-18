@@ -41,7 +41,7 @@
      
     // The function that returns true if line segment 'p1q1'
     // and 'p2q2' intersect.
-    Geom.doIntersect = function(p1, q1, p2, q2, acceptEndsMeet)
+    /*ext.Line.lineIntersects = function(p1, q1, p2, q2, acceptEndsMeet)
     {
         if(acceptEndsMeet===undefined)acceptEndsMeet = true;
 
@@ -77,10 +77,10 @@
         if (o4 == 0 && Geom.onSegment(p2, q1, q2))return true;
         
         return false; // Doesn't fall in any of the above cases
-    }
+    }*/
      
     // Returns true if the point p lies inside the polygon[] with n vertices
-    Geom.isInside = function(polygon, p)
+   /* Geom.isInside = function(polygon, p)
     {
         var n = polygon.length;
 
@@ -98,7 +98,7 @@
      
             // Check if the line segment from 'p' to 'extreme' intersects
             // with the line segment from 'polygon[i]' to 'polygon[next]'
-            if (Geom.doIntersect(polygon[i], polygon[next], p, extreme))
+            if (ext.Line.lineIntersects(polygon[i], polygon[next], p, extreme))
             {
                 // If the point 'p' is colinear with line segment 'i-next',
                 // then check if it lies on segment. If it lies, return true,
@@ -113,11 +113,35 @@
      
         // Return true if count is odd, false otherwise
         return count&1;  // Same as (count%2 == 1)
-    }
+    }*/
 
     Geom.polygonBounds = function(polygon)
     {
         var length = polygon.length;
+        var ret;
+        for(var i=0; i<length; i++){
+            var bezier = polygon[i];
+            var bounds = bezier.bbox();
+            if(!ret){
+                ret = { left:bounds.x.min, top:bounds.y.min, right:bounds.x.max, bottom:bounds.y.max};
+            }else{
+                if(bounds.x.min < ret.left){
+                    ret.left = bounds.x.min;
+                }
+                if(bounds.x.max > ret.right){
+                    ret.right = bounds.x.max;
+                }
+                if(bounds.y.min < ret.top){
+                    ret.top = bounds.y.min;
+                }
+                if(bounds.y.max > ret.bottom){
+                    ret.bottom = bounds.y.max;
+                }
+            }
+        }
+        return ret;
+
+       /* var length = polygon.length;
         var ret;
         for(var i=0; i<length; i++){
             var point = polygon[i];
@@ -136,7 +160,7 @@
                 }
             }
         }
-        return ret;
+        return ret;*/
     }
 
     Geom.boundsIntersect = function(bounds1, bounds2)
@@ -152,40 +176,54 @@
     - If any segments intersect then polys intersect
     - If a random point from one poly falls inside the other poly (tests for one poly being completely inside the other)
     */
-    Geom.intersects = function(polygon1, polygon2)
+    Geom.polygonsIntersect = function(polygon1, polygon2)
     {
+        //fl.trace("\n\npolygonsIntersect: "+polygon1.length+" "+polygon2.length);
         var n1 = polygon1.length;
         var n2 = polygon2.length;
 
         // There must be at least 3 vertices in polygon[]
         if (n1 < 3 || n2 < 3)  return false;
 
+        // create a string of the polygons to more quickly test if points exist
+        var p1Str = polygon1.stringVers;
+        if(!p1Str){
+            p1Str = "";
+            for(var i=0; i<polygon1.length; i++){
+                var p = polygon1[i].points[0];
+                p1Str += "_"+p.x+","+p.y+"_";
+            }
+            polygon1.stringVers = p1Str;
+        }
+        var p2Str = polygon2.stringVers;
+        if(!p2Str){
+            p2Str = "";
+            for(var i=0; i<polygon2.length; i++){
+                var p = polygon2[i].points[0];
+                p2Str += "_"+p.x+","+p.y+"_";
+            }
+            polygon2.stringVers = p2Str;
+        }
+
+
         // pick any point from one polygon to see whether it is inside the other polygon
         var p1;
         var p2;
 
-        // create a ctring of the polygons to more quickly test if points exist
-        var p1Str = "";
         for(var i=0; i<polygon1.length; i++){
-            var p = polygon1[i];
-            p1Str += "_"+p.x+","+p.y+"_";
-        }
-        var p2Str = "";
-        for(var i=0; i<polygon2.length; i++){
-            var p = polygon2[i];
-            var pStr = "_"+p.x+","+p.y+"_";
-            p2Str += pStr;
-            if(!p2 && p1Str.indexOf(pStr) == -1) p2 = p;
-        }
-        for(var i=0; i<polygon1.length; i++){
-            var p = polygon1[i];
+            var p = polygon1[i].points[0];
             var pStr = "_"+p.x+","+p.y+"_";
             if(!p1 && p2Str.indexOf(pStr) == -1) p1 = p;
         }
+        for(var i=0; i<polygon2.length; i++){
+            var p = polygon2[i].points[0];
+            var pStr = "_"+p.x+","+p.y+"_";
+            if(!p2 && p1Str.indexOf(pStr) == -1) p2 = p;
+        }
      
         // Create a point for line segment from p to infinite
-        if(p1)var extreme1 = {x:Geom.POSITIVE_INFINITY, y:p1.y};
-        if(p2)var extreme2 = {x:Geom.POSITIVE_INFINITY, y:p2.y};
+        if(p1)var extreme1 = {p1:p1, p2:{x:p1.x+1000, y:p1.y}};
+        if(p2)var extreme2 = {p1:p2, p2:{x:p2.x+1000, y:p2.y}};
      
         // Count intersections of the above line with sides of polygon
         var count1 = 0, i = 0, onEdge1 = false;//, lastY1 = null;
@@ -193,16 +231,18 @@
         {
             var next1 = (i+1)%n1;
 
-            var p1s = polygon1[i];
-            var p1e = polygon1[next1];
+            var bez1 = polygon1[i];
+            var p1s = bez1.points[0];
+            var p1e = bez1.points[bez1.points.length - 1];
      
             // Check if the line segment from 'p' to 'extreme' intersects
             // with the line segment from 'polygon[i]' to 'polygon[next1]'
-            /*fl.trace("inter: "+p1s.x+" "+p1s.y+" "+p1e.x+" "+p1e.y);
-            fl.trace("\t"+p2.x+" "+p2.y+" "+extreme2.x+" "+extreme2.y);
-            fl.trace("\t"+Geom.doIntersect(p1s, p1e, p2, extreme2));*/
+            //fl.trace("inter: "+p1s.x+" "+p1s.y+" "+p1e.x+" "+p1e.y);
+            //fl.trace("\tex: "+p2.x+" "+p2.y+" "+extreme2.p2.x+" "+extreme2.p2.y);
+            //fl.trace("\tint: "+ext.Line.doesIntersect(bez1, extreme2));
+            //fl.trace("\t"+p1.x+" "+p1.y+" "+extreme1.p2.x+" "+extreme1.p2.y);
 
-            if (p2 && Geom.doIntersect(p1s, p1e, p2, extreme2))
+            if (p2 && ext.Line.doesIntersect(bez1, extreme2))
             {
                 var ignorePoint = false;
                 var onStart = (p1s.y==p2.y);
@@ -222,7 +262,7 @@
                     // If the point 'p' is colinear with line segment 'i-next1',
                     // then check if it lies on segment. If it lies, return true,
                     // otherwise false
-                    if (Geom.orientation(p1s, p2, p1e) == 0 && Geom.onSegment(p1s, p2, p1e))
+                    if (bez1.points.length==2 && Geom.orientation(p1s, p2, p1e) == 0 && Geom.onSegment(p1s, p2, p1e))
                        onEdge1 = true;
                     
                     count1++;
@@ -234,11 +274,12 @@
             {
                 var next2 = (k+1)%n2;
 
-                var p2s = polygon2[k];
-                var p2e = polygon2[next2];
+                var bez2 = polygon2[k];
+                var p2s = bez2.points[0];
+                var p2e = bez2.points[bez2.points.length-1];
      
                 // The same sort of point test for the other poly
-                if (p1 && Geom.doIntersect(p2s, p2e, p1, extreme1))
+                if (p1 && ext.Line.doesIntersect(bez2, extreme1))
                 {
                     var ignorePoint = false;
                     var onStart = (p2s.y==p1.y);
@@ -254,27 +295,29 @@
                         }
                     }
                     if(!ignorePoint){
-                        if (Geom.orientation(p2s, p1, p2e) == 0 && Geom.onSegment(p2s, p1, p2e))
+                        if (bez2.points.length==2 && Geom.orientation(p2s, p1, p2e) == 0 && Geom.onSegment(p2s, p1, p2e))
                            onEdge2 = true;
 
                         count2++;
                         //lastY2 = p1.y==p2e.y ? p2e.y : p2s.y;
-                        fl.trace("\tadd: " +p2s.x+" "+p2s.y+" - "+p2e.x+" "+p2e.y+" "+onStart+" "+onEnd);
+                       // fl.trace("\tadd: " +p2s.x+" "+p2s.y+" - "+p2e.x+" "+p2e.y+" "+onStart+" "+onEnd);
                     }
                 }
                 
                 // Test if two segments intersect, if so then the polygons intersect
-                if(Geom.doIntersect(p1s, p1e, p2s, p2e, false)){
-                    fl.trace("WHA: "+p1s.x+" "+p1s.y+" - "+p1e.x+" "+p1e.y);
-                    fl.trace("WHA: "+p2s.x+" "+p2s.y+" - "+p2e.x+" "+p2e.y);
+                if(!ext.Line.linesEqual(bez1, bez2) && ext.Line.doesIntersect(bez1, bez2, false)){
+                    //fl.trace("BEZ: "+bez1.points.length+" "+bez2.points.length);
+                    //fl.trace("WHA: "+bez1.toString());
+                    //fl.trace("WHA: "+bez2.toString());
                     return true;
                 }
 
                 k = next2;
             } while (k != 0);
 
-            fl.trace("count2: "+count2+" "+(!onEdge2 || count2>1));
+            //fl.trace("count2: "+count2+" "+(!onEdge2 || count2>1));
             if(count2&1 && (!onEdge2 || count2>1)){
+                //fl.trace("count2: "+count2+" "+(!onEdge2 || count2>1));
                 return true;
             }
 
@@ -282,7 +325,7 @@
         } while (i != 0);
         
         // Return true if count is odd, false otherwise
-            fl.trace("count1: "+(count1&1 && (!onEdge1 || count1>1)));
+        //fl.trace("count1: "+(count1&1 && (!onEdge1 || count1>1)));
         return count1&1 && (!onEdge1 || count1>1);  // Same as (count%2 == 1)
     }
     ext.extend({Geom:Geom});

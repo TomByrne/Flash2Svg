@@ -2076,27 +2076,32 @@
 								elemSettings.lookupName = timelineName+"_"+i+"."+frame.startFrame+(items.length>1?"."+j:"");
 
 							}else if(element.symbolType=="graphic"){
+
 								var childFrame = element.firstFrame;
 								if(element.loop=="single frame" || frame.duration==1){
 									elemSettings.startFrame = this._getPriorFrame(element.timeline, element.firstFrame);
 									elemSettings.frameCount = 1;
-								}else{
+								}else {
 									elemSettings.startFrame = element.firstFrame + (n - frame.startFrame);
 									if(elemSettings.startFrame >= element.timeline.frameCount) elemSettings.startFrame = element.timeline.frameCount-1;
 									elemSettings.frameCount = Math.min(frame.duration, element.timeline.frameCount - elemSettings.startFrame);
 								}
 
 							}else if(element.symbolType=="movie clip"){
-								if((element.libraryItem.timeline.frameCount<(frameEnd-n)) && frameEnd>n+1 && settings.repeatCount!="indefinite"){
+								if((element.libraryItem.timeline.frameCount<(frameEnd-n)) && frameEnd>n+1){
 									// this changes from an animation with the same duration as the parent timeline to one with a shorter duration (and a repearDur)
 									elemSettings.beginOffset = settings.beginOffset + this.precision(elemSettings.animOffset / ext.doc.frameRate);
 									elemSettings.animOffset = 0;
 									elemSettings.frameCount = element.libraryItem.timeline.frameCount;
 									elemSettings.totalDuration = elemSettings.frameCount;
-									elemSettings.repeatCount = this.precision((frameEnd - n) / ext.doc.frameRate)+"s";
+									if(settings.repeatCount!="indefinite"){
+										elemSettings.repeatCount = this.precision((frameEnd - n) / ext.doc.frameRate)+"s";
+									}else{
+										elemSettings.loopTweens = settings.loopTweens;
+									}
 								}else{
 									elemSettings.loopTweens = settings.loopTweens;
-									if(n==0 && frameEnd==timeline.frameCount){
+									if((n==0 && frameEnd==timeline.frameCount)){
 										// When a child timeline spans the entirity of it's parent, it is allowed to maintain it's own loop 
 										elemSettings.beginOffset = settings.beginOffset;
 										elemSettings.animOffset = settings.animOffset;
@@ -2341,6 +2346,12 @@
 								this._checkTimeValid(timeDur, transAnimObj.timeList, [transAnimObj.splineList, transAnimObj.rotSplineList, transAnimObj.xList, transAnimObj.yList, transAnimObj.rotList, transAnimObj.trxList, transAnimObj.tryList, transAnimObj.skxList, transAnimObj.skyList, transAnimObj.scxList, transAnimObj.scyList, transAnimObj.transXList, transAnimObj.transYList,
 																				transAnimObj.alphaMList, transAnimObj.redOList, transAnimObj.redMList, transAnimObj.greenOList, transAnimObj.greenMList, transAnimObj.blueOList, transAnimObj.blueMList, transAnimObj.alphaOList])
 								
+
+								if(settings.frameCount < animDur && settings.repeatCount=="indefinite"){
+									this._loopAnimation(settings.frameCount, animDur, transAnimObj.timeList, [transAnimObj.splineList, transAnimObj.rotSplineList, transAnimObj.xList, transAnimObj.yList, transAnimObj.rotList, transAnimObj.trxList, transAnimObj.tryList, transAnimObj.skxList, transAnimObj.skyList, transAnimObj.scxList, transAnimObj.scyList, transAnimObj.transXList, transAnimObj.transYList,
+																				transAnimObj.alphaMList, transAnimObj.redOList, transAnimObj.redMList, transAnimObj.greenOList, transAnimObj.greenMList, transAnimObj.blueOList, transAnimObj.blueMList, transAnimObj.alphaOList]);
+								}
+
 								if(combineSkewScales){
 									this._checkTimeValid(timeDur, transAnimObj.skxTimeList, [transAnimObj.skxSplineList, transAnimObj.skyScaleXList, transAnimObj.skxScaleYList]);
 								}else{
@@ -2399,33 +2410,52 @@
 
 							var lastFrameInd = (transToDiff ? frameEnd-1 : frameEnd);
 							if(settings.loopTweens && lastFrameInd > (animDur - settings.animOffset + settings.startFrame))lastFrameInd = (animDur - settings.animOffset + settings.startFrame); // really just to suppress the warning
+ 
 
 							var frameTimeStart = this.precision((settings.animOffset + n - settings.startFrame)/animDur);
 							var frameTimeEnd = this.precision((settings.animOffset + lastFrameInd - settings.startFrame)/animDur);
 
-							if(frameTimeStart>1)fl.trace("START TIME WARNING: "+frameTimeStart+" "+settings.animOffset+" "+animDur+" "+n+" "+settings.startFrame+" "+((n - settings.startFrame)*(1/ext.doc.frameRate)));
-							if(frameTimeEnd>1)fl.trace("END TIME WARNING: "+timeline.name+" "+(settings.animOffset + lastFrameInd - settings.startFrame)+" / "+animDur+" = "+frameTimeEnd+" "+frameTimeStart);
-
-
-							if(frameTimeEnd>1)frameTimeEnd = 1;
-
 							if(items.length>0 && (frameTimeStart!=0 || frameTimeEnd!=1)){ // don't bother if element is always there
-								var fAnimNode = animNode.copy();
-								if(frameTimeStart==0){
-									fAnimNode.@keyTimes = frameTimeStart+";"+frameTimeEnd+";1";
-									fAnimNode.@values="inline;none;none";
 
-								}else{
-									frameXML.@style += "display:none;";
-									if(frameTimeEnd==1){
-										fAnimNode.@keyTimes = "0;"+frameTimeStart+";"+frameTimeEnd;
-										fAnimNode.@values="none;inline;inline";
-										
-									}else{
-										fAnimNode.@keyTimes = "0;"+frameTimeStart+";"+frameTimeEnd+";1";
-										fAnimNode.@values="none;inline;none;none";
-									}
+								var visTimes = [settings.animOffset + n - settings.startFrame, settings.animOffset + lastFrameInd - settings.startFrame];
+								var visValues = ["inline", "none"];
+
+								if(settings.frameCount < animDur && settings.repeatCount=="indefinite"){
+									this._loopAnimation(settings.frameCount, animDur, visTimes, [visValues]);
 								}
+
+								for(var m=0; m<visTimes.length; m++){
+									visTimes[m] = this.precision(visTimes[m]/animDur);
+								}
+
+								frameTimeEnd = visTimes[visTimes.length-1];
+
+								if(frameTimeStart>1)fl.trace("START TIME WARNING: "+frameTimeStart+" "+settings.animOffset+" "+animDur+" "+n+" "+settings.startFrame+" "+((n - settings.startFrame)*(1/ext.doc.frameRate)));
+								if(frameTimeStart > 0){
+									visTimes.unshift(0);
+									visValues.unshift("none");
+								}
+
+
+								if(frameTimeEnd>1){
+									fl.trace("END TIME WARNING: "+timeline.name+" "+(settings.animOffset + lastFrameInd - settings.startFrame)+" / "+animDur+" = "+frameTimeEnd+" "+frameTimeStart);
+									visTimes[visTimes.length-1] = 1;
+									frameTimeEnd = 1;
+
+								}else if(frameTimeEnd < 1){
+									visTimes.push(1);
+									visValues.push(visValues[visValues.length-1]);
+								}
+
+								if(visValues[visValues.length - 2] == "inline"){
+									visValues[visValues.length - 1] = "inline";
+								}
+
+
+								var fAnimNode = animNode.copy();
+								fAnimNode.@keyTimes = visTimes.join(";");
+								fAnimNode.@values = visValues.join(";");
+								if(frameTimeStart!=0) frameXML.@style += "display:none;";
 								frameXML.appendChild(fAnimNode);
 							}
 						}
@@ -2819,6 +2849,28 @@
 
 			return diff>0;
 		},
+		_loopAnimation:function(frameCount, totalDur, timeList, valueLists){
+			var loopTime = frameCount;
+			var loops = 0;
+			var origLength = timeList.length;
+			while(frameCount < totalDur){
+
+				var i=0;
+				while(i < origLength && frameCount + timeList[i] < totalDur){
+					timeList.push(frameCount + timeList[i]);
+					for(var j=0; j<valueLists.length; j++){
+						var valueList = valueLists[j];
+						valueList.push(valueList[i]);
+					}
+					i++;
+				}
+				if(i == 0) break;
+
+				frameCount += loopTime;
+				loops++;
+			}
+			return loops;
+		},
 		_addTimeValue:function(fromIndex, toIndex, time, timeList, valueLists){
 			timeList.splice(toIndex, 0, time);
 			for(var j=0; j<valueLists.length; ++j){
@@ -3009,7 +3061,6 @@
 
 			var looping = repeatCount=="indefinite";
 			var beginAnim;
-			var timeAtom = 1/Math.pow(10, timePrecision);
 			beginOffset = this.precision(beginOffset + (looping ? 0 : startTime));
 			if(beginAnimation=="0s"){
 				beginAnim = (beginOffset ? beginOffset + "s": "0s");
@@ -3057,23 +3108,28 @@
 
 			var spline = lastSpline==this.NO_TWEEN_SPLINE_TOKEN ? this.NO_TWEEN_SPLINE : lastSpline;
 
+			var reduceByTiny = [];
+
 			if(looping && offset > 0){
-				var validV = [defaultValue,lastVal];
-				var validT = [0,lastTime];
-				var validS = [this.NO_TWEEN_SPLINE,spline];
+				var validV = [defaultValue,defaultValue,lastVal];
+				var validT = [0,lastTime,lastTime];
+				var validS = [this.NO_TWEEN_SPLINE,this.NO_TWEEN_SPLINE,spline];
+				reduceByTiny[1] = true;
 			}else{
 				var validV = [lastVal];
 				var validT = [lastTime];
 				var validS = [spline];
 			}
 
+			var timeAtom = 1/Math.pow(10, timePrecision);
+			var tinyTime = 1/Math.pow(10, timePrecision + 3);
 
 			var endPointMode = false;
 			n = times.length;
 			var takenTo = offset;
-			var capLength = (looping ? 29 : 31);
+			var capLength = (looping ? 28 : 31);
 			for(var i=offset + 1; i<n && validT.length<32; ++i){
-				lastTime = times[i];//this.precision((times[i]-startTime)/totalTime, timePrecision);
+				lastTime = times[i];
 				var newVal = values[i];
 				var newSpline = splineList[i];
 				var doStop = false;
@@ -3084,11 +3140,13 @@
 						n--; // no room to add a tween killer
 						doStop = true;
 					}else if(lastVal==validV[validV.length-2]){
-						validT[validT.length-1] = lastTime - 1/Math.pow(10, this.decimalPointPrecision);
+						reduceByTiny[validT.length-1] = true;
+						validT[validT.length-1] = lastTime;
 						validS[validS.length-1] = this.NO_TWEEN_SPLINE;
 					}else{
+						reduceByTiny[validV.length] = true;
 						validV.push(lastVal);
-						validT.push(lastTime - 1/Math.pow(10, this.decimalPointPrecision));
+						validT.push(lastTime);
 						validS.push(this.NO_TWEEN_SPLINE);
 					}
 				}
@@ -3128,7 +3186,7 @@
 				}
 				if(!looping && doStop)break;
 
-				if(looping && (doStop || (validT.length == 30 && i < n-1))){
+				if(looping && (doStop || (validT.length == 29 && i < n-2))){
 					// this only applies to looping animations
 
 					var count = 1;
@@ -3139,6 +3197,10 @@
 						count++;
 					}
 
+					reduceByTiny[validV.length] = true;
+					validV.push(values[i+1]);
+					validT.push(lastTime);
+					validS.push(this.NO_TWEEN_SPLINE);
 
 					validV.push(defaultValue);
 					validT.push(lastTime);
@@ -3157,16 +3219,20 @@
 			for(var i=0; i<validT.length; i++){
 				var time = validT[i];
 				if(looping){
-					time = this.precision(time/totalTime, timePrecision);
+					time = time/totalTime;
 				}else{
-					time = this.precision((time-startTime)/nodeDur, timePrecision);
+					time = (time-startTime)/nodeDur;
 				}
+				time = this.precision(time, timePrecision);
 				if(lastTime == time){
 					if(i>=validT.length-1){
 						validT[i-1] -= timeAtom;
 					}else{
 						time += timeAtom;
 					}
+				}
+				if(reduceByTiny[i] && i!=validT.length-1){
+					time = this.precisionStr(time - tinyTime, timePrecision + 2);
 				}
 				validT[i] = time;
 				lastTime = time;
@@ -3987,7 +4053,7 @@
 							continue;
 						}
 		
-						if(!ext.Geom.intersects(otherPoly, holePoly)){
+						if(!ext.Geom.polygonsIntersect(otherPoly, holePoly)){
 							continue;
 						}
 
@@ -3996,7 +4062,7 @@
 						d = d.replace("z", '');
 						d += " "+pathStr;
 
-						fl.trace("CUT HOLE");
+						//fl.trace("CUT HOLE");
 						if(pathNode.@stroke.length()){
 							var newNode = new XML('<path fill="'+pathNode.@fill+'" d="'+d+'"/>\n');
 							//otherG.insertChildBefore(pathNode, newNode);
@@ -4084,6 +4150,19 @@
 				return svg.children()[0];
 			}else{
 				return svg;
+			}
+		},
+		_createLine:function(points){
+			if(points.length > 2){
+
+				//return new ext.Bezier(points);
+				return new ext.Line(points[0], points[points.length-1]);
+			}else{
+				/*var start = points[0];
+				var end = points[1];
+				var halfway = {x:(start.x+end.x)/2, y:(start.y+end.y)/2};
+				return new ext.Bezier([start, halfway, end]);*/
+				return new ext.Line(points);
 			}
 		},
 		_getContour:function(contour, polygonsList, options){
@@ -4267,7 +4346,7 @@
 					if(!lastPoint || lastPoint.x!=firstPoint.x || lastPoint.y!=firstPoint.y){
 						lastDeg = degPrefix[0];
 						pathStr += lastDeg+this.precision(firstPoint.x)+","+this.precision(firstPoint.y);
-						if(!lastPoint)polygon.push({x:firstPoint.x, y:firstPoint.y});
+						//if(!lastPoint) polygon.push({x:firstPoint.x, y:firstPoint.y});
 					}
 					var deg = degPrefix[cp.length-1];
 					if(deg!=lastDeg){
@@ -4284,7 +4363,8 @@
 						}
 						pathStr += this.precision(point.x)+","+this.precision(point.y);
 					}
-					polygon.push({x:point.x, y:point.y});
+					//polygon.push({x:point.x, y:point.y});
+					polygon.push(this._createLine(cp));
 					lastPoint = point;
 				}
 				if(cutHole && currPath==filledPath){
@@ -4958,6 +5038,20 @@
 		precision:function(num, precision){
 			if(precision==undefined)precision = this.decimalPointPrecision;
 			return Math.roundTo(num, precision);
+		},
+		/**
+		 * Some numbers suffer from floating point issues even when applying precision.
+		 * So we do the transform as a string.
+		 */
+		precisionStr:function(num, precision){
+			var str = num.toString();
+			var dot = str.indexOf(".");
+			if(dot != -1){
+				if(str.length - dot - 1 > precision){
+					str = str.substr(0, dot + precision + 1);
+				}
+			}
+			return str
 		},
 		/**
 		 * Applies transformation matrices recursively given an SVG graphic element.

@@ -38,7 +38,9 @@
 				for(var i=0;i<mods.length;i++){
 					if(force || this._modules.indexOf[mods[i]]<0){
 						var file=this.dir+"/"+mods[i]+".jsfl";
-						if(file!=fl.scriptURI && FLfile.exists(file)){
+						if(file==fl.scriptURI)continue;
+
+						if(FLfile.exists(file)){
 							try{
 								fl.runScript(file);
 								this.modules.push(mods[i]);
@@ -46,6 +48,8 @@
 								this.warn("Problem loading "+mods[i]);
 								break;
 							}
+						}else{
+							this.warn("Couldn't locate script "+mods[i]);
 						}
 					}
 				}
@@ -309,8 +313,10 @@ if(fl.scriptURI && fl.scriptURI!="unknown:"){
 			'Timer',
 			'Function',
 			'MathUtils',
-			'ArrayUtils',
-			'Geom'
+			'Geom',
+			'BezierUtils',
+			'Bezier',
+			'Line'
 		],
 		true
 	);
