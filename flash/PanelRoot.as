@@ -244,7 +244,7 @@ package{
 				controlsLogic.setEnabled(true);
 				var fileName;
 				if(MMExecute('extensible.doc.pathURI')!=='undefined'){
-					fileName = MMExecute('extensible.doc.pathURI.relativeToDocument.stripExtension()');
+					fileName = MMExecute('decodeURIComponent(extensible.doc.pathURI.relativeToDocument).stripExtension()');
 				}else{
 					fileName = MMExecute('extensible.doc.name.stripExtension()');
 				}
@@ -586,7 +586,6 @@ package{
 		
 		public function endProgress():Boolean
 		{
-			Fl.log("endProgress");
 			this.removeEventListener(Event.ENTER_FRAME, processQue);
 			this.controlsLogic.setEnabled(true);
 			this.controlsLayout.progressBar.indeterminate=false;

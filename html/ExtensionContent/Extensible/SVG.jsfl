@@ -3128,7 +3128,7 @@
 				}
 				if(!looping && doStop)break;
 
-				if(doStop || (validT.length == 30 && i < n-1)){
+				if(looping && (doStop || (validT.length == 30 && i < n-1))){
 					// this only applies to looping animations
 
 					var count = 1;
@@ -3150,6 +3150,7 @@
 					break;
 				}
 			}
+
 			var endTime = lastTime;
 			var nodeDur = endTime - startTime;
 			var lastTime;
@@ -3202,8 +3203,7 @@
 					animNode.@repeatCount = repeatCount;
 				}
 			}
-
-			animNode.@dur = this.precision(totalTime)+"s";
+			animNode.@dur = this.precision(looping ? totalTime : nodeDur)+"s";
 			animNode.@keyTimes = validT.join(";");
 			animNode.@values = validV.join(";");
 
@@ -3951,9 +3951,9 @@
 				if(!holePoly.bounds)holePoly.bounds = ext.Geom.polygonBounds(holePoly);
 
 				var oppFills = new ext.Array();
-			if(ext.log){
-				var timer1=ext.log.startTimer('extensible.SVG._getShape() edges');	
-			}
+				if(ext.log){
+					var timer1=ext.log.startTimer('extensible.SVG._getShape() edges');	
+				}
 				for(var i=0;i<contours.length;i++){
 					var othContour = contours[i];
 					if(othContour==contour)continue;
@@ -3962,9 +3962,9 @@
 						oppFills.push(othContour.fill);
 					}
 				}
-			if(ext.log){
-				ext.log.pauseTimer(timer1);	
-			}
+				if(ext.log){
+					ext.log.pauseTimer(timer1);	
+				}
 				for(var i=0; i<holeObj.maxPath; i++){
 					//var otherG = pathList[i].node;
 					var otherPaths = pathList[i].nodes;
@@ -3981,6 +3981,7 @@
 
 						var otherPoly = othPolys[k];
 						if(!otherPoly.bounds)otherPoly.bounds = ext.Geom.polygonBounds(otherPoly);
+
 						if(!ext.Geom.boundsIntersect(otherPoly.bounds, holePoly.bounds)){
 							// Do bounds test first because it's much quicker
 							continue;
@@ -3995,6 +3996,7 @@
 						d = d.replace("z", '');
 						d += " "+pathStr;
 
+						fl.trace("CUT HOLE");
 						if(pathNode.@stroke.length()){
 							var newNode = new XML('<path fill="'+pathNode.@fill+'" d="'+d+'"/>\n');
 							//otherG.insertChildBefore(pathNode, newNode);
@@ -4239,7 +4241,7 @@
 			var pathNodes = [];
 			var polygons = [];
 			//fl.trace("\nContour: "+paths.length+" int: "+contour.interior+" ori: "+contour.orientation+" "+fillString+" cut:"+cutHole+" r:"+reverse+" lastStroke: "+lastStroke);
-			//fl.trace("edges: "+edgeIDs+" "+filledPath);
+			//fl.trace("edges: "+edgeIDs.join(",")+" "+fill);
 			for (var i=0; i<paths.length; i++) 
 			{ 
 				currPath = paths[i];
@@ -4285,7 +4287,7 @@
 					polygon.push({x:point.x, y:point.y});
 					lastPoint = point;
 				}
-				if(cutHole && i==0){
+				if(cutHole && currPath==filledPath){
 					holes.push({contour:contour, edgeIDs:edgeIDs, pathStr:pathStr, polygon:polygon, maxPath:pathList.length});
 					if(fill || currPath.stroke){
 						polygons.push(polygon);

@@ -161,15 +161,34 @@
         if (n1 < 3 || n2 < 3)  return false;
 
         // pick any point from one polygon to see whether it is inside the other polygon
-        var p1 = polygon1[0];
-        var p2 = polygon2[0];
+        var p1;
+        var p2;
+
+        // create a ctring of the polygons to more quickly test if points exist
+        var p1Str = "";
+        for(var i=0; i<polygon1.length; i++){
+            var p = polygon1[i];
+            p1Str += "_"+p.x+","+p.y+"_";
+        }
+        var p2Str = "";
+        for(var i=0; i<polygon2.length; i++){
+            var p = polygon2[i];
+            var pStr = "_"+p.x+","+p.y+"_";
+            p2Str += pStr;
+            if(!p2 && p1Str.indexOf(pStr) == -1) p2 = p;
+        }
+        for(var i=0; i<polygon1.length; i++){
+            var p = polygon1[i];
+            var pStr = "_"+p.x+","+p.y+"_";
+            if(!p1 && p2Str.indexOf(pStr) == -1) p1 = p;
+        }
      
         // Create a point for line segment from p to infinite
-        var extreme1 = {x:Geom.POSITIVE_INFINITY, y:p1.y};
-        var extreme2 = {x:Geom.POSITIVE_INFINITY, y:p2.y};
+        if(p1)var extreme1 = {x:Geom.POSITIVE_INFINITY, y:p1.y};
+        if(p2)var extreme2 = {x:Geom.POSITIVE_INFINITY, y:p2.y};
      
         // Count intersections of the above line with sides of polygon
-        var count1 = 0, i = 0, onEdge1 = false, lastY1 = null;
+        var count1 = 0, i = 0, onEdge1 = false;//, lastY1 = null;
         do
         {
             var next1 = (i+1)%n1;
@@ -182,7 +201,8 @@
             /*fl.trace("inter: "+p1s.x+" "+p1s.y+" "+p1e.x+" "+p1e.y);
             fl.trace("\t"+p2.x+" "+p2.y+" "+extreme2.x+" "+extreme2.y);
             fl.trace("\t"+Geom.doIntersect(p1s, p1e, p2, extreme2));*/
-            if (p1s.y!=lastY1 && Geom.doIntersect(p1s, p1e, p2, extreme2))
+
+            if (p2 && Geom.doIntersect(p1s, p1e, p2, extreme2))
             {
                 var ignorePoint = false;
                 var onStart = (p1s.y==p2.y);
@@ -206,11 +226,10 @@
                        onEdge1 = true;
                     
                     count1++;
-                    lastY1 = p2.y==p1e.y ? p1e.y : p1s.y;
                 }
             }
 
-            var count2 = 0, k = 0, onEdge2 = false, lastY2 = null;
+            var count2 = 0, k = 0, onEdge2 = false;//, lastY2 = null;
             do
             {
                 var next2 = (k+1)%n2;
@@ -219,7 +238,7 @@
                 var p2e = polygon2[next2];
      
                 // The same sort of point test for the other poly
-                if (p2s.y!=lastY2 && Geom.doIntersect(p2s, p2e, p1, extreme1))
+                if (p1 && Geom.doIntersect(p2s, p2e, p1, extreme1))
                 {
                     var ignorePoint = false;
                     var onStart = (p2s.y==p1.y);
@@ -237,20 +256,24 @@
                     if(!ignorePoint){
                         if (Geom.orientation(p2s, p1, p2e) == 0 && Geom.onSegment(p2s, p1, p2e))
                            onEdge2 = true;
-             
+
                         count2++;
-                        lastY2 = p1.y==p2e.y ? p2e.y : p2s.y;
+                        //lastY2 = p1.y==p2e.y ? p2e.y : p2s.y;
+                        fl.trace("\tadd: " +p2s.x+" "+p2s.y+" - "+p2e.x+" "+p2e.y+" "+onStart+" "+onEnd);
                     }
                 }
                 
                 // Test if two segments intersect, if so then the polygons intersect
                 if(Geom.doIntersect(p1s, p1e, p2s, p2e, false)){
+                    fl.trace("WHA: "+p1s.x+" "+p1s.y+" - "+p1e.x+" "+p1e.y);
+                    fl.trace("WHA: "+p2s.x+" "+p2s.y+" - "+p2e.x+" "+p2e.y);
                     return true;
                 }
 
                 k = next2;
             } while (k != 0);
 
+            fl.trace("count2: "+count2+" "+(!onEdge2 || count2>1));
             if(count2&1 && (!onEdge2 || count2>1)){
                 return true;
             }
@@ -259,6 +282,7 @@
         } while (i != 0);
         
         // Return true if count is odd, false otherwise
+            fl.trace("count1: "+(count1&1 && (!onEdge1 || count1>1)));
         return count1&1 && (!onEdge1 || count1>1);  // Same as (count%2 == 1)
     }
     ext.extend({Geom:Geom});
