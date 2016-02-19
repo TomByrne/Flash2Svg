@@ -2343,14 +2343,15 @@
 									}
 								}
 
+								if(settings.frameCount < animDur && settings.repeatCount=="indefinite"){
+									this._loopAnimation(settings.frameCount/ext.doc.frameRate, animDur/ext.doc.frameRate , transAnimObj.timeList, [transAnimObj.xList, transAnimObj.yList, transAnimObj.rotList, transAnimObj.trxList, transAnimObj.tryList, transAnimObj.skxList, transAnimObj.skyList, transAnimObj.scxList, transAnimObj.scyList, transAnimObj.transXList, transAnimObj.transYList,
+																				transAnimObj.alphaMList, transAnimObj.redOList, transAnimObj.redMList, transAnimObj.greenOList, transAnimObj.greenMList, transAnimObj.blueOList, transAnimObj.blueMList, transAnimObj.alphaOList], [transAnimObj.splineList, transAnimObj.rotSplineList]);
+								}
+
 								this._checkTimeValid(timeDur, transAnimObj.timeList, [transAnimObj.splineList, transAnimObj.rotSplineList, transAnimObj.xList, transAnimObj.yList, transAnimObj.rotList, transAnimObj.trxList, transAnimObj.tryList, transAnimObj.skxList, transAnimObj.skyList, transAnimObj.scxList, transAnimObj.scyList, transAnimObj.transXList, transAnimObj.transYList,
 																				transAnimObj.alphaMList, transAnimObj.redOList, transAnimObj.redMList, transAnimObj.greenOList, transAnimObj.greenMList, transAnimObj.blueOList, transAnimObj.blueMList, transAnimObj.alphaOList])
 								
 
-								if(settings.frameCount < animDur && settings.repeatCount=="indefinite"){
-									this._loopAnimation(settings.frameCount, animDur, transAnimObj.timeList, [transAnimObj.splineList, transAnimObj.rotSplineList, transAnimObj.xList, transAnimObj.yList, transAnimObj.rotList, transAnimObj.trxList, transAnimObj.tryList, transAnimObj.skxList, transAnimObj.skyList, transAnimObj.scxList, transAnimObj.scyList, transAnimObj.transXList, transAnimObj.transYList,
-																				transAnimObj.alphaMList, transAnimObj.redOList, transAnimObj.redMList, transAnimObj.greenOList, transAnimObj.greenMList, transAnimObj.blueOList, transAnimObj.blueMList, transAnimObj.alphaOList]);
-								}
 
 								if(combineSkewScales){
 									this._checkTimeValid(timeDur, transAnimObj.skxTimeList, [transAnimObj.skxSplineList, transAnimObj.skyScaleXList, transAnimObj.skxScaleYList]);
@@ -2422,41 +2423,63 @@
 
 								if(settings.frameCount < animDur && settings.repeatCount=="indefinite"){
 									this._loopAnimation(settings.frameCount, animDur, visTimes, [visValues]);
+
+									var m=0;
+									while(m<visTimes.length-1){
+										var time1 = visTimes[m];
+										var value1 = visValues[m];
+										var time2 = visTimes[m+1];
+										var value2 = visValues[m+1];
+
+										if(value1 == value2){
+											visTimes.splice(m+1, 1);
+											visValues.splice(m+1, 1);
+										}else if(time1==time2){
+											visTimes.splice(m, 1);
+											visValues.splice(m, 1);
+											if(m>0)m--; // move back to check previous for similarity
+										}else{
+											m++;
+										}
+									}
 								}
 
-								for(var m=0; m<visTimes.length; m++){
-									visTimes[m] = this.precision(visTimes[m]/animDur);
+								if(visTimes.length > 2 || visTimes[0]!=0 || (visTimes.length==2 && visTimes[1]!=animDur)){ // don't bother if element is always there
+
+									for(var m=0; m<visTimes.length; m++){
+										visTimes[m] = this.precision(visTimes[m]/animDur);
+									}
+
+									frameTimeEnd = visTimes[visTimes.length-1];
+
+									if(frameTimeStart>1)fl.trace("START TIME WARNING: "+frameTimeStart+" "+settings.animOffset+" "+animDur+" "+n+" "+settings.startFrame+" "+((n - settings.startFrame)/ext.doc.frameRate));
+									if(frameTimeStart > 0){
+										visTimes.unshift(0);
+										visValues.unshift("none");
+									}
+
+
+									if(frameTimeEnd>1){
+										fl.trace("END TIME WARNING: "+timeline.name+" "+(settings.animOffset + lastFrameInd - settings.startFrame)+" / "+animDur+" = "+frameTimeEnd+" "+frameTimeStart);
+										visTimes[visTimes.length-1] = 1;
+										frameTimeEnd = 1;
+
+									}else if(frameTimeEnd < 1){
+										visTimes.push(1);
+										visValues.push(visValues[visValues.length-1]);
+									}
+
+									if(visValues[visValues.length - 2] == "inline"){
+										visValues[visValues.length - 1] = "inline";
+									}
+
+
+									var fAnimNode = animNode.copy();
+									fAnimNode.@keyTimes = visTimes.join(";");
+									fAnimNode.@values = visValues.join(";");
+									if(frameTimeStart!=0) frameXML.@style += "display:none;";
+									frameXML.appendChild(fAnimNode);
 								}
-
-								frameTimeEnd = visTimes[visTimes.length-1];
-
-								if(frameTimeStart>1)fl.trace("START TIME WARNING: "+frameTimeStart+" "+settings.animOffset+" "+animDur+" "+n+" "+settings.startFrame+" "+((n - settings.startFrame)*(1/ext.doc.frameRate)));
-								if(frameTimeStart > 0){
-									visTimes.unshift(0);
-									visValues.unshift("none");
-								}
-
-
-								if(frameTimeEnd>1){
-									fl.trace("END TIME WARNING: "+timeline.name+" "+(settings.animOffset + lastFrameInd - settings.startFrame)+" / "+animDur+" = "+frameTimeEnd+" "+frameTimeStart);
-									visTimes[visTimes.length-1] = 1;
-									frameTimeEnd = 1;
-
-								}else if(frameTimeEnd < 1){
-									visTimes.push(1);
-									visValues.push(visValues[visValues.length-1]);
-								}
-
-								if(visValues[visValues.length - 2] == "inline"){
-									visValues[visValues.length - 1] = "inline";
-								}
-
-
-								var fAnimNode = animNode.copy();
-								fAnimNode.@keyTimes = visTimes.join(";");
-								fAnimNode.@values = visValues.join(";");
-								if(frameTimeStart!=0) frameXML.@style += "display:none;";
-								frameXML.appendChild(fAnimNode);
 							}
 						}
 
@@ -2849,26 +2872,39 @@
 
 			return diff>0;
 		},
-		_loopAnimation:function(frameCount, totalDur, timeList, valueLists){
-			var loopTime = frameCount;
+		_loopAnimation:function(animDur, totalDur, timeList, valueLists, splineLists){
+			var loopTime = animDur;
 			var loops = 0;
 			var origLength = timeList.length;
-			while(frameCount < totalDur){
+			//fl.trace("\n_loopAnimation: "+animDur+" / "+totalDur);
+			//fl.trace("\ttimes: "+timeList);
+			//fl.trace("\tvalues: "+valueLists.join("  |  "));
+			//fl.trace("\tsplines: "+splineLists.join("  |  "));
+			while(animDur < totalDur){
 
 				var i=0;
-				while(i < origLength && frameCount + timeList[i] < totalDur){
-					timeList.push(frameCount + timeList[i]);
+				while(i < origLength && animDur + timeList[i] < totalDur){
+					timeList.push(animDur + timeList[i]);
 					for(var j=0; j<valueLists.length; j++){
 						var valueList = valueLists[j];
 						valueList.push(valueList[i]);
+					}
+					if(splineLists != null){
+						for(var j=0; j<splineLists.length; j++){
+							var splineList = splineLists[j];
+							splineList.push(i==origLength ? this.NO_TWEEN_SPLINE_TOKEN : splineList[i]);
+						}
 					}
 					i++;
 				}
 				if(i == 0) break;
 
-				frameCount += loopTime;
+				animDur += loopTime;
 				loops++;
 			}
+			//fl.trace("\ttimes: "+timeList);
+			//fl.trace("\tvalues: "+valueLists.join("  |  "));
+			//fl.trace("\tsplines: "+splineLists.join("  |  "));
 			return loops;
 		},
 		_addTimeValue:function(fromIndex, toIndex, time, timeList, valueLists){
@@ -3225,7 +3261,7 @@
 				}
 				time = this.precision(time, timePrecision);
 				if(lastTime == time){
-					if(i>=validT.length-1){
+					if(i<validT.length-1 || validV[i+1]==validV[i]){
 						validT[i-1] -= timeAtom;
 					}else{
 						time += timeAtom;
@@ -3237,16 +3273,6 @@
 				validT[i] = time;
 				lastTime = time;
 			}
-
-			/*if(validT[validT.length-1]<1){
-				if(validV.length==2 && validV[0]==validV[1]){
-					validT[1] = 0.5; // reduces unneeded decimal points
-				}
-				validV.push(lastVal);
-				validT.push(1);
-			}else{
-				validS.pop(); // spline list should be one element shorter than other lists
-			}*/
 
 			validS.pop(); // spline list should be one element shorter than other lists
 
