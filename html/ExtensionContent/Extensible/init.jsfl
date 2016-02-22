@@ -314,9 +314,7 @@ if(fl.scriptURI && fl.scriptURI!="unknown:"){
 			'Function',
 			'MathUtils',
 			'Geom',
-			'BezierUtils',
-			'Bezier',
-			'Line'
+			'FileSystem'
 		],
 		true
 	);

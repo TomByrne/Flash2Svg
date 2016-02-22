@@ -209,7 +209,8 @@ function onLoaded() {
     			'Timer',
     			'Function',
     			'MathUtils',
-    			'Geom'
+    			'Geom',
+    			'FileSystem'
     		];
     
     setProgressState(false, "Initialising", 0, files.length);
