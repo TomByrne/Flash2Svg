@@ -624,7 +624,7 @@
 			svgData = svgData.replace(/ Q /g, "Q");
 			svgData = svgData.replace(/ C /g, "C");
 			svgData = svgData.replace(/ Z/g, "Z");
-			
+
 			var svgXml = new XML(svgData);
 
 			var defs = svgXml.defs[0].children();
@@ -1503,7 +1503,7 @@
 				}
 			}
 			if(options.lookupName){
-				var symbol = new XML('<symbol/>');
+				var symbol = new XML('<g/>');
 				symbol['@id'] = options.lookupName;
 				symbol.appendChild(result);
 				this._symbolList.push(symbol);
@@ -1874,7 +1874,7 @@
 				// instanceXML['@y']=0;
 				//instanceXML['@overflow']="visible";
 
-				xml=new XML('<symbol/>');
+				xml=new XML('<g/>');
 				xml['@id']=id;
 				xml['@overflow']="visible";
 
@@ -2208,7 +2208,7 @@
 							}
 							if(!elemSettings.lookupName || !this._symbols[elemSettings.lookupName]){
 								if(this._delayedProcessing){
-									var elementXML = new XML( elemSettings.lookupName ? '<symbol id="'+elemSettings.lookupName+'" overflow="visible"/>' : '<g/>' );
+									var elementXML = new XML( elemSettings.lookupName ? '<g id="'+elemSettings.lookupName+'" overflow="visible"/>' : '<g/>' );
 									this.qData.push(closure(this.processElement, [elementXML, element, elemSettings, dom], this));
 								}else{
 									var elementXML = this._getElement( element, elemSettings );
@@ -4123,8 +4123,8 @@
 				layer.visible = true;
 				layer.locked = false;
 
-				var frame = layer.frames[settings.parentFrame];
-				var item = frame.elements[settings.editItemPath[0]].$;
+				var frame = layer.frames[settings.parentFrame].$;
+				var item = frame.elements[settings.editItemPath[0]];
 				ext.doc.selectNone();
 				ext.doc.selection = [item];
 				for(var i=1; i<settings.editItemPath.length; i++){
@@ -4132,6 +4132,11 @@
 					item = item.members[settings.editItemPath[i]];
 					ext.doc.selectNone();
 					ext.doc.selection = [item];
+				}
+				if(settings.editItemPath.length == 1){
+					ext.doc.selection = frame.elements;
+				}else{
+					ext.doc.selectAll();
 				}
 				ext.doc.clipCopy();
 
@@ -4146,6 +4151,11 @@
 
 				ext.doc.clipPaste();
 
+				var items = layer.frames[0].elements;
+				var newShape = items[0];
+				newShape.x = shape.x;
+				newShape.y = shape.y;
+
 				if(shape.isGroup){
 					ext.doc.selectNone();
 					ext.doc.selection = [layer.frames[0].elements[0]];
@@ -4159,10 +4169,6 @@
 					ext.doc.selection = [elem];
 					ext.doc.deleteSelection();
 				}
-
-				var newShape = items[0];
-				newShape.x = shape.x;
-				newShape.y = shape.y;
 
 				this._shapeRefs[layerInd - 1] = svg;
 			}
