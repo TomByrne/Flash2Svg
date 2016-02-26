@@ -1,4 +1,4 @@
-# Animated SVG Exporter for Flash Professional#
+# Animated SVG Exporter for Flash Pro / Adobe Animate#
 
 ## To Install from ZXP ##
 - Select latest release from [releases page](https://github.com/TomByrne/Flash2Svg/releases)
@@ -8,7 +8,7 @@
 - Go to the plugin page at [Adobe Addons](https://creative.adobe.com/addons/products/7232)
 - Click the 'Free' button to install
 
-## To Use in Flash CC / CC 2014 ##
+## To Use in Flash CC / Adobe Animate ##
 - Open panel through menus, Window > Extensions > SVG Animation
 - Open the FLA you wish to use and navigate to the timeline you wish to export
 - Select suitable options
@@ -22,7 +22,8 @@
 
 
 ### Installation issues ###
-If you've installed the plugin but it isn't showing up, it's probably due to language issues with Adobe products. A guide to resolving these issues will be done in the future.
+If you've installed the plugin but it isn't showing up, it could be a number of issues related to the Adobe plugin installation system.
+[Check here for manual installation process.](http://www.tbyrne.org/manually-installing-flash2svg)
 
 ## To build the extension on Windows ##
 - Download the [CS6 Signing Toolkit](http://www.adobe.com/devnet/creativesuite/sdk/eula_cs6-signing-toolkit.html)
