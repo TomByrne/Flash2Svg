@@ -375,12 +375,17 @@
 		process:function(){
 			if(this.qData.length>0){
 				var endTime = (new Date()).getTime()+(1000/30);
-				while(
-					this.qData.length && ( new Date()).getTime()<endTime ){
-					var nextCall = this.qData.shift();
-					nextCall();
-					
-					if(!this.swfPanel){ break; }				
+				try{
+					while(
+						this.qData.length && ( new Date()).getTime()<endTime ){
+						var nextCall = this.qData.shift();
+						nextCall();
+						
+						if(!this.swfPanel){ break; }				
+					}
+				}catch(e){
+					ext.message(e);
+					return false;
 				}
 			}else{
 				try{
@@ -391,6 +396,7 @@
 					}
 				}catch(e){
 					ext.message(e);
+					return false;
 				}
 			}
 			return true;
@@ -3300,7 +3306,7 @@
 
 					lastSpline = newSpline;
 
-					if(stopTime!=null){
+					if(stopTime!=null && i > offset+1){
 						if(lastTime == stopTime){
 							doStop = true;
 
@@ -4151,23 +4157,27 @@
 
 				ext.doc.clipPaste();
 
-				var items = layer.frames[0].elements;
-				var newShape = items[0];
-				newShape.x = shape.x;
-				newShape.y = shape.y;
+				var index = settings.editItemPath[settings.editItemPath.length-1];
 
-				if(shape.isGroup){
-					ext.doc.selectNone();
-					ext.doc.selection = [layer.frames[0].elements[0]];
-					ext.doc.breakApart();
-				}
+				var items = layer.frames[0].elements.concat([]);
+				var newItem = items[index];
+				ext.doc.moveSelectionBy( { x:item.x - newItem.x, y:item.y - newItem.y } );
 
-				var items = layer.frames[0].elements;
-				for(var i=1; i<items.length; i++){
+
+				for(var i=0; i<items.length; i++){
 					var elem = items[i];
+					if(i == index)continue;
 					ext.doc.selectNone();
 					ext.doc.selection = [elem];
 					ext.doc.deleteSelection();
+				}
+
+				var items = layer.frames[0].elements;
+
+				if(shape.isDrawingObject){
+					ext.doc.selectNone();
+					ext.doc.selection = [layer.frames[0].elements[0]];
+					ext.doc.breakApart();
 				}
 
 				this._shapeRefs[layerInd - 1] = svg;
@@ -4330,7 +4340,7 @@
 					mat = fl.Math.concatMatrix(mat, options.matrix);
 				}
 				options.matrix = mat;
-				var xml=this._getShape(currentTimeline.layers[tempLayerIndex].elements[0],options);
+				var xml = this._getShape(currentTimeline.layers[tempLayerIndex].elements[0],options);
 				currentTimeline.deleteLayer(tempLayerIndex);
 				element.removePersistentData(id);
 				if(ext.log){
