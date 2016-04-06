@@ -197,6 +197,12 @@
 			this.animated = true;
 		}
 		if(this.animated)this.applyTransformations = false;
+
+		this.isFlashDoc = (ext.doc.type == "Flash" || ext.doc.type == null);
+		if(!this.isFlashDoc){
+			alert("Exporting from Non-Flash documents is not supported.\n\nPlease copy and paste all layers into a Flash document before exporting.");
+			return;
+		}
 		
 		if(typeof(this.curveDegree)=='string'){
 			var num = parseInt(this.curveDegree);
@@ -207,7 +213,7 @@
 			}
 		}
 		this.swfPanel=ext.swfPanel(this.swfPanelName); // the swfPanel
-		this._timer=undefined;
+		this._timer = undefined;
 		//this._symbolToUseNodes={};
 		//this._rootItem={};
 		this._tempLibFolder=ext.lib.uniqueName('temp'); // Library folder holding temporary symbols.
@@ -1719,23 +1725,30 @@
 			var timelineName = timeline.libraryItem?timeline.libraryItem.name:timeline.name;
 			var timelineRef = options.timelineRef == null ? timelineName : timelineRef;
 
-			var symbolIDString = timelineName.split("/").join("_");
+			var symbolIDString = timelineName.split("/").join("_").split(" ").join("-");
+			var suffix = "";
 			if(settings.color){
-				symbolIDString += '_'+settings.color.idString; //should factor this out and use a transform
+				suffix += 'c'+settings.color.idString; //should factor this out and use a transform
 			}
 			if(frameCount>1){
 				var offset = settings.animOffset;
 				if(settings.frameCount==1){
-					symbolIDString += '_f'+settings.startFrame;
-				}else if(settings.animOffset!=null && settings.animOffset>0){
-					symbolIDString += '_t'+settings.animOffset;
+					suffix += 'f'+settings.startFrame;
+				}else if(settings.startFrame!=null && settings.startFrame>0){
+					suffix += 't'+settings.startFrame;
 				}
-				if(settings.totalDuration > settings.frameCount){
-					symbolIDString += '_d'+settings.totalDuration;
+				if(settings.animOffset!=null && settings.animOffset>0){
+					suffix += 'o'+settings.animOffset;
+				}
+				if(settings.frameCount!=1 && settings.totalDuration > settings.frameCount){
+					suffix += 'd'+settings.totalDuration;
 				}
 				if(settings.repeatCount!="indefinite"){
-					symbolIDString += '_l'+settings.repeatCount;
+					suffix += 'r'+settings.repeatCount;
 				}
+			}
+			if(suffix.length){
+				symbolIDString += suffix;
 			}
 			var isNew,boundingBox;
 			if(this._symbols[symbolIDString]){
@@ -1922,9 +1935,6 @@
 					}else{
 						animDur = totFrames;
 					}
-					if(settings.loopTweens){
-						animDur -= 1;
-					}
 
 					animNode.@dur = this.precision( animDur / ext.doc.frameRate )+"s";
 				}else{
@@ -2030,6 +2040,7 @@
 					var frames = layer.frames;
 					var n=settings.startFrame;
 					layerSelected = false;
+					var realDur = animDur + (settings.loopTweens ? 0 : 1);
 					while( n<layerEnd ){
 						if(ext.log){
 							var timer2=ext.log.startTimer('extensible.SVG._getTimeline() >> Get frame items');	
@@ -2045,7 +2056,7 @@
 							}else if(lastMaskState!=maskState){
 								if(maskAnim==null)maskAnim = new XML('<animate attributeName="mask" repeatCount="'+settings.repeatCount+'" dur="'+timeDur+'s" keyTimes="0" values="'+lastMaskState+'"/>');
 								if(settings.repeatCount!="indefinite")maskAnim.@fill = "freeze";
-								maskAnim.@keyTimes += ";" + this.precision((settings.animOffset + n - settings.startFrame)/animDur);
+								maskAnim.@keyTimes += ";" + this.precision((settings.animOffset + n - settings.startFrame)/realDur);
 								maskAnim.@values += ";" + maskState;
 								lastMaskState = maskState;
 							}
@@ -2445,8 +2456,8 @@
 									}
 								}
 
-								if(settings.frameCount < animDur && settings.repeatCount=="indefinite"){
-									this._loopAnimation(settings.frameCount/ext.doc.frameRate, animDur/ext.doc.frameRate , transAnimObj.timeList, [transAnimObj.xList, transAnimObj.yList, transAnimObj.rotList, transAnimObj.trxList, transAnimObj.tryList, transAnimObj.skxList, transAnimObj.skyList, transAnimObj.scxList, transAnimObj.scyList, transAnimObj.transXList, transAnimObj.transYList,
+								if(settings.frameCount < realDur && settings.repeatCount=="indefinite"){
+									this._loopAnimation(settings.frameCount/ext.doc.frameRate, realDur/ext.doc.frameRate , transAnimObj.timeList, [transAnimObj.xList, transAnimObj.yList, transAnimObj.rotList, transAnimObj.trxList, transAnimObj.tryList, transAnimObj.skxList, transAnimObj.skyList, transAnimObj.scxList, transAnimObj.scyList, transAnimObj.transXList, transAnimObj.transYList,
 																				transAnimObj.alphaMList, transAnimObj.redOList, transAnimObj.redMList, transAnimObj.greenOList, transAnimObj.greenMList, transAnimObj.blueOList, transAnimObj.blueMList, transAnimObj.alphaOList], [transAnimObj.splineList, transAnimObj.rotSplineList]);
 								}
 
@@ -2512,19 +2523,19 @@
 							}
 
 							var lastFrameInd = (transToDiff ? frameEnd-1 : frameEnd);
-							if(settings.loopTweens && lastFrameInd > (animDur - settings.animOffset + settings.startFrame))lastFrameInd = (animDur - settings.animOffset + settings.startFrame); // really just to suppress the warning
+							//if(settings.loopTweens && lastFrameInd > (animDur - settings.animOffset + settings.startFrame))lastFrameInd = (animDur - settings.animOffset + settings.startFrame); // really just to suppress the warning
  
 
-							var frameTimeStart = this.precision((settings.animOffset + n - settings.startFrame)/animDur);
-							var frameTimeEnd = this.precision((settings.animOffset + lastFrameInd - settings.startFrame)/animDur);
+							var frameTimeStart = this.precision((settings.animOffset + n - settings.startFrame)/realDur);
+							var frameTimeEnd = this.precision((settings.animOffset + lastFrameInd - settings.startFrame)/realDur);
 
 							if(items.length>0 && (frameTimeStart!=0 || frameTimeEnd!=1)){ // don't bother if element is always there
 
 								var visTimes = [settings.animOffset + n - settings.startFrame, settings.animOffset + lastFrameInd - settings.startFrame];
 								var visValues = ["inline", "none"];
 
-								if(settings.frameCount < animDur && settings.repeatCount=="indefinite"){
-									this._loopAnimation(settings.frameCount, animDur, visTimes, [visValues]);
+								if(settings.frameCount < realDur && settings.repeatCount=="indefinite"){
+									this._loopAnimation(settings.frameCount, realDur, visTimes, [visValues]);
 
 									var m=0;
 									while(m<visTimes.length-1){
@@ -2546,15 +2557,15 @@
 									}
 								}
 
-								if(visTimes.length > 2 || visTimes[0]!=0 || (visTimes.length==2 && visTimes[1]!=animDur)){ // don't bother if element is always there
+								if(visTimes.length > 2 || visTimes[0]!=0 || (visTimes.length==2 && visTimes[1]!=realDur)){ // don't bother if element is always there
 
 									for(var m=0; m<visTimes.length; m++){
-										visTimes[m] = this.precision(visTimes[m]/animDur);
+										visTimes[m] = this.precision(visTimes[m]/realDur);
 									}
 
 									frameTimeEnd = visTimes[visTimes.length-1];
 
-									if(frameTimeStart>1)fl.trace("START TIME WARNING: "+frameTimeStart+" "+settings.animOffset+" "+animDur+" "+n+" "+settings.startFrame+" "+((n - settings.startFrame)/ext.doc.frameRate));
+									if(frameTimeStart>1)fl.trace("START TIME WARNING: "+frameTimeStart+" "+settings.animOffset+" "+realDur+" "+n+" "+settings.startFrame+" "+((n - settings.startFrame)/ext.doc.frameRate));
 									if(frameTimeStart > 0){
 										visTimes.unshift(0);
 										visValues.unshift("none");
@@ -2562,7 +2573,7 @@
 
 
 									if(frameTimeEnd>1){
-										fl.trace("END TIME WARNING: "+timeline.name+" "+(settings.animOffset + lastFrameInd - settings.startFrame)+" / "+animDur+" = "+frameTimeEnd+" "+frameTimeStart);
+										fl.trace("END TIME WARNING: "+timeline.name+" "+(settings.animOffset + lastFrameInd - settings.startFrame)+" / "+realDur+" = "+frameTimeEnd+" "+frameTimeStart);
 										visTimes[visTimes.length-1] = 1;
 										frameTimeEnd = 1;
 
