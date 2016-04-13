@@ -630,6 +630,13 @@
 			svgData = svgData.replace(/xlink:href/g, "xlink-href");
 			svgData = svgData.replace(/\n/g, " "); // puts newlines in paths which remain
 
+			// Shorten numbers to correct precision
+			var regex = new RegExp( "(\\.\\d{" + this.decimalPointPrecision + "})[\\d]+", "g" );
+			svgData = svgData.replace(regex, "$1");
+
+			// Do this before removing spaces from paths as it won't work afterwards
+			svgData = this.removeLeadingZeros(svgData);
+
 			// Paths have extra spaces
 			svgData = svgData.replace(/ L /g, "L");
 			svgData = svgData.replace(/ M /g, "M");
@@ -1023,6 +1030,7 @@
 				//fl.trace("finalise: "+timeline.filePath);
 				this.qData.push(closure(this.processFixUseLinks, [outputObject], this));
 				this.qData.push(closure(this.processCompactColours, [outputObject], this));
+				this.qData.push(closure(this.processRemoveZeros, [outputObject], this));
 				this.qData.push(closure(this.processRemoveIdentMatrices, [outputObject], this));
 				this.qData.push(closure(this.processConvertHairlineStrokes, [outputObject], this));
 				this.qData.push(closure(this.processSaveFile, [outputObject, timeline.filePath, timeline], this));
@@ -1069,6 +1077,21 @@
 			if(ext.log){
 				ext.log.pauseTimer(timer);
 			}
+		},
+		processRemoveZeros:function(outputObj){
+			if(ext.log){
+				var timer=ext.log.startTimer('extensible.SVG.processRemoveZeros()');	
+			}
+			outputObj.string = this.removeLeadingZeros(outputObj.string);
+
+			if(ext.log){
+				ext.log.pauseTimer(timer);
+			}
+		},
+		removeLeadingZeros:function(str){
+			// Change zero floats from "0.004" to ".004" (for example) 
+			var regex = new RegExp( "([^\\d\\w])0\\.", "g" );
+			return str.replace(regex, "$1.");
 		},
 		processRemoveIdentMatrices:function(outputObj){
 			if(ext.log){
