@@ -534,6 +534,10 @@
 			xml['@xml:space']='preserve';
 			xml.appendChild(new XML('<defs/>'));
 
+			if(this.beginAnimation == "click"){
+				this.beginAnimation = this.id+".click";
+			}
+
 			var x=this._getTimeline(
 				timeline.timeline,
 				{
@@ -633,6 +637,9 @@
 			// Shorten numbers to correct precision
 			var regex = new RegExp( "(\\.\\d{" + this.decimalPointPrecision + "})[\\d]+", "g" );
 			svgData = svgData.replace(regex, "$1");
+
+			// remove space after matrix()
+			svgData = svgData.replace(/="matrix\(\s*(.*?),\s*(.*?),\s*(.*?),\s*(.*?),\s*(.*?),\s*(.*?)\s*\)\s*"/g, '="matrix($1 $2 $3 $4 $5 $6)"');
 
 			// Do this before removing spaces from paths as it won't work afterwards
 			svgData = this.removeLeadingZeros(svgData);
@@ -1031,7 +1038,9 @@
 				this.qData.push(closure(this.processFixUseLinks, [outputObject], this));
 				this.qData.push(closure(this.processCompactColours, [outputObject], this));
 				this.qData.push(closure(this.processRemoveZeros, [outputObject], this));
+				this.qData.push(closure(this.processSimplifyOnes, [outputObject], this));
 				this.qData.push(closure(this.processRemoveIdentMatrices, [outputObject], this));
+				this.qData.push(closure(this.processSimplifyMatrices, [outputObject], this));
 				this.qData.push(closure(this.processConvertHairlineStrokes, [outputObject], this));
 				this.qData.push(closure(this.processSaveFile, [outputObject, timeline.filePath, timeline], this));
 					
@@ -1088,6 +1097,23 @@
 				ext.log.pauseTimer(timer);
 			}
 		},
+		processSimplifyOnes:function(outputObj){
+			if(ext.log){
+				var timer=ext.log.startTimer('extensible.SVG.processSimplifyOnes()');	
+			}
+			var regex = new RegExp( "\\.9{" + this.decimalPointPrecision + "}(\\D)", "g" );
+			outputObj.string = outputObj.string.replace(regex, "1$1");
+
+			regex = new RegExp( "1\\.0+(\\D)", "g" );
+			outputObj.string = outputObj.string.replace(regex, "1$1");
+
+			
+			outputObj.string = outputObj.string.replace('<?xml version="1"', '<?xml version="1.0"');
+
+			if(ext.log){
+				ext.log.pauseTimer(timer);
+			}
+		},
 		removeLeadingZeros:function(str){
 			// Change zero floats from "0.004" to ".004" (for example) 
 			var regex = new RegExp( "([^\\d\\w])0\\.", "g" );
@@ -1098,7 +1124,16 @@
 				var timer=ext.log.startTimer('extensible.SVG.processRemoveIdentMatrices()');	
 			}
 			outputObj.string = outputObj.string.replace(' transform="matrix(1 0 0 1 0 0)"','');
-			outputObj.string = outputObj.string.replace(" transform='matrix(1 0 0 1 0 0)'",'');
+			//outputObj.string = outputObj.string.replace(" transform='matrix(1 0 0 1 0 0)'",'');
+			if(ext.log){
+				ext.log.pauseTimer(timer);
+			}
+		},
+		processSimplifyMatrices:function(outputObj){
+			if(ext.log){
+				var timer=ext.log.startTimer('extensible.SVG.processSimplifyMatrices()');	
+			}
+			outputObj.string = outputObj.string.replace(/matrix\(1 0 0 1 (.*?) (.*?)\)/g,'translate($1 $2)');
 			if(ext.log){
 				ext.log.pauseTimer(timer);
 			}
@@ -1108,7 +1143,7 @@
 				var timer=ext.log.startTimer('extensible.SVG.processConvertHairlineStrokes()');	
 			}
 			outputObj.string = outputObj.string.replace(' stroke="0"',' stroke="0.1"');
-			outputObj.string = outputObj.string.replace(" stroke='0'",' stroke="0.1"');
+			//outputObj.string = outputObj.string.replace(" stroke='0'",' stroke="0.1"');
 			if(ext.log){
 				ext.log.pauseTimer(timer);
 			}
@@ -2613,7 +2648,7 @@
 									var fAnimNode = animNode.copy();
 									fAnimNode.@keyTimes = visTimes.join(";");
 									fAnimNode.@values = visValues.join(";");
-									if(frameTimeStart!=0) frameXML.@style += "display:none;";
+									if(frameTimeStart!=0) frameXML.@display = "none";
 									frameXML.appendChild(fAnimNode);
 								}
 							}
