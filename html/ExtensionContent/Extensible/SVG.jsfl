@@ -842,6 +842,11 @@
 					}
 					if(verbose)fl.trace("\n\nBEF:\n"+frameNode.toXMLString());
 
+					if(animNodes && childNode.@display.length()>0){
+						frameNode.@display = childNode.@display;
+						delete childNode.@display;
+					}
+
 					doSearchSelf = true;
 					var hasTrans = childNode.@transform.length()>0;
 					var parentTakenTrans = false;
@@ -1101,8 +1106,11 @@
 			if(ext.log){
 				var timer=ext.log.startTimer('extensible.SVG.processSimplifyOnes()');	
 			}
-			var regex = new RegExp( "\\.9{" + this.decimalPointPrecision + "}(\\D)", "g" );
-			outputObj.string = outputObj.string.replace(regex, "1$1");
+			var regex = new RegExp( "(\\d)\\.9{" + this.decimalPointPrecision + "}(\\D)", "g" );
+			outputObj.string = outputObj.string.replace(regex, "$1$2");
+
+			regex = new RegExp( "(\\D)\\.9{" + this.decimalPointPrecision + "}(\\D)", "g" );
+			outputObj.string = outputObj.string.replace(regex, "$11$2");
 
 			regex = new RegExp( "1\\.0+(\\D)", "g" );
 			outputObj.string = outputObj.string.replace(regex, "1$1");
@@ -1530,6 +1538,19 @@
 					this.copyNodeContents(node, elementXML);
 					parent.insertChildBefore(node, elementXML);
 					delete parent.children()[node.childIndex()];
+
+					for(var i=0; i<this._layerCacheLists.length; i++){
+						var list = this._layerCacheLists[i];
+						var done = false;
+						for(var j=0; j<list.length; j++){
+							if(list[j] == node){
+								list[j] = elementXML;
+								done = true;
+								break;
+							}
+						}
+						if(done) break;
+					}
 				// }else{
 				// 	ext.warn("Error: multiple items with the same id found ("+id+")");
 				// }
@@ -2249,7 +2270,7 @@
 							}else if(element.symbolType=="graphic"){
 
 								var childFrame = element.firstFrame;
-								if(element.loop=="single frame" || frame.duration==1){
+								if(element.loop=="single frame" || frame.duration==1 || !this.animated){
 									elemSettings.startFrame = this._getPriorFrame(element.timeline, element.firstFrame);
 									elemSettings.frameCount = 1;
 								}else {
@@ -2476,8 +2497,8 @@
 			 						//fl.trace("\nframe: "+nextFrame.startFrame);
 									//addTweenKiller = (nextFrame.tweenType=="none" && (!loopAnim || !isLast));
 									var transPoint = nextElement.getTransformationPoint();
-									this.checkSkewQuadrant(skewX, time, lastSkX, lastTime, transAnimObj.skxScaleYList, transAnimObj.skxScaleXList, transAnimObj.skxTimeList, transAnimObj.skxSplineList, transPoint.x, transPoint.y, lastFrame.tweenType!="none")
-									this.checkSkewQuadrant(skewY, time, lastSkY, lastTime, transAnimObj.skyScaleXList, transAnimObj.skyScaleYList, transAnimObj.skyTimeList, transAnimObj.skySplineList, transPoint.y, transPoint.x, lastFrame.tweenType!="none")
+									this.checkSkewQuadrant(skewX, time, lastSkX, lastTime, transAnimObj.skxScaleYList, transAnimObj.skxScaleXList, transAnimObj.skxTimeList, transAnimObj.skxSplineList, transPoint.x, transPoint.y, nextFrame.tweenType!="none")
+									this.checkSkewQuadrant(skewY, time, lastSkY, lastTime, transAnimObj.skyScaleXList, transAnimObj.skyScaleYList, transAnimObj.skyTimeList, transAnimObj.skySplineList, transPoint.y, transPoint.x, nextFrame.tweenType!="none")
 									this._addAnimFrame(nextFrame, nextElement, invMatrix, time, startTime, forceDiscrete, rot, skewX, skewY, autoRotate, transAnimObj, timeline, i, allowRotTween);
 									
 									lastFrame = nextFrame;
@@ -2589,7 +2610,7 @@
 
 							if(items.length>0 && (frameTimeStart!=0 || frameTimeEnd!=1)){ // don't bother if element is always there
 
-								var visTimes = [settings.animOffset + n - settings.startFrame, settings.animOffset + lastFrameInd - settings.startFrame];
+								var visTimes = [settings.animOffset + n - settings.startFrame, settings.animOffset + lastFrameInd - settings.startFrame + (settings.loopTweens ? 0 : 1)];
 								var visValues = ["inline", "none"];
 
 								if(settings.frameCount < realDur && settings.repeatCount=="indefinite"){
