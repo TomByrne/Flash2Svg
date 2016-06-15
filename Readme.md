@@ -1,5 +1,7 @@
 # Animated SVG Exporter for Flash Pro / Adobe Animate#
 
+###INFO: The last version that works in CS5.5 and CS6 is v3.36###
+
 ## To Install from ZXP ##
 - Select latest release from [releases page](https://github.com/TomByrne/Flash2Svg/releases)
 - Install with Extension Manager (or [ExManCmd](https://www.adobeexchange.com/resources/28))
