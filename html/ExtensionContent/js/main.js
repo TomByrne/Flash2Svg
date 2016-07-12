@@ -44,7 +44,7 @@ var REMOVE_GROUPS = "removeGroups";
 var COMPACT_OUTPUT = "compactOutput";
 var AVOID_MITER = "avoidMiter";
 var TWEEN_TYPE = "tweenType";
-var REVERT = "revert";
+//var REVERT = "revert";
 
 
 var accordion;
@@ -74,8 +74,8 @@ var previewReloadButton;
 var previewFilename;
 var previewBrowser;
 var previewFrame;
-var revertSelect;
-var revertHint;
+//var revertSelect;
+//var revertHint;
 
 var timelineSettingsStr;
 var dir;
@@ -87,7 +87,7 @@ function onLoaded() {
 	var self = this;
 
 	accordion = $( "#accordion" );
-	inputs = $("#accordion input,#accordion select,#export-revert");
+	inputs = $("#accordion input,#accordion select");
 
     csInterface = new CSInterface();
 	
@@ -114,8 +114,8 @@ function onLoaded() {
     progBar = $( "#export-progress" );
     progLabel = $("#export-progress-label");
     exportButton = $( "#export-button" );
-    revertSelect = $("#export-revert");
-    revertHint = $("#revert-hint");
+    //revertSelect = $("#export-revert");
+    //revertHint = $("#revert-hint");
     
     sourceSelect = $("#source-timelines");
 	frameSelect = $("#source-frames");
@@ -332,11 +332,11 @@ function bindSettings(){
 	ControlBinder.bind(this.settings, LOOP_TWEENS, loopTweensCheckbox);
 	ControlBinder.bind(this.settings, BEGIN_ANIMATION, $("#anim-begin"));
 	ControlBinder.bind(this.settings, TWEEN_TYPE, tweenTypeSelect);
-	ControlBinder.bind(this.settings, REVERT, revertSelect);
+	//ControlBinder.bind(this.settings, REVERT, revertSelect);
 	this.settings.change = closure(this, onSettingsChanged);
 	
-	revertSelect.on("change", closure(this, onRevertChanged));
-	onRevertChanged();
+	//revertSelect.on("change", closure(this, onRevertChanged));
+	//onRevertChanged();
 
 
 	loopCheckbox.on("change", closure(this, onLoopChanged));
@@ -423,7 +423,7 @@ function onOutputChanged(e){
 function onFramesChanged(e){
 	frameRange.css("display", frameSelect.val()=="custom" ? "" : "none");
 }
-function onRevertChanged(e){
+/*function onRevertChanged(e){
 	switch(revertSelect.val()){
 		case "none":
 			revertHint.text("Changes from export will remain (can cause issues with files which already contain corrupted items).");
@@ -441,7 +441,7 @@ function onRevertChanged(e){
 			revertHint.text("Reverts after export, will lose any unsaved changes.");
 			break;
 	}
-}
+}*/
 function roundTo(num, points){
 	var pow = Math.pow(10, points);
 	return Math.round(num * pow) / pow;
@@ -752,7 +752,7 @@ function doSavePreset(){
 	var animation = saveAnimationSettings.prop("checked");
 	
 	var props = [];
-	props.push(REVERT);
+	//props.push(REVERT);
 	if(source){
 		props.push(SOURCE);
 		props.push(FRAMES);
