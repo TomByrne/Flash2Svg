@@ -90,10 +90,10 @@
 			settings.extend(options);
 			ext.Task.apply(this,[settings]);
 		}
-		if(settings.revert && !ext.doc.canRevert()){
+		/*if(settings.revert && !ext.doc.canRevert()){
 			alert("Can't revert document, please deselect revert or use a revertable document");
 			return;
-		}
+		}*/
 		var fileUri = ext.FileSystem.getDocFileBase();
 		var fileDir = ext.FileSystem.getDocFolder();
 
@@ -1289,9 +1289,9 @@
 				}
 			}
 
-			if(this.revert && this.revert!="none"){
+			/*if(this.revert && this.revert!="none"){
 				ext.doc.revert();
-			}
+			}*/
 		},
 		/**
 		 * Expands symbol instances ( use tags ).
