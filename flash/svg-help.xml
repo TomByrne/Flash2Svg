@@ -24,22 +24,6 @@
         <label value=""/>
         <label value="'Once Used' will only expand symbols which are only used once and is the recommended setting."/>
       </row>
-
-      <row>
-        <label value="Before/After Anim"/>
-      </row>
-      <row>
-        <label value=""/>
-        <label value="Controls how the output looks when it is not being animated, this doesn't apply to auto-playing looping animations."/>
-      </row>
-      
-      <row>
-        <label value="Apply Transforms"/>
-      </row>
-      <row>
-        <label value=""/>
-        <label value="Whether matrix transforms should be applied into all child paths."/>
-      </row>
       
       <row>
         <label value="Convert Patterns to Symbols"/>
@@ -71,6 +55,38 @@
       <row>
         <label value=""/>
         <label value="Will attempt to seemlessly animate the end of a tween back into it's beginning. Only applies when Fixed FPS is not being used."/>
+      </row>
+      
+      <row>
+        <label value="Remove Groups"/>
+      </row>
+      <row>
+        <label value=""/>
+        <label value="Removes unrequired groups from the SVG hierarchy, reducing output file size."/>
+      </row>
+      
+      <row>
+        <label value="Compact Output"/>
+      </row>
+      <row>
+        <label value=""/>
+        <label value="Removes whitespace from the output file, resulting in a smaller but less readable SVG file."/>
+      </row>
+      
+      <row>
+        <label value="Use Animated viewbox"/>
+      </row>
+      <row>
+        <label value=""/>
+        <label value="This option allows for a rectangle to be animated as part of the timeline which will then be considered the viewport into the scene. The clip should have the instance name 'viewbox'"/>
+      </row>
+
+      <row>
+        <label value="Show Final Frame"/>
+      </row>
+      <row>
+        <label value=""/>
+        <label value="When animation is not running, you can optionally show the final frame. This will also be the state shown in browsers that don't support SMIL."/>
       </row>
 
     </rows>

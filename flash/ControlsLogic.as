@@ -59,7 +59,8 @@ package{
 								layout.removeGroupsCheckBox,
 								layout.compactOutputCheckBox,
 								layout.avoidMiterCheckBox,
-								layout.useViewbox];
+								layout.useViewbox,
+								layout.showFinalFrame];
 
 			rightControls = [   layout.helpButton,
 								layout.fileRow.button,
@@ -93,7 +94,8 @@ package{
 						layout.removeGroupsCheckBox,
 						layout.compactOutputCheckBox,
 						layout.avoidMiterCheckBox,
-						layout.useViewbox];
+						layout.useViewbox,
+						layout.showFinalFrame];
 
 			enable = [	layout.fileRow.input,
 						layout.sourceRow.input,
@@ -123,7 +125,8 @@ package{
 						layout.removeGroupsCheckBox,
 						layout.compactOutputCheckBox,
 						layout.avoidMiterCheckBox,
-						layout.useViewbox];
+						layout.useViewbox,
+						layout.showFinalFrame];
 
 		}
 

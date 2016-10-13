@@ -71,6 +71,7 @@
 			beginAnimation:"0s",
 			repeatCount:"indefinite",
 			loop:null,
+			showFinalFrame:false,
 			loopTweens:true,
 			discreteEasing:true,
 			removeGroups:true,
@@ -192,6 +193,12 @@
 		else if(this.repeatCount===false)this.repeatCount = "1";
 
 		this._showMiterWarning = false;
+
+		if(this.showFinalFrame){
+			this.showEndFrame = true;
+		}else{
+			this.showStartFrame = true;
+		}
 
 		if(this.output=='animation'){
 			this.animated = true;
@@ -2354,6 +2361,9 @@
 												skyScaleXList:[], skyScaleYList:[], skyTimeList:[], skySplineList:[],
 												transXList:[], transYList:[]};
 
+							if(this.showEndFrame){
+								filterElement = lastFrame.elements[0];
+							}
 							
 							var filterID=this._getFilters(filterElement, elementXML, elemSettings, dom.defs, transAnimObj);
 							if(filterID && dom.defs.filter.(@id.toString()==filterID).length()){
@@ -2387,8 +2397,12 @@
 								}
 								var withinQuad = (maxRot - minRot) <= 90;
 								allowRotateList.push(allowRotateList[allowRotateList.length-1]);
-								nextElement = element;
-								matrix = element.matrix.clone();
+								if(this.showEndFrame){
+									matrix = new ext.Matrix(lastElement.matrix);
+								}else{
+									nextElement = element;
+									matrix = element.matrix.clone();
+								}
 
 								var invMatrix = new ext.Matrix();
 								var firstRot = 0;
@@ -2589,6 +2603,7 @@
 										this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, transAnimObj.colorTransNode.feFuncA, "slope", [transAnimObj.alphaMList], transAnimObj.timeList, stopTimes, timeDur, timePrecision, transAnimObj.splineList, 1, settings.repeatCount, forceDiscrete);
 
 									}else if(hasOpacityAnim && this._addAnimationNodes(settings.beginAnimation, settings.beginOffset, elementXML, "opacity", [transAnimObj.alphaMList], transAnimObj.timeList, stopTimes, timeDur, timePrecision, transAnimObj.splineList, 1, settings.repeatCount, forceDiscrete)){
+										if(this.showEndFrame)elementXML.@opacity = lastElement.colorAlphaPercent / 100;
 										transAnimObj.colorTransNode.feFuncA.@slope = 1;
 									}
 								}
@@ -2669,7 +2684,13 @@
 									var fAnimNode = animNode.copy();
 									fAnimNode.@keyTimes = visTimes.join(";");
 									fAnimNode.@values = visValues.join(";");
-									if(frameTimeStart!=0) frameXML.@display = "none";
+
+									if(this.showEndFrame){
+										if(frameTimeEnd < 1) frameXML.@display = "none";
+									}else if(frameTimeStart!=0){
+										frameXML.@display = "none";
+									}
+
 									frameXML.appendChild(fAnimNode);
 								}
 							}
@@ -4253,20 +4274,34 @@
 				var newItem = items[index];
 				ext.doc.moveSelectionBy( { x:item.x - newItem.x, y:item.y - newItem.y } );
 
-
-				for(var i=0; i<items.length; i++){
+				if(items.length > 1){
+					ext.doc.selectNone();
+					items.splice(index, 1);
+					ext.doc.selection = items;
+					ext.doc.deleteSelection();
+				}
+				/*for(var i=0; i<items.length; i++){
 					var elem = items[i];
 					if(i == index)continue;
 					ext.doc.selectNone();
 					ext.doc.selection = [elem];
-					ext.doc.deleteSelection();
-				}
+					if(ext.doc.selection.length == 0){
+						fl.trace("elem: "+elem+" "+ext.doc.selection.length+" "+i+" "+index);
+						ext.doc.selection = [elem];
+						fl.trace("hm: "+settings.parentTimeline.libraryItem.name+" "+settings.parentLayer.name+" "+settings.parentTimeline.currentFrame);
+					}else{
+						ext.doc.deleteSelection();
+					}
+				}*/
 
 				var items = layer.frames[0].elements;
+				if(items.length > 1){
+					fl.trace("WARNING: Failed to clear other items from frame (Layer "+layer.name+", Frame "+settings.parentFrame+")");
+				}
 
 				if(shape.isDrawingObject){
 					ext.doc.selectNone();
-					ext.doc.selection = [layer.frames[0].elements[0]];
+					ext.doc.selection = [newItem];
 					ext.doc.breakApart();
 				}
 

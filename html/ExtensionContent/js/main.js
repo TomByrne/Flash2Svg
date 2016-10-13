@@ -36,7 +36,7 @@ var SELECTION = "selection";
 var TRACE_LOG = "traceLog";
 var BEGIN_ANIMATION = "beginAnimation";
 var REPEAT_COUNT = "repeatCount";
-var NON_ANIM_SHOW = "nonAnimatingShow";
+var SHOW_FINAL_FRAME = "showFinalFrame";
 var LOOP = "loop";
 var LOOP_TWEENS = "loopTweens";
 var DISCRETE_EASING = "discreteEasing";
@@ -331,8 +331,8 @@ function bindSettings(){
 	ControlBinder.bind(this.settings, LOOP, loopCheckbox);
 	ControlBinder.bind(this.settings, LOOP_TWEENS, loopTweensCheckbox);
 	ControlBinder.bind(this.settings, BEGIN_ANIMATION, $("#anim-begin"));
+	ControlBinder.bind(this.settings, SHOW_FINAL_FRAME, $("#anim-finalframe"));
 	ControlBinder.bind(this.settings, TWEEN_TYPE, tweenTypeSelect);
-	//ControlBinder.bind(this.settings, REVERT, revertSelect);
 	this.settings.change = closure(this, onSettingsChanged);
 	
 	//revertSelect.on("change", closure(this, onRevertChanged));
