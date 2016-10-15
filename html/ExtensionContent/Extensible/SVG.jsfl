@@ -2191,6 +2191,7 @@
 						var doCollateFrames = (doAnim && items.length==1 && tweenType!="shape" && items[0].$.instanceType=="symbol");
 						var frameEnd = n+1;
 						var transToDiff = false;
+						var frameByFrame = false;
 						if(doCollateFrames){
 							if(ext.log){
 								var timer2=ext.log.startTimer('extensible.SVG._getTimeline() >> Collate frames');	
@@ -2247,6 +2248,7 @@
 								frameEnd++;
 								// this will add in extra time for frames with non changing content (which won't be included as a real frame)
 							}
+							frameByFrame = true;
 						}
 
 						var frameHasAnimated = false;
@@ -2625,8 +2627,8 @@
 							var frameTimeEnd = this.precision((settings.animOffset + lastFrameInd - settings.startFrame)/realDur);
 
 							if(items.length>0 && (frameTimeStart!=0 || frameTimeEnd!=1)){ // don't bother if element is always there
-
-								var visTimes = [settings.animOffset + n - settings.startFrame, settings.animOffset + lastFrameInd - settings.startFrame + (settings.loopTweens ? 0 : 1)];
+								var shortDur = (settings.loopTweens && frameEnd==settings.endFrame) || frameByFrame;
+								var visTimes = [settings.animOffset + n - settings.startFrame, settings.animOffset + lastFrameInd - settings.startFrame + (shortDur ? 0 : 1)];
 								var visValues = ["inline", "none"];
 
 								if(settings.frameCount < realDur && settings.repeatCount=="indefinite"){
