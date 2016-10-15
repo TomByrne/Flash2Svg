@@ -2080,21 +2080,24 @@
 					var layerXML = null;
 					if(layer.layerType=='mask'){
 						isMask = true;
-						layerXML = new XML("<mask id='"+this._uniqueID('mask_')+"'/>");
-						xml.prependChild(layerXML);
-						maskXML = layerXML;
+						var maskNode = new XML("<mask id='"+this._uniqueID('mask_')+"'/>");
+						xml.prependChild(maskNode);
+
+						layerXML = new XML("<g/>");
+						maskNode.prependChild(layerXML);
+
+						maskXML = maskNode;
 						maskAnim = null;
 						lastMaskState = null;
 
-						if(this.maskingType=='alpha'){
-							// This makes semi-transparent parts of masks fully opaque
-							colorX=new ext.Color('#FFFFFF00');
-						}else if(this.maskingType=='clipping'){
-							colorX=new ext.Color('#FFFFFF00');
-							colorX.percent[3]=999999999999999;						
-						};
-
 						if(!this._maskFilter){
+							if(this.maskingType=='alpha'){
+								// This makes semi-transparent parts of masks fully opaque
+								colorX=new ext.Color('#FFFFFF00');
+							}else if(this.maskingType=='clipping'){
+								colorX=new ext.Color('#FFFFFF00');
+								colorX.percent[3]=999999999999999;						
+							};
 							this._maskFilter=this._getFilters(
 								null,layerXML,{
 									color:colorX,
@@ -2102,9 +2105,7 @@
 								}, dom.defs
 							);
 						}
-						if(this._maskFilter){
-							layerXML.@filter="url(#"+this._maskFilter+")";
-						}
+						layerXML.@filter="url(#"+this._maskFilter+")";
 
 					}else if(layer.layerType=='masked' && (
 								layer.parentLayer && 
