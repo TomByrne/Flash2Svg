@@ -604,12 +604,11 @@
 			ext.lib.editItem(shapeContainer);
 
 			//Change Publish Settings
-			publishSettings = publishSettings.replace(/<flash>.<\/flash>/,'<flash>0</flash>');
-			publishSettings = publishSettings.replace(/<swc>.<\/swc>/,'<swc>0</swc>');
+			var disableFormats = ["flash", "projectorWin", "projectorMac", "html", "gif", "jpg", "png", "swc", "oam"];
+			for each(var format in disableFormats){
+				publishSettings = publishSettings.replace("<"+format+">1<\/"+format+">","<"+format+">0</"+format+">");
+			}
 			publishSettings = publishSettings.replace(/<ExportSwc>.<\/ExportSwc>/,'<ExportSwc>0</ExportSwc>');
-			publishSettings = publishSettings.replace(/<gif>.<\/gif>/,'<gif>0</gif>');
-			publishSettings = publishSettings.replace(/<jpeg>.<\/jpeg>/,'<jpeg>0</jpeg>');
-			publishSettings = publishSettings.replace(/<png>.<\/png>/,'<png>0</png>');
 			publishSettings = publishSettings.replace(/>.<\/publishFormat>/,">1<\/publishFormat>");
 			publishSettings = publishSettings.replace('<Property name="default">true</Property>','<Property name="default">false</Property>');
 			publishSettings = publishSettings.replace('<Property name="includeHiddenLayers">true</Property>','<Property name="includeHiddenLayers">false</Property>');
@@ -2048,6 +2047,7 @@
 				//var maskId = null;
 				var maskXML = null;
 				var maskAnim = null;
+				var applyMaskAttr = null;
 				var lastMaskState = null;
 				for(var i=0;i<layers.length;i++){
 					var layer=layers[i];
@@ -2088,6 +2088,7 @@
 
 						maskXML = maskNode;
 						maskAnim = null;
+						applyMaskAttr = true;
 						lastMaskState = null;
 
 						if(!this._maskFilter){
@@ -2116,7 +2117,8 @@
 						if(maskAnim!=null){
 							layerXML = new XML("<g/>");
 							layerXML.appendChild(maskAnim.copy());
-						}else{
+						}
+						if(applyMaskAttr){
 							layerXML = new XML("<g mask='url(#"+maskXML.@id+")'/>");
 						}
 						xml.prependChild(layerXML);
@@ -2624,12 +2626,12 @@
  
 
 							var frameTimeStart = this.precision((settings.animOffset + n - settings.startFrame)/realDur);
-							var frameTimeEnd = this.precision((settings.animOffset + lastFrameInd - settings.startFrame)/realDur);
+							var frameTimeEnd = this.precision((settings.animOffset + lastFrameInd - settings.startFrame + 1)/realDur);
 
 							if(items.length>0 && (frameTimeStart!=0 || frameTimeEnd!=1)){ // don't bother if element is always there
 								var shortDur = (settings.loopTweens && frameEnd==settings.endFrame) || frameByFrame;
 								var visTimes = [settings.animOffset + n - settings.startFrame, settings.animOffset + lastFrameInd - settings.startFrame + (shortDur ? 0 : 1)];
-								var visValues = ["inline", "none"];
+								var visValues = ["inline", frameTimeEnd<1?"none":"inline"];
 
 								if(settings.frameCount < realDur && settings.repeatCount=="indefinite"){
 									this._loopAnimation(settings.frameCount, realDur, visTimes, [visValues]);
@@ -2689,8 +2691,8 @@
 									fAnimNode.@values = visValues.join(";");
 
 									if(this.showEndFrame){
-										if(frameTimeEnd < 1) frameXML.@display = "none";
-									}else if(frameTimeStart!=0){
+										if(visValues[visValues.length - 1] == "none") frameXML.@display = "none";
+									}else if(visValues[0] == "none"){
 										frameXML.@display = "none";
 									}
 
@@ -2730,6 +2732,11 @@
 						if(times[times.length-1]!="1"){
 							maskAnim.@keyTimes += ";1";
 							maskAnim.@values += ";"+lastMaskState;
+						}
+						if(this.showEndFrame){
+							applyMaskAttr = (lastMaskState != "none");
+						}else{
+							applyMaskAttr = (maskAnim.@values.indexOf("none") != 0);
 						}
 					}
 					if(layer.visible!=lVisible) layer.visible=lVisible;
