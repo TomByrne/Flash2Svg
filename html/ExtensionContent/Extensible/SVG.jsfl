@@ -81,6 +81,14 @@
 			drawStrokesOverFills:true,
 			revert:false
 		});
+
+
+		this.isFlashDoc = (ext.doc.type == "Flash" || ext.doc.type == null);
+		if(!this.isFlashDoc){
+			alert("Exporting from Non-AS3 documents is not supported.\n\nPlease do the following:\n- Select and copy all layers\n- Create new Actionscript 3 document\n- Paste all layers into new document\n- Save new document\n- Retry export\n\nCurrent doument type is "+ext.doc.type+".");
+			return;
+		}
+
 		if(options instanceof XML || typeof(options)=='string'){
 			ext.Task.apply(this,[settings]);
 			this.loadSettings(options);
@@ -204,12 +212,6 @@
 			this.animated = true;
 		}
 		if(this.animated)this.applyTransformations = false;
-
-		this.isFlashDoc = (ext.doc.type == "Flash" || ext.doc.type == null);
-		if(!this.isFlashDoc){
-			alert("Exporting from Non-Flash documents is not supported.\n\nPlease copy and paste all layers into a Flash document before exporting.");
-			return;
-		}
 		
 		if(typeof(this.curveDegree)=='string'){
 			var num = parseInt(this.curveDegree);
@@ -1103,6 +1105,9 @@
 				var timer=ext.log.startTimer('extensible.SVG.processRemoveZeros()');	
 			}
 			outputObj.string = this.removeLeadingZeros(outputObj.string);
+
+			// Temporary fix for Firefox issue
+			outputObj.string = outputObj.string.split('dur=".').join('dur="0.');
 
 			if(ext.log){
 				ext.log.pauseTimer(timer);
