@@ -436,6 +436,7 @@
 					this.qData.push(closure(this.doNextTimeline, [], this));
 					break;
 				case this.STATE_EXPORT_SHAPES:
+					//confirm("Export?");
 					this.qData.push(closure(this.processExportShapes, [], this));
 					break;
 				case this.STATE_IMPORT_SHAPES:
@@ -2631,11 +2632,10 @@
  
 
 							var frameTimeStart = this.precision((settings.animOffset + n - settings.startFrame)/realDur);
-							var frameTimeEnd = this.precision((settings.animOffset + lastFrameInd - settings.startFrame + 1)/realDur);
+							var frameTimeEnd = this.precision((settings.animOffset + lastFrameInd - settings.startFrame)/realDur);
 
 							if(items.length>0 && (frameTimeStart!=0 || frameTimeEnd!=1)){ // don't bother if element is always there
-								var shortDur = (settings.loopTweens && frameEnd==settings.endFrame) || frameByFrame;
-								var visTimes = [settings.animOffset + n - settings.startFrame, settings.animOffset + lastFrameInd - settings.startFrame + (shortDur ? 0 : 1)];
+								var visTimes = [settings.animOffset + n - settings.startFrame, settings.animOffset + lastFrameInd - settings.startFrame];
 								var visValues = ["inline", frameTimeEnd<1?"none":"inline"];
 
 								if(settings.frameCount < realDur && settings.repeatCount=="indefinite"){
@@ -3255,6 +3255,9 @@
 			var isTrans = (type=="scale" || type=="translate" || type=="rotate" || type=="skewX" || type=="skewY");
 			var doReplace = isTrans && toNode.animateTransform.length()==0;
 
+
+			var MAX = 100000;//32; // Limit this to 32 for older versions of Webkit 
+
 			var count = times.length + (times[times.length-1] < totalTime ? 1 : 0);
 			var lastEndTime = 0;
 			var lastTakenTo = 0;
@@ -3262,10 +3265,10 @@
 			var stopI = 0;
 			while(lastTakenTo < times.length-1){
 				var stopTime = stopTimes.length ? stopTimes[stopI] : null;
-				var takenTo = this._addAnimationNode(lastTakenTo, beginAnimation, beginOffset, totalTime, lastEndTime, toNode, type, values, valueLists, times, stopTime, timePrecision, splineList, defaultValue, repeatCount, forceDiscrete, validateAllLists, doReplace, isTrans);
+				var takenTo = this._addAnimationNode(MAX, lastTakenTo, beginAnimation, beginOffset, totalTime, lastEndTime, toNode, type, values, valueLists, times, stopTime, timePrecision, splineList, defaultValue, repeatCount, forceDiscrete, validateAllLists, doReplace, isTrans);
 				
 				if(takenTo===false){
-					lastTakenTo += 31;
+					lastTakenTo += MAX-1;
 					if(stopTimes.length){
 						while(stopTimes[stopI] < times[lastTakenTo]){
 							stopI++;
@@ -3316,7 +3319,7 @@
 			}
 			return ret;
 		},
-		_addAnimationNode:function(offset, beginAnimation, beginOffset, totalTime, startTime, toNode, type, values, valueLists, times, stopTime, timePrecision, splineList, defaultValue, repeatCount, forceDiscrete, validateAllLists, doReplace, isTrans){
+		_addAnimationNode:function(MAX, offset, beginAnimation, beginOffset, totalTime, startTime, toNode, type, values, valueLists, times, stopTime, timePrecision, splineList, defaultValue, repeatCount, forceDiscrete, validateAllLists, doReplace, isTrans){
 			/*
 				When looping, the timing of stacked nodes is handled very differently.
 				Each node runs the full duration of the animation with long dormant parts at the beginning and/or end.
@@ -3339,7 +3342,7 @@
 			for(var i=0; i<n; ++i){
 				var list = valueLists[i];
 				var firstVal = list[offset];
-				for(var j=offset; j<list.length && j<offset+32; ++j){
+				for(var j=offset; j<list.length && j<offset+MAX; ++j){
 					var val = list[j];
 					if(val!=defaultValue){
 						found = true;
@@ -3352,7 +3355,7 @@
 				return false;
 			}
 			var n = splineList.length;
-			if(n > offset+32) n = offset+32;
+			if(n > offset+MAX) n = offset+MAX;
 			var hasTweens = false;
 			var hasEasing = false;
 			for(var i=offset; i<n; ++i){
@@ -3391,8 +3394,8 @@
 			var endPointMode = false;
 			n = times.length;
 			var takenTo = offset;
-			var capLength = (looping ? 28 : 31);
-			for(var i=offset + 1; i<n && validT.length<32; ++i){
+			var capLength = MAX - (looping ? 4 : 1);
+			for(var i=offset + 1; i<n && validT.length<MAX; ++i){
 				lastTime = times[i];
 				var newVal = values[i];
 				var newSpline = splineList[i];
@@ -3450,7 +3453,7 @@
 				}
 				if(!looping && doStop)break;
 
-				if(looping && (doStop || (validT.length == 29 && i < n-2))){
+				if(looping && (doStop || (validT.length == MAX-3 && i < n-2))){
 					// this only applies to looping animations
 
 					var count = 1;
