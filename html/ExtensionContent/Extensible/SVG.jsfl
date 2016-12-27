@@ -4236,12 +4236,13 @@
 
 			pathMatrix = descendantMatrix;
 			var contours=shape.$.contours;
+			var isText = shape.elementType == "text";
 
 			var svg=new XML('<g/>');
 			var matrixStr = this._getMatrix(matrix);
 			if(matrixStr!=this.IDENTITY_MATRIX)svg['@transform']=matrixStr;
 
-			if(contours && contours.length){
+			if(isText || (contours && contours.length)){
 
 				if(!this._shapeContainerName){
 					this._shapeContainerName = ext.lib.uniqueName(this._tempLibFolder+'/ShapeContainer');
@@ -4317,6 +4318,12 @@
 					fl.trace("WARNING: Failed to clear other items from frame (Layer "+layer.name+", Frame "+settings.parentFrame+")");
 				}
 
+				if(isText){
+					ext.doc.selection = [newItem];
+					ext.doc.breakApart(); // Break to Chars
+					if(ext.doc.selection.length > 1) ext.doc.breakApart(); // Break to Shapes
+				}
+
 				if(shape.isDrawingObject){
 					ext.doc.selectNone();
 					ext.doc.selection = [newItem];
@@ -4375,7 +4382,7 @@
 			settings.extend(options);
 			var xml;
 			if(this.convertTextToOutlines){
-				var timeline=element.timeline;
+				/*var timeline = options.parentTimeline;
 				if(element instanceof ext.Text){
 					if(
 						!element.$.length
@@ -4391,7 +4398,9 @@
 					layer.frames[settings.frame]:
 					element.frame
 				);
-				var index=element.frame.elements.expandGroups().indexOf(element);
+				var expanded = element.frame.elements.expandGroups();
+				fl.trace("expanded: "+expanded.length+" "+element.elementType);
+				var index=expanded.indexOf(element);
 				var matrix=element.matrix;
 				var id=element.uniqueDataName(String('temporaryID_'+String(Math.floor(Math.random()*9999))));
 				var pd=Math.floor(Math.random()*99999999);
@@ -4489,7 +4498,9 @@
 				if(ext.log){
 					ext.log.pauseTimer(timer);	
 				}
-				return xml;
+				return xml;*/
+
+				return this._getShape(element,options);
 			}else{
 				var text = element.$;
 				var textRuns = text.textRuns;
