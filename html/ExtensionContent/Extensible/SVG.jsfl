@@ -2135,7 +2135,7 @@
 					var frames = layer.frames;
 					var n=settings.startFrame;
 					layerSelected = false;
-					var realDur = animDur + (settings.loopTweens ? 0 : 1);
+					var realDur = animDur;
 					while( n<layerEnd ){
 						if(ext.log){
 							var timer2=ext.log.startTimer('extensible.SVG._getTimeline() >> Get frame items');	
