@@ -4218,19 +4218,19 @@
 
 			
 			
-			if(shape.isGroup || shape.isRectangleObject || shape.isOvalObject || shape.isDrawingObject){
-				descendantMatrix = matrix;
-				matrix = new ext.Matrix();
-				if(this._appVersion<12){
-					// an issue before CS6 resulted in groups having incorrect transforms
-				}else{
-					descendantMatrix = new ext.Matrix(fl.Math.concatMatrix(descendantMatrix, settings.matrix));
-				}
+			if(shape.isGroup || shape.isRectangleObject || shape.isOvalObject){
+				// descendantMatrix = matrix;
+				// matrix = new ext.Matrix();
+				// if(this._appVersion<12){
+				// 	// an issue before CS6 resulted in groups having incorrect transforms
+				// }else{
+				// 	descendantMatrix = new ext.Matrix(fl.Math.concatMatrix(descendantMatrix, settings.matrix));
+				// }
 			}else{
 				matrix.tx = 0;//shape.left;
 				matrix.ty = 0;//shape.top;
-				matrix = fl.Math.concatMatrix(matrix, settings.matrix);
 			}
+			matrix = fl.Math.concatMatrix(matrix, settings.matrix);
 
 
 
