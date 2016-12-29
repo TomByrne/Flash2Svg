@@ -611,12 +611,26 @@
 			for each(var format in disableFormats){
 				publishSettings = publishSettings.replace("<"+format+">1<\/"+format+">","<"+format+">0</"+format+">");
 			}
+			var finder = /<publishFormat id="(.*?)">.<\/publishFormat>/g;
+			var res;
+			while((res = finder.exec(publishSettings)) != null){
+				var value;
+				if(res[1] == "BBC1F406-65F2-4219-9304-FA48C7549E44"){
+					// SVG
+					value = "1";
+				}else{
+					// Other
+					value = "0";
+				}
+				publishSettings = publishSettings.substr(0, res.index) + '<publishFormat id="' + res[1] + '">' + value + '<\/publishFormat>' + publishSettings.substr(res.index + res[0].length);
+			}
+
 			publishSettings = publishSettings.replace(/<ExportSwc>.<\/ExportSwc>/,'<ExportSwc>0</ExportSwc>');
-			publishSettings = publishSettings.replace(/>.<\/publishFormat>/,">1<\/publishFormat>");
+			//publishSettings = publishSettings.replace(/>.<\/publishFormat>/,">1<\/publishFormat>");
 			publishSettings = publishSettings.replace('<Property name="default">true</Property>','<Property name="default">false</Property>');
 			publishSettings = publishSettings.replace('<Property name="includeHiddenLayers">true</Property>','<Property name="includeHiddenLayers">false</Property>');
 			publishSettings = publishSettings.replace('<Property name="copy">true</Property>','<Property name="copy">false</Property>');
-			publishSettings = publishSettings.replace(/<Property ?name="filename">.*<\/Property>/,'<Property name="filename">' + filePath + '</Property>');
+			publishSettings = publishSettings.replace(/<Property name="filename">.*<\/Property>/g,'<Property name="filename">' + filePath + '</Property>');
 
 			ext.doc.importPublishProfileString(publishSettings);
 			ext.doc.publish();

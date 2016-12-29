@@ -90,6 +90,49 @@
 		return str;
 	};
 	/**
+	 * This is a replacement for the built-in String.replace() that replaces
+	 * all occurrances, not just the first (as was the behaviour before v2017) 
+	 */
+	String.prototype.replace=function(repl, to){
+		var str=this;
+		if(repl instanceof RegExp){
+			if(!repl.global){
+				var flags = "g";
+				if(repl.ignoreCase) flags += "i";
+				if(repl.multiline) flags += "m";
+
+				var asStr = repl.toString();
+				repl = new RegExp(asStr.substr(1, asStr.lastIndexOf("/") - 1), flags);
+			}
+			repl.lastIndex = 0;
+			var res;
+			var origStr = str;
+			var offset = 0;
+			var lastIndex = -1;
+			while((res = repl.exec(origStr)) != null){
+				if(res.index <= lastIndex) break;
+				lastIndex = res.index;
+
+				var hereTo = to;
+				if(to.indexOf("$") != -1){
+					for(var j=0; j<res.length; j++){
+						hereTo = hereTo.replace("$"+j, res[j]);
+					}
+				}
+				var newStr = str.substr(0, res.index + offset) + hereTo + str.substr(res.index + res[0].length + offset);
+				offset += newStr.length - str.length;
+				str = newStr;
+			}
+		}else{
+			var index = 0;
+			while((index = str.indexOf(repl, index)) != -1){
+				str = str.substr(0, index) + to + str.substr(index + repl.length);
+				index += repl.length;
+			}
+		}
+		return str;
+	};
+	/**
 	 * Returns an absolute URI from a relative URI 
 	 * from reference point uri.
 	 * @addon
