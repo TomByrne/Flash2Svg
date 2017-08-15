@@ -1603,6 +1603,12 @@
 			var settings=new ext.Object({});
 			settings.extend(options);
 			var result;
+			try{
+				element.matrix; // Trips an error if element is invalid
+			}catch(e){
+				fl.trace("Element is no longer available, skipping");
+				return;
+			}
 			if(element instanceof ext.Instance){
 				if(element.instanceType=='symbol'){
 					result=this._getSymbolInstance(element, settings);

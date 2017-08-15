@@ -1,5 +1,6 @@
 set /p password=<password.txt
 set /p version=<version.txt
+set timeserver=http://sha1timestamp.ws.symantec.com/sha1/timestamp
 
 del MXI /Q
 del MXI /Q /S
@@ -23,13 +24,13 @@ xcopy /s "..\html\ExtensionContent" HTML
 
 call repl.bat "{version}" "%version%" L < "html-manifest.xml" >"HTML\CSXS\manifest.xml"
 
-tools\ZXPSignCmd -sign HTML "MXI\HTML\org.tbyrne.SvgAnimationForFlash.zxp" cert.p12 %password% -tsa https://timestamp.geotrust.com/tsa
+tools\ZXPSignCmd -sign HTML "MXI\HTML\org.tbyrne.SvgAnimationForFlash.zxp" cert.p12 %password% -tsa %timeserver%
 
 echo f | xcopy "..\bundle\icon.png" "MXI\icon.png" /Y
 
-xcopy "metainfo" MXI
+xcopy "..\build\metainfo" MXI
 call repl.bat "{version}" "%version%" L < "bundle.mxi" >"MXI\org.tbyrne.SvgAnimationForFlash.mxi"
-java -jar tools\ucf.jar -package -storetype PKCS12 -keystore cert.p12 -storepass %password% -tsa https://timestamp.geotrust.com/tsa "../bin/Flash2Svg v%version%.zxp" -C MXI .
+java -jar tools\ucf.jar -package -storetype PKCS12 -keystore cert.p12 -storepass %password% -tsa %timeserver% "../bin/Flash2Svg v%version%.zxp" -C MXI .
 
 
 del MXI /Q
