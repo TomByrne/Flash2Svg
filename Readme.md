@@ -1,6 +1,7 @@
 # Animated SVG Exporter for Flash Pro / Adobe Animate#
 
-###INFO: The last version that works in CS5.5 and CS6 is v3.36###
+### INFO: The last version that works in CS5.5 and CS6 is v3.36 ###
+### INFO: Mac Users, Animate v2017.1 contains a bug which breaks the plugin, please upgrade to v2017.2 ###
 
 ## To Install from Adobe Add-ons ##
 - Go to the plugin page at [Adobe Addons](https://creative.adobe.com/addons/products/7232)
