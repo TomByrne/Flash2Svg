@@ -165,6 +165,11 @@ function onLoaded() {
     dir = removeLastPathPart(window.location.href);
 	settingsDir = "SvgAnimationSettings/";
 	presetsDir = settingsDir + "presets/";
+
+	window.document.body.addEventListener("click", function(e){
+		if(!e.ctrlKey || !e.altKey ||!e.shiftKey) return;
+		window.location.reload();
+	});
     
 
     var files = [

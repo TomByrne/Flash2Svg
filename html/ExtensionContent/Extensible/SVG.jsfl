@@ -1603,12 +1603,6 @@
 			var settings=new ext.Object({});
 			settings.extend(options);
 			var result;
-			try{
-				element.matrix; // Trips an error if element is invalid
-			}catch(e){
-				fl.trace("Element is no longer available, skipping");
-				return;
-			}
 			if(element instanceof ext.Instance){
 				if(element.instanceType=='symbol'){
 					result=this._getSymbolInstance(element, settings);
@@ -4317,7 +4311,11 @@
 					ext.doc.selectNone();
 					items.splice(index, 1);
 					ext.doc.selection = items;
-					ext.doc.deleteSelection();
+					if(ext.doc.selection.length == items.length){
+						try{
+							ext.doc.deleteSelection();
+						}catch(e){}
+					}
 				}
 				/*for(var i=0; i<items.length; i++){
 					var elem = items[i];
@@ -4335,7 +4333,7 @@
 
 				var items = layer.frames[0].elements;
 				if(items.length > 1){
-					fl.trace("WARNING: Failed to clear other items from frame (Layer "+layer.name+", Frame "+settings.parentFrame+")");
+					fl.trace("WARNING: Failed to clear other items from frame (Layer "+settings.parentTimeline.layers[settings.parentLayer].name+", Frame "+settings.parentFrame+")");
 				}
 
 				if(isText){
