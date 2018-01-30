@@ -4246,17 +4246,44 @@
 			}
 			matrix = fl.Math.concatMatrix(matrix, settings.matrix);
 
+			var errLocation = " (Timeline " + settings.parentTimeline.name + ", Layer "+settings.parentTimeline.layers[settings.parentLayer].name+", Frame "+settings.parentFrame+", EditPath " + settings.editItemPath.join(":") + ")";
+			fl.trace("getShape: "+errLocation);
 
+
+			var layer = settings.parentTimeline.layers[settings.parentLayer];
+			var frame = layer.frames[settings.parentFrame].$;
+			var item;
+			var items = frame.elements;
+			for(var i=0; i<settings.editItemPath.length; i++){
+				var ind = settings.editItemPath[i];
+				item = items[ind];
+				items = item.members;
+				if(item == null){
+					fl.trace("WARNING: Couldn't find item at edit path" + errLocation);
+				}
+			}
+
+
+			var goDeep = (
+				shape.isGroup && 
+				shape.members.length > 0 &&
+				!shape.isDrawingObject && 
+				!shape.isRectangleObject &&
+				!shape.isOvalObject
+			)
 
 			pathMatrix = descendantMatrix;
-			var contours=shape.$.contours;
-			var isText = shape.elementType == "text";
+			var contours = item.contours;
+			var isText = item.elementType == "text";
 
-			var svg=new XML('<g/>');
+			var svg=new XML('<g test="' + settings.parentTimeline.name + '"/>');
 			var matrixStr = this._getMatrix(matrix);
-			if(matrixStr!=this.IDENTITY_MATRIX)svg['@transform']=matrixStr;
+			if(matrixStr!=this.IDENTITY_MATRIX) svg['@transform']=matrixStr;
 
-			if(isText || (contours && contours.length)){
+			if(isText || (contours && contours.length && !item.isGroup)){
+				settings.parentTimeline.setSelectedLayers(settings.parentLayer);
+				settings.parentTimeline.setSelectedFrames(settings.parentFrame, settings.parentFrame+1);
+				settings.parentTimeline.copyFrames();
 
 				if(!this._shapeContainerName){
 					this._shapeContainerName = ext.lib.uniqueName(this._tempLibFolder+'/ShapeContainer');
@@ -4264,98 +4291,46 @@
 					this._shapeContainers[this._timelineIndex] = this._shapeContainerName;
 				}
 
-				this.editTimeline(settings.parentTimeline);
-				settings.parentTimeline.currentLayer = settings.parentLayer;
-				settings.parentTimeline.currentFrame = settings.parentFrame;
-				var layer = settings.parentTimeline.layers[settings.parentLayer];
-				var layerWasVis = layer.visible;
-				var layerWasLocked = layer.locked;
-				layer.visible = true;
-				layer.locked = false;
-
-				var frame = layer.frames[settings.parentFrame].$;
-				var item = frame.elements[settings.editItemPath[0]];
-				ext.doc.selectNone();
-				ext.doc.selection = [item];
-				for(var i=1; i<settings.editItemPath.length; i++){
-					ext.doc.enterEditMode("inPlace");
-					item = item.members[settings.editItemPath[i]];
-					ext.doc.selectNone();
-					ext.doc.selection = [item];
-				}
-				if(settings.editItemPath.length == 1){
-					ext.doc.selection = frame.elements;
-				}else{
-					ext.doc.selectAll();
-				}
-				ext.doc.clipCopy();
-
-				layer.visible = layerWasVis;
-				layer.locked = layerWasLocked;
-
 				ext.lib.editItem(this._shapeContainerName);
 				var newTimeline = ext.lib.items[ext.lib.findItemIndex(this._shapeContainerName)].timeline.$;
 
 				var layerInd = newTimeline.addNewLayer("s"+newTimeline.layers.length, "normal", false);
 				var layer = newTimeline.layers[layerInd];
 
-				ext.doc.clipPaste();
+				newTimeline.setSelectedLayers(layerInd);
+				newTimeline.pasteFrames(0, 1);
 
-				var index = settings.editItemPath[settings.editItemPath.length-1];
+				var frame = layer.frames[0];
 
-				var items = layer.frames[0].elements.concat([]);
-				var newItem = items[index];
-				ext.doc.moveSelectionBy( { x:item.x - newItem.x, y:item.y - newItem.y } );
-
-				if(items.length > 1){
-					ext.doc.selectNone();
-					items.splice(index, 1);
-					ext.doc.selection = items;
-					if(ext.doc.selection.length == items.length){
-						try{
-							ext.doc.deleteSelection();
-						}catch(e){}
+				var newItem;
+				var newItems = frame.elements;
+				for(var i=0; i<settings.editItemPath.length; i++){
+					var ind = settings.editItemPath[i];
+					newItem = newItems[ind];
+					if(newItem == null){
+						fl.trace("WARNING: Couldn't find item at edit path" + errLocation);
 					}
-				}
-				/*for(var i=0; i<items.length; i++){
-					var elem = items[i];
-					if(i == index)continue;
-					ext.doc.selectNone();
-					ext.doc.selection = [elem];
-					if(ext.doc.selection.length == 0){
-						fl.trace("elem: "+elem+" "+ext.doc.selection.length+" "+i+" "+index);
-						ext.doc.selection = [elem];
-						fl.trace("hm: "+settings.parentTimeline.libraryItem.name+" "+settings.parentLayer.name+" "+settings.parentTimeline.currentFrame);
-					}else{
+					if(frame.elements.length > 1){
+						newItems.splice(ind, 1);
+						ext.doc.selectNone();
+						ext.doc.selection = newItems;
 						ext.doc.deleteSelection();
 					}
-				}*/
-
-				var items = layer.frames[0].elements;
-				if(items.length > 1){
-					fl.trace("WARNING: Failed to clear other items from frame (Layer "+settings.parentTimeline.layers[settings.parentLayer].name+", Frame "+settings.parentFrame+")");
-				}
-
-				if(isText){
-					ext.doc.selection = [newItem];
-					ext.doc.breakApart(); // Break to Chars
-					if(ext.doc.selection.length > 1) ext.doc.breakApart(); // Break to Shapes
-				}
-
-				if(shape.isDrawingObject){
 					ext.doc.selectNone();
 					ext.doc.selection = [newItem];
-					ext.doc.breakApart();
-				}
+					if(i == settings.editItemPath.length - 1 && settings.parentTimeline.libraryItem == null){
+						ext.doc.moveSelectionBy( { x:item.x - newItem.x, y:item.y - newItem.y } ); // Moving items from scene level > timeline will shift them
+					}
+					if(i < settings.editItemPath.length - 1 || newItem.elementType != "shape" || newItem.isDrawingObject || shape.isRectangleObject || shape.isOvalObject){
+						ext.doc.breakApart();
+						newItems = frame.elements;
 
+					}
+				}
 				this._shapeRefs[layerInd - 1] = svg;
 			}
-			if(
-				shape.isGroup && 
-				!shape.isDrawingObject && 
-				!shape.isRectangleObject &&
-				!shape.isOvalObject
-			){
+
+			if(goDeep){
 				var g=shape.members;
 				for(i=0;i<g.length;i++){
 					var e=this._getElement(
@@ -4380,7 +4355,7 @@
 							editItemPath: settings.editItemPath.concat(i)
 						}
 					);
-					if(e)svg.appendChild(e);
+					if(e) svg.appendChild(e);
 				}
 			}
 			if(ext.log){
