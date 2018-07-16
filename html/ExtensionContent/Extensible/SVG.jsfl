@@ -82,7 +82,6 @@
 			revert:false
 		});
 
-
 		this.isFlashDoc = (ext.doc.type == "Flash" || ext.doc.type == null);
 		if(!this.isFlashDoc){
 			alert("Exporting from Non-AS3 documents is not supported.\n\nPlease do the following:\n- Select and copy all layers\n- Create new Actionscript 3 document\n- Paste all layers into new document\n- Save new document\n- Retry export\n\nCurrent doument type is "+ext.doc.type+".");
@@ -522,6 +521,7 @@
 
 
 			var timeline = this.timelines[timelineIndex];
+			timeline.usedIds = this._ids;
 			fl.trace("\ndoNextTimeline: "+timelineIndex+" "+timeline.filePath);
 
 			var xml=new XML('<svg xmlns:xlink="http://www.w3.org/1999/xlink"/>');
@@ -682,7 +682,7 @@
 			for(var i=0; i<defL; i++){
 				var def = defs[i];
 				var oldId = def.@id.toString();
-				var newId = this._uniqueID(oldId);
+				var newId = this._uniqueID(oldId, index);
 				def.@id = newId;
 				idMap[oldId] = newId;
 				dom.defs.appendChild(def);
@@ -694,6 +694,19 @@
 			for each(var link in links){
 				var id = link['@xlink-href'].substr(1);
 				link['@xlink-href'] = "#" + idMap[id];
+			}
+
+			var urlAttrs = ["fill", "filter"];
+			for(var i=0; i<urlAttrs.length; i++){
+				var attr = urlAttrs[i];
+
+				var links = svgXml.descendants().(function::attribute(attr).length() && @[attr].toString().indexOf("url(#") == 0);
+				var linksL = links.length();
+				for each(var link in links){
+					var id = link['@' + attr].toString();
+					id = id.substring(5, id.length-1);
+					link['@' + attr] = "url(#" + idMap[id] + ")";
+				}
 			}
 
 			var all = svgXml.children().(function::name() != "defs");
@@ -768,7 +781,7 @@
 					}
 				}
 
-				var symbol=defs.children().("#"+@id.toString()==id);
+				var symbol=defs.children().(function::attribute('id').length() && "#"+@id.toString()==id);
 				if(symbol && symbol.length() && (!nested || (symbol[0]..use && symbol[0]..use.length()))
 					&& (!onceUsed || useList.length==1)){
 
@@ -1010,6 +1023,7 @@
 			for(var k=0; k<this.timelines.length;k++){
 				var timeline = this.timelines[k];
 				var document = this.doms[k];
+				this._ids = timeline.usedIds;
 				if(!document)continue; // Export failed
 
 				if(this.applyTransformations){
@@ -1018,7 +1032,7 @@
 				if(this.applyColorEffects){
 					this._applyColorEffects(document, document, document.defs);
 				}
-				this._deleteUnusedFilters(document);
+				this._deleteUnusedDefs(document);
 				document['@xmlns']="http://www.w3.org/2000/svg";
 
 				if(document.defs.children().length()==0){
@@ -1467,20 +1481,31 @@
 		 * Deletes unreferenced defs.
 		 * @parameter {XML} xml
 		 */
-		_deleteUnusedFilters:function(xml){
+		_deleteUnusedDefs:function(xml){
 			if(!xml.defs || xml.defs.length()==0){
 				return xml;	
 			}
 			var filtered = xml.descendants().(function::attribute('filter').length() && @['filter']!=null);
+			var filled = xml.descendants().(function::attribute('fill').length() && @['fill']!=null);
 			var references = xml.defs.children();
 			for(var i=references.length()-1; i>=0; i--){
 				var def = references[i];
-				if(def.localName()!="filter")continue;
-
+				var name = def.localName();
 				var id = "url(#"+def.@id.toString()+")";
-				if(filtered.(@filter.toString()==id).length()==0){
+				var nodeList;
+				if(name == "filter")
+				{
+					nodeList = filtered.(@filter.toString()==id);
+
+				}else if(name == "linearGradient" || name == "radialGradient" || name == "pattern")
+				{
+					nodeList = filled.(@fill.toString()==id);
+
+				}
+				if(nodeList != null && nodeList.length()==0){
 					delete xml.defs.children()[i];
 				}
+
 			}
 		},
 		/**
@@ -4724,7 +4749,16 @@
 				String(this.precision(matrix.ty))+')'
 			].join(' '));
 		},
-		_uniqueID:function(id,xml){
+		_uniqueID:function(id, timelineIndex){
+
+			var usedIds;
+			if(timelineIndex != null){
+				var timeline = this.timelines[timelineIndex];
+				usedIds = timeline.usedIds;
+			}else{
+				usedIds = this._ids;
+			}
+
 			id = id.replace(' ',"_",'g');
 			var invalid=id.match(/[^A-Za-z\d\-\.\:]/g);
 			if(invalid && invalid.length){
@@ -4744,11 +4778,11 @@
 			if(parts && parts.length>2){
 				increment=Number(parts[2]);
 			}
-			if(this._ids[base]!==undefined){
-				this._ids[base]+=1;
-				return base+String(this._ids[base]);
+			if(usedIds[base]!==undefined){
+				usedIds[base]+=1;
+				return base+String(usedIds[base]);
 			}else{
-				this._ids[base]=increment;
+				usedIds[base]=increment;
 				return id;
 			}
 		},
