@@ -4,7 +4,8 @@
 		ExtensionBundleName="SvgAnimationForFlash" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 	<Author>
 		<![CDATA[tbyrne.org]]>
-	</Author>	<ExtensionList>
+	</Author>
+	<ExtensionList>
 		<Extension Id="org.tbyrne.SvgAnimationForFlash.ExportPanel" Version="1.0" />
 	</ExtensionList>
 	<ExecutionEnvironment>

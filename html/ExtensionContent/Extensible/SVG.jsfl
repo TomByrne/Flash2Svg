@@ -4301,9 +4301,9 @@
 			var contours = item.contours;
 			var isText = item.elementType == "text";
 
-			var svg=new XML('<g test="' + settings.parentTimeline.name + '"/>');
-			var matrixStr = this._getMatrix(matrix);
-			if(matrixStr!=this.IDENTITY_MATRIX) svg['@transform']=matrixStr;
+			var svg=new XML('<g/>');
+			//var matrixStr = this._getMatrix(matrix);
+			//if(matrixStr!=this.IDENTITY_MATRIX) svg['@transform']=matrixStr;
 
 			if(isText || (contours && contours.length && !item.isGroup)){
 				settings.parentTimeline.setSelectedLayers(settings.parentLayer);
