@@ -1,5 +1,9 @@
 # Animated SVG Exporter for Flash Pro / Adobe Animate#
 
+![Example animation](https://github.com/TomByrne/Flash2Svg/wiki/img/BirdFlapClosed.svg)
+
+[See more examples here](https://github.com/TomByrne/Flash2Svg/wiki/Examples)
+
 ### INFO: The last version that works in CS5.5 and CS6 is v3.36 ###
 ### INFO: Mac Users, Animate v2017.1 contains a bug which breaks the plugin, please upgrade to v2017.2 ###
 
@@ -105,3 +109,9 @@ This allows tween animations to play at whatever framerate the browser chooses (
 
 ### Animated View Box ###
 If you have a scene which you'd like to pan and zoom around during the animation, you can add a rectangular symbol and name it "viewBox" (with exactly that capitalisation) and animate it around your scene. When the animation is exported, this area will be considered the 'camera' and will animate the visible area of the scene during playback.
+
+## Wiki
+
+- [Examples](https://github.com/TomByrne/Flash2Svg/wiki/Examples)
+- [Expanding symbols](https://github.com/TomByrne/Flash2Svg/wiki/Expanding-Symbols)
+- [SVG & SMIL features used](https://github.com/TomByrne/Flash2Svg/wiki/SVG-&-SMIL-elements-&-attributes-used)
