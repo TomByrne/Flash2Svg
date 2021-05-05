@@ -10,7 +10,8 @@
 ## To Install from ZXP ##
 - Select latest release from [releases page](https://github.com/TomByrne/Flash2Svg/releases)
 - Install with one of the following tools:
-  - [ZXPInstaller](http://zxpinstaller.com/) (recommended)
+  - [Anastasiy’s Extension Manager](https://install.anastasiy.com/) (recommended)
+  - [ZXPInstaller](http://zxpinstaller.com/)
   - Extension Manager (installed with Adobe applications)
   - [ExManCmd](https://www.adobeexchange.com/resources/28)
 
