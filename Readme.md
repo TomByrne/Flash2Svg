@@ -31,7 +31,7 @@
 
 ### Installation issues ###
 If you've installed the plugin but it isn't showing up, it could be a number of issues related to the Adobe plugin installation system.
-[Check here for manual installation process.](https://blog.tbyrne.org/?p=1524)
+[Check here for manual installation process.](docs/manual-install.md)
 
 ## To build the extension on Windows ##
 - Download the [CS6 Signing Toolkit](http://www.adobe.com/devnet/creativesuite/sdk/eula_cs6-signing-toolkit.html)
