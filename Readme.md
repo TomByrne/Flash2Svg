@@ -15,13 +15,14 @@
   - Extension Manager (installed with Adobe applications)
   - [ExManCmd](https://www.adobeexchange.com/resources/28)
 
-## To Use in Flash CC / Adobe Animate ##
+## To Use in Adobe Animate / Flash Pro CC ##
+![Where to find in menus](docs/img/menu-cc-win.png)
 - Open panel through menus, Window > Extensions > SVG Animation
 - Open the FLA you wish to use and navigate to the timeline you wish to export
 - Select suitable options
 - Click export button
 
-## To Use in Flash CS5 / CS5.5 / CS6 ##
+## To Use in Flash Pro CS5 / CS5.5 / CS6 ##
 - Open panel through menus, Window > Other Panels > SVG
 - Open the FLA you wish to use and navigate to the timeline you wish to export
 - Select suitable options
