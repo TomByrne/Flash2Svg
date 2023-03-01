@@ -4344,7 +4344,8 @@
 					ext.doc.selectNone();
 					ext.doc.selection = [newItem];
 					if(i == settings.editItemPath.length - 1 && settings.parentTimeline.libraryItem == null){
-						ext.doc.moveSelectionBy( { x:item.x - newItem.x, y:item.y - newItem.y } ); // Moving items from scene level > timeline will shift them
+						newItem.x = item.x;
+						newItem.y = item.y;
 					}
 					if(i < settings.editItemPath.length - 1 || newItem.elementType != "shape" || newItem.isDrawingObject || shape.isRectangleObject || shape.isOvalObject){
 						ext.doc.breakApart();
