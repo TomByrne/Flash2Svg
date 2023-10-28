@@ -1,6 +1,6 @@
 set /p password=<password.txt
 set /p version=<version.txt
-set timeserver=http://sha1timestamp.ws.symantec.com/sha1/timestamp
+set timeserver=http://timestamp.digicert.com/
 
 del MXI /Q
 del MXI /Q /S

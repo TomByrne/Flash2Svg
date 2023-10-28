@@ -43,6 +43,7 @@ If you've installed the plugin but it isn't showing up, it could be a number of 
 - Put the contents of both archives into the `build/tools` folder
 - Create a p12 certificate and save it to `build/cert.p12`
 - Open the `password.txt` file and save the certificate's password in the file (this will be ignored by GIT).
+- Create `bin` folder in the root directory to receive the output
 - Run the `build/build.bat` file
 
 To build on other operating systems, the build.bat file will have to be converted, if you do this send me a pull request and I'll add your script into the main repo.
